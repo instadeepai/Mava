@@ -31,7 +31,7 @@ from optax._src.base import OptState
 from rich.pretty import pprint
 from typing_extensions import NamedTuple
 
-from mava.networks.base import FeedForwardActor as Actor
+from mava.networks import FeedForwardActor as Actor
 from mava.networks.sable_network import SableNetwork
 from mava.systems.sable.types import (
     ActorApply,

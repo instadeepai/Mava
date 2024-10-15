@@ -35,7 +35,7 @@ from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
 from mava.evaluator import ActorState, get_eval_fn, get_num_eval_envs
-from mava.networks.base import RecQNetwork, ScannedRNN
+from mava.networks import RecQNetwork, ScannedRNN
 from mava.systems.q_learning.types import (
     ActionSelectionState,
     ActionState,
