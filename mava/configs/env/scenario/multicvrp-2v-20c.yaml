@@ -1,0 +1,9 @@
+name: MultiCVRP-v0
+task_name: multicvrp-2v-20c
+
+task_config:
+  num_customers : 20
+  num_vehicles : 2
+
+env_kwargs:
+  {}  # there are no scenario specific env_kwargs for this env
