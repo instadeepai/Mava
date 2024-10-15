@@ -13,15 +13,14 @@
 # limitations under the License.
 
 
-from functools import partial
 import queue
 import threading
 import time
+from functools import partial
 from typing import Any, Dict, List, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 from colorama import Fore, Style
 from jax import tree
 from jumanji.types import TimeStep
@@ -159,6 +158,7 @@ class Pipeline(threading.Thread):
 
     def shard_payload(self, payload: Any):
         return jax.device_put_sharded(payload, devices=self.learner_devices)
+
 
 class ParamsSource(threading.Thread):
     """A `ParamSource` is a component that allows networks params to be passed from a

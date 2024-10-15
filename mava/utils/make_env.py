@@ -46,7 +46,6 @@ from mava.wrappers import (
     ConnectorWrapper,
     GigastepWrapper,
     GymAgentIDWrapper,
-    GymLBFWrapper,
     GymRecordEpisodeMetrics,
     GymToJumanji,
     GymWrapper,
@@ -78,7 +77,7 @@ _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 _gym_registry = {
     "RobotWarehouse": (gym_Warehouse, GymWrapper),
-    "LevelBasedForaging": (gym_ForagingEnv, GymLBFWrapper),
+    "LevelBasedForaging": (gym_ForagingEnv, GymWrapper),
 }
 
 

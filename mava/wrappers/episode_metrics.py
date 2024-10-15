@@ -17,10 +17,10 @@ from typing import TYPE_CHECKING, Dict, Tuple
 import chex
 import jax
 import jax.numpy as jnp
+import numpy as np
 from jax import tree
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
-import numpy as np
 
 from mava.types import MarlEnv, State
 

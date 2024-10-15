@@ -146,7 +146,7 @@ def rollout(
             try:
                 rollout_queue.put(traj, timestep, actor_timings)
             except queue.Full:
-                err = "Waited too long to add to the rollout queue, killing the actor thread" 
+                err = "Waited too long to add to the rollout queue, killing the actor thread"
                 warnings.warn(err, stacklevel=2)
                 break
 
@@ -162,7 +162,6 @@ def get_learner_step_fn(
 
     num_agents, num_envs = config.system.num_agents, config.arch.num_envs
     num_learner_envs = int(num_envs // len(config.arch.learner_device_ids))
-    
 
     # Get apply and update functions for actor and critic networks.
     actor_apply_fn, critic_apply_fn = apply_fns
@@ -205,7 +204,9 @@ def get_learner_step_fn(
             return advantages, advantages + traj_batch.value
 
         # Calculate advantage
-        last_dones = jnp.repeat(learner_state.timestep.last(), num_agents).reshape(num_learner_envs, -1)
+        last_dones = jnp.repeat(learner_state.timestep.last(), num_agents).reshape(
+            num_learner_envs, -1
+        )
         params, opt_states, key, _, _ = learner_state
         last_val = critic_apply_fn(params.critic_params, learner_state.timestep.observation)
         advantages, targets = _calculate_gae(traj_batch, last_val, last_dones)
@@ -582,7 +583,9 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Unfortunately we have to do this here, because creating envs inside the actor threads causes deadlocks
     envs = [[] for i in range(len(actor_devices))]
-    print(f"{Fore.BLUE}{Style.BRIGHT}Starting up environments, this may take a while...{Style.RESET_ALL}")
+    print(
+        f"{Fore.BLUE}{Style.BRIGHT}Starting up environments, this may take a while...{Style.RESET_ALL}"
+    )
     for i in range(len(actor_devices)):
         for _ in range(config.arch.n_threads_per_executor):
             env = environments.make_gym_env(config, config.arch.num_envs)
@@ -671,7 +674,6 @@ def run_experiment(_config: DictConfig) -> float:
 
     evaluator_envs.close()
     eval_performance = float(np.mean(eval_metrics[config.env.eval_metric]))
-
 
     # Measure absolute metric.
     if config.arch.absolute_metric:

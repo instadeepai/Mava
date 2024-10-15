@@ -15,11 +15,11 @@
 import sys
 import traceback
 import warnings
+from dataclasses import field
 from multiprocessing import Queue
 from multiprocessing.connection import Connection
-from typing import Any, Callable, Dict, Optional, Tuple, Union, NamedTuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Union
 
-from dataclasses import field
 import gymnasium
 import gymnasium.vector.async_vector_env
 import numpy as np
@@ -56,7 +56,6 @@ class TimeStep:
     observation: Observation
     extras: Dict = field(default_factory=dict)
 
-
     def first(self) -> bool:
         return self.step_type == StepType.FIRST
 
@@ -69,8 +68,7 @@ class TimeStep:
 
 class GymWrapper(gymnasium.Wrapper):
     """Base wrapper for multi-agent gym environments.
-    This wrapper works out of the box for RobotWarehouse.
-    See `GymLBFWrapper` for how it can be modified to work for other environments.
+    This wrapper works out of the box for RobotWarehouse and level based foraging.
     """
 
     def __init__(
@@ -129,18 +127,6 @@ class GymWrapper(gymnasium.Wrapper):
     def get_global_obs(self, obs: NDArray) -> NDArray:
         global_obs = np.concatenate(obs, axis=0)
         return np.tile(global_obs, (self.num_agents, 1))
-
-
-class GymLBFWrapper(GymWrapper):
-    """Wrapper for the gym level based foraging environment."""
-
-    def step(self, actions: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
-        agents_view, reward, terminated, truncated, info = super().step(actions)
-
-        truncated = np.repeat(truncated, self.num_agents)
-        terminated = np.repeat(terminated, self.num_agents)
-
-        return agents_view, reward, terminated, truncated, info
 
 
 class GymRecordEpisodeMetrics(gymnasium.Wrapper):
@@ -247,7 +233,7 @@ class GymToJumanji:
 
         ep_done = np.zeros(num_envs, dtype=float)
         rewards = np.zeros((num_envs, num_agents), dtype=float)
-        teminated = np.zeros((num_envs, num_agents), dtype=float)
+        teminated = np.zeros(num_envs, dtype=float)
 
         timestep = self._create_timestep(obs, ep_done, teminated, rewards, info)
 
@@ -256,7 +242,7 @@ class GymToJumanji:
     def step(self, action: list) -> TimeStep:
         obs, rewards, terminated, truncated, info = self.env.step(action)
 
-        ep_done = np.logical_or(terminated, truncated).all(axis=1)
+        ep_done = np.logical_or(terminated, truncated)
 
         timestep = self._create_timestep(obs, ep_done, terminated, rewards, info)
 
@@ -286,7 +272,6 @@ class GymToJumanji:
         # Filter out the masks and auxiliary data
         extras = {key: value for key, value in info["metrics"].items() if key[0] != "_"}
         step_type = np.where(ep_done, StepType.LAST, StepType.MID)
-        terminated = np.all(terminated, axis=1)
 
         return TimeStep(
             step_type=step_type,

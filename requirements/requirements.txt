@@ -11,7 +11,7 @@ jax==0.4.30
 jaxlib==0.4.30
 jaxmarl
 jumanji @ git+https://github.com/sash-a/jumanji@old_jumanji  # Includes a few extra MARL envs
-lbforaging @ git+https://github.com/LukasSchaefer/lb-foraging.git@gymnasium_integration # fixes: https://github.com/semitable/lb-foraging/issues/20
+lbforaging
 matrax @ git+https://github.com/instadeepai/matrax
 mujoco==3.1.3
 mujoco-mjx==3.1.3
@@ -20,7 +20,7 @@ numpy==1.26.4
 omegaconf
 optax
 protobuf~=3.20
-rware @ git+https://github.com/RuanJohn/robotic-warehouse.git # compatibility with latest gymnasium
+rware
 scipy==1.12.0
 tensorboard_logger
 tensorflow_probability
