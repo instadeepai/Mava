@@ -30,6 +30,13 @@ HiddenState: TypeAlias = chex.Array
 State: TypeAlias = Any
 Metrics: TypeAlias = Dict[str, chex.Array]
 
+class ValueNormParams(NamedTuple):
+    beta: float = 0.99999
+    epsilon: float = 1e-5
+    running_mean: float = 0.0
+    running_mean_sq: float = 0.0
+    debiasing_term: float = 0.0
+
 
 class MarlEnv(Protocol):
     """The API used by mava for environments.
