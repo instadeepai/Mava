@@ -44,8 +44,6 @@ from mava.wrappers.episode_metrics import get_final_step_metrics
 
 # NOTE (Ruan): It is training. Tomorrow:
 # 1. Remove value norm.
-# 2. Remove huber loss.
-# 3. Add new Mava style evaluator.
 
 
 class LearnerState(NamedTuple):
@@ -57,14 +55,6 @@ class LearnerState(NamedTuple):
     env_state: State
     timestep: TimeStep
     value_norm_params: ValueNormParams
-
-
-def huber_loss(
-    value: chex.Array, target: chex.Array, delta: float = 10.0
-) -> chex.Array:
-    """Huber loss."""
-    error = jnp.abs(target - value)
-    return jnp.where(error <= delta, 0.5 * error**2, delta * (error - 0.5 * delta))
 
 
 def get_learner_fn(
@@ -295,27 +285,14 @@ def get_learner_fn(
                         config.system.normalise_value_targets,
                     )
 
-                    if config.system.use_huber_loss:
-                        # HUBER LOSS
-                        value_losses = huber_loss(
-                            value, value_targets, config.system.huber_delta
-                        )
-                        value_losses_clipped = huber_loss(
-                            value_pred_clipped, value_targets, config.system.huber_delta
-                        )
-                        value_loss = jnp.maximum(
-                            value_losses, value_losses_clipped
-                        ).mean()
-
-                    else:
-                        # MSE LOSS
-                        value_losses = jnp.square(value - value_targets)
-                        value_losses_clipped = jnp.square(
-                            value_pred_clipped - value_targets
-                        )
-                        value_loss = (
-                            0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
-                        )
+                    # MSE LOSS
+                    value_losses = jnp.square(value - value_targets)
+                    value_losses_clipped = jnp.square(
+                        value_pred_clipped - value_targets
+                    )
+                    value_loss = (
+                        0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
+                    )
 
                     total_loss = (
                         loss_actor

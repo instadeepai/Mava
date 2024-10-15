@@ -22,6 +22,4 @@ vf_coef: 0.5 # Critic weight in
 max_grad_norm: 10 # Maximum norm of the gradients for a weight update.
 decay_learning_rates: False # Whether learning rates should be linearly decayed during training.
 
-use_huber_loss: False
-huber_delta: 10
 normalise_value_targets: False
