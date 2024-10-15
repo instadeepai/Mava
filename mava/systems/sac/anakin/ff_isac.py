@@ -32,8 +32,8 @@ from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
 from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
-from mava.networks.ff_rnn_network import FeedForwardActor as Actor
-from mava.networks.ff_rnn_network import FeedForwardQNet as QNetwork
+from mava.networks.base import FeedForwardActor as Actor
+from mava.networks.base import FeedForwardQNet as QNetwork
 from mava.systems.sac.types import (
     BufferState,
     LearnerState,
@@ -602,11 +602,16 @@ def run_experiment(cfg: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../../configs", config_name="default_ff_isac.yaml", version_base="1.2")
+@hydra.main(
+    config_path="../../../configs/default",
+    config_name="ff_isac.yaml",
+    version_base="1.2",
+)
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
+    cfg.logger.system_name = "ff_isac"
 
     # Run experiment.
     final_return = run_experiment(cfg)

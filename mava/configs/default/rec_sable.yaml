@@ -1,7 +1,11 @@
 defaults:
-  - logger: sable
+  - logger: logger
   - arch: anakin
-  - system: sable/ff_sable
+  - system: sable/rec_sable
   - network: retention
   - env: rware  # [cleaner, connector, gigastep, lbf, mabrax, matrax, rware, smax]
   - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs

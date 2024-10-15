@@ -30,9 +30,9 @@ from optax._src.base import OptState
 from rich.pretty import pprint
 
 from mava.evaluator import get_eval_fn, get_num_eval_envs, make_rec_eval_act_fn
-from mava.networks.ff_rnn_network import RecurrentActor as Actor
-from mava.networks.ff_rnn_network import RecurrentValueNet as Critic
-from mava.networks.ff_rnn_network import ScannedRNN
+from mava.networks.base import RecurrentActor as Actor
+from mava.networks.base import RecurrentValueNet as Critic
+from mava.networks.base import ScannedRNN
 from mava.systems.ppo.types import (
     HiddenStates,
     OptStates,
@@ -715,11 +715,16 @@ def run_experiment(_config: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../../configs", config_name="default_rec_mappo.yaml", version_base="1.2")
+@hydra.main(
+    config_path="../../../configs/default",
+    config_name="rec_mappo.yaml",
+    version_base="1.2",
+)
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
+    cfg.logger.system_name = "rec_mappo"
 
     # Run experiment.
     eval_performance = run_experiment(cfg)

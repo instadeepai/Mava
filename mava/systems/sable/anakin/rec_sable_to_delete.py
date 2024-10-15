@@ -31,7 +31,7 @@ from optax._src.base import OptState
 from rich.pretty import pprint
 from typing_extensions import NamedTuple
 
-from mava.networks.ff_rnn_network import FeedForwardActor as Actor
+from mava.networks.base import FeedForwardActor as Actor
 from mava.networks.sable_network import SableNetwork
 from mava.systems.sable.types import (
     ActorApply,
@@ -776,16 +776,16 @@ def run_experiment(_config: DictConfig) -> float:
 
     return 0  # eval_performance
 
-
 @hydra.main(
-    config_path="../../configs",
-    config_name="default_rec_sable.yaml",
+    config_path="../../../configs/default",
+    config_name="rec_sable.yaml",
     version_base="1.2",
 )
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
+    cfg.logger.system_name = "rec_sable"
 
     # Run experiment.
 
