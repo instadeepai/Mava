@@ -13,3 +13,12 @@
 # limitations under the License.
 # ruff: noqa: F401
 
+from mava.networks.base import (
+    FeedForwardActor,
+    FeedForwardQNet,
+    FeedForwardValueNet,
+    RecQNetwork,
+    RecurrentActor,
+    RecurrentValueNet,
+    ScannedRNN,
+)
