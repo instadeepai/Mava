@@ -9,17 +9,17 @@ seed: 42
 add_agent_id: True
 
 # --- RL hyperparameters ---
-actor_lr: 0.001 # Learning rate for actor network
+actor_lr: 0.0005 # Learning rate for actor network
 update_batch_size: 2 # Number of vectorised gradient updates per device.
 rollout_length: 128 # Number of environment steps per vectorised environment.
-ppo_epochs: 2 # Number of ppo epochs per training data batch.
-num_minibatches: 2 # Number of minibatches per ppo epoch.
+ppo_epochs: 5 # Number of ppo epochs per training data batch.
+num_minibatches: 1 # Number of minibatches per ppo epoch.
 gamma: 0.99 # Discounting factor.
 gae_lambda: 0.95 # Lambda value for GAE computation.
 clip_eps: 0.1 # Clipping value for PPO updates and value function.
 ent_coef: 0.01 # Entropy regularisation term for loss function.
 vf_coef: 0.5 # Critic weight in
-max_grad_norm: 10 # Maximum norm of the gradients for a weight update.
+max_grad_norm: 5 # Maximum norm of the gradients for a weight update.
 decay_learning_rates: False # Whether learning rates should be linearly decayed during training.
 
 normalise_value_targets: False

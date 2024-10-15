@@ -1,7 +1,7 @@
 # --- Network params ---
 actor_network:
   n_block: 3
-  n_embd: 64
+  n_embd: 128
   n_head: 1
 
 use_rmsnorm: False

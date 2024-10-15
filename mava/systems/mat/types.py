@@ -25,7 +25,7 @@ class LearnerState(NamedTuple):
     """State of the learner."""
 
     params: Params
-    opt_states: OptStates
+    opt_state: OptState
     key: chex.PRNGKey
     env_state: State
     timestep: TimeStep
