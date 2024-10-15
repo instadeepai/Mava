@@ -1,17 +1,17 @@
 # ---MLP Networks---
 actor_network:
   pre_torso:
-    _target_: mava.networks.MLPTorso
+    _target_: mava.networks.torsos.MLPTorso
     layer_sizes: [128, 128]
     use_layer_norm: False
     activation: relu
 
 action_head:
-  _target_: mava.networks.ContinuousActionHead
+  _target_: mava.networks.heads.ContinuousActionHead
 
 critic_network:
   pre_torso:
-    _target_: mava.networks.MLPTorso
+    _target_: mava.networks.torsos.MLPTorso
     layer_sizes: [128, 128]
     use_layer_norm: False
     activation: relu
