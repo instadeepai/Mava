@@ -361,7 +361,6 @@ def get_learner_fn(
                 - key (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
-                - hstates (HiddenStates): The initial hidden states of the network.
 
         """
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
