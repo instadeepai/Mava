@@ -4,7 +4,7 @@ defaults:
   - arch: anakin
   - system: q_learning/rec_iql
   - network: rnn  # [rnn, rcnn]
-  - env: smax  # [cleaner, connector, gigastep, lbf, matrax, rware, smax]
+  - env: smax  # [cleaner, connector, gigastep, lbf, matrax, rware, smax, mpe]
 
 hydra:
   searchpath:
