@@ -81,6 +81,8 @@ def rollout(
     num_agents, num_envs = config.system.num_agents, config.arch.num_envs
     move_to_device = lambda x: jax.device_put(x, device=actor_device)
 
+    key = move_to_device(key)
+
     @jax.jit
     def act_fn(
         params: Params,
@@ -96,7 +98,7 @@ def rollout(
         return action, log_prob, value
 
     timestep = env.reset(seed=seeds)
-    next_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
+    dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
     # Loop till the desired num_updates is reached.
     while not thread_lifetime.should_stop():
@@ -105,38 +107,33 @@ def rollout(
         actor_timings: Dict[str, List[float]] = defaultdict(list)
         with RecordTimeTo(actor_timings["rollout_time"]):
             for _ in range(config.system.rollout_length):
-                # if thread_lifetime.should_stop():
-                #     env.close()
-                #     return
-
                 with RecordTimeTo(actor_timings["get_params_time"]):
                     # Get the latest parameters from the learner
                     params = params_source.get()
 
-                cached_next_obs = tree.map(move_to_device, timestep.observation)
-                cached_next_dones = move_to_device(next_dones)
+                obs_tpu = tree.map(move_to_device, timestep.observation)
 
                 # Get action and value
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
-                    action, log_prob, value = act_fn(params, cached_next_obs, act_key)
+                    action, log_prob, value = act_fn(params, obs_tpu, act_key)
                     cpu_action = jax.device_get(action)
 
                 # Step environment
                 with RecordTimeTo(actor_timings["env_step_time"]):
                     timestep = env.step(cpu_action.swapaxes(0, 1))
 
-                next_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
+                dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
                 # Append data to storage
                 traj.append(
                     PPOTransition(
-                        cached_next_dones,
+                        dones,
                         action,
                         value,
                         timestep.reward,
                         log_prob,
-                        cached_next_obs,
+                        obs_tpu,
                         timestep.extras,
                     )
                 )
@@ -182,21 +179,24 @@ def get_learner_step_fn(
         """
 
         def _calculate_gae(
-            traj_batch: PPOTransition, last_val: chex.Array, last_done: chex.Array
+            traj_batch: PPOTransition, last_val: chex.Array
         ) -> Tuple[chex.Array, chex.Array]:
-            def _get_advantages(
-                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: PPOTransition
-            ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
-                gae, next_value, next_done = carry
+            """Calculate the GAE."""
+
+            gamma, gae_lambda = config.system.gamma, config.system.gae_lambda
+
+            def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
+                """Calculate the GAE for a single transition."""
+                gae, next_value = gae_and_next_value
                 done, value, reward = transition.done, transition.value, transition.reward
-                gamma = config.system.gamma
-                delta = reward + gamma * next_value * (1 - next_done) - value
-                gae = delta + gamma * config.system.gae_lambda * (1 - next_done) * gae
-                return (gae, value, done), gae
+
+                delta = reward + gamma * next_value * (1 - done) - value
+                gae = delta + gamma * gae_lambda * (1 - done) * gae
+                return (gae, value), gae
 
             _, advantages = jax.lax.scan(
                 _get_advantages,
-                (jnp.zeros_like(last_val), last_val, last_done),
+                (jnp.zeros_like(last_val), last_val),
                 traj_batch,
                 reverse=True,
                 unroll=16,
@@ -204,12 +204,9 @@ def get_learner_step_fn(
             return advantages, advantages + traj_batch.value
 
         # Calculate advantage
-        last_dones = jnp.repeat(learner_state.timestep.last(), num_agents).reshape(
-            num_learner_envs, -1
-        )
-        params, opt_states, key, _, _ = learner_state
-        last_val = critic_apply_fn(params.critic_params, learner_state.timestep.observation)
-        advantages, targets = _calculate_gae(traj_batch, last_val, last_dones)
+        params, opt_states, key, _, final_timestep = learner_state
+        last_val = critic_apply_fn(params.critic_params, final_timestep.observation)
+        advantages, targets = _calculate_gae(traj_batch, last_val)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
