@@ -34,9 +34,9 @@ ppo_systems = [
 q_learning_systems = ["q_learning.anakin.rec_iql"]
 sac_systems = ["sac.anakin.ff_isac", "sac.anakin.ff_masac"]
 
-discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax"]
+discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax", "mpe"]
 cnn_envs = ["cleaner", "connector"]
-continuous_envs = ["mabrax"]
+continuous_envs = ["mabrax", "mpe"]  # todo: test mpe only in cont or disc envs?
 
 
 def _run_system(system_name: str, cfg: DictConfig) -> float:
@@ -94,9 +94,12 @@ def test_sac_system(fast_config: dict, system_path: str) -> None:
     """Test all SAC systems on random envs."""
     _, _, system_name = system_path.split(".")
     env = random.choice(continuous_envs)
+    overrides = [f"env={env}"]
+    if env == "mpe":
+        overrides.append("env.kwargs.action_type=Continuous")
 
     with initialize(version_base=None, config_path=config_path):
-        cfg = compose(config_name=f"{system_name}", overrides=[f"env={env}"])
+        cfg = compose(config_name=f"{system_name}", overrides=overrides)
         cfg = _get_fast_config(cfg, fast_config)
 
     _run_system(system_path, cfg)
@@ -131,15 +134,17 @@ def test_discrete_cnn_env(fast_config: dict, env_name: str) -> None:
     _run_system(system_path, cfg)
 
 
-# leaving this here for the future if we have some new continuous envs
-@pytest.mark.skip(reason="MaBrax is the only continuous env and already tested in test_mava_system")
 @pytest.mark.parametrize("env_name", continuous_envs)
 def test_continuous_env(fast_config: dict, env_name: str) -> None:
     """Test all continuous envs on random systems."""
     system_path = random.choice(ppo_systems + sac_systems)
     _, _, system_name = system_path.split(".")
+    action_head = "mava.networks.heads.ContinuousActionHead "
+    overrides = [f"env={env_name}", f"network.action_head._target_={action_head}"]
 
-    overrides = [f"env={env_name}", "network=continuous_mlp"]
+    if "mpe" in env_name:
+        overrides.append("env.kwargs.action_type=Continuous")
+
     with initialize(version_base=None, config_path=config_path):
         cfg = compose(config_name=f"{system_name}", overrides=overrides)
         cfg = _get_fast_config(cfg, fast_config)

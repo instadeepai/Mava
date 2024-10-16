@@ -137,7 +137,7 @@ def make_jaxmarl_env(
     if "smax" in env_name.lower():
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
     elif "mpe" in env_name.lower():
-        kwargs = config.env.scenario.task_config
+        kwargs.update(config.env.scenario.task_config)
 
     # Create jaxmarl envs.
     train_env = _jaxmarl_registry[config.env.env_name](

@@ -4,7 +4,7 @@ defaults:
   - arch: anakin
   - system: sac/ff_masac
   - network: continuous_mlp  # [continuous_mlp]
-  - env: mabrax  # [mabrax]
+  - env: mabrax  # [mabrax, mpe]
 
 hydra:
   searchpath:
