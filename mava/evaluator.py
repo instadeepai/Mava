@@ -26,6 +26,7 @@ from jumanji.types import TimeStep
 from omegaconf import DictConfig
 from typing_extensions import TypeAlias
 
+from mava.systems.sable.types import ExecutionApply
 from mava.types import (
     Action,
     ActorApply,
@@ -205,5 +206,32 @@ def make_rec_eval_act_fn(actor_apply_fn: RecActorApply, config: DictConfig) -> E
         hidden_state, pi = actor_apply_fn(params, hidden_state, ac_in)
         action = pi.mode() if config.arch.evaluation_greedy else pi.sample(seed=key)
         return action.squeeze(0), {_hidden_state: hidden_state}
+
+    return eval_act_fn
+
+
+def make_sable_act_fn(actor_apply_fn: ExecutionApply) -> EvalActFn:
+    """Makes an act function that conforms to the evaluator API given Sable network."""
+
+    _hidden_state = "hidden_state"
+
+    def eval_act_fn(
+        params: FrozenDict, timestep: TimeStep, key: PRNGKey, actor_state: ActorState
+    ) -> Tuple[Action, Dict]:
+        hidden_state = actor_state[_hidden_state]
+
+        output_action, _, _, hidden_state = actor_apply_fn(  # type: ignore
+            params,
+            timestep.observation.agents_view,
+            timestep.observation.action_mask,
+            hidden_state,
+            key,
+        )
+
+        # Sequenze the output actions
+        actions = jnp.squeeze(output_action, axis=(-1))
+
+        # TODO: deal with continuous action squeezing
+        return actions, {_hidden_state: hidden_state}
 
     return eval_act_fn

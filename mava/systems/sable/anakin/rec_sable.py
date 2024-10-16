@@ -15,7 +15,7 @@
 import copy
 import time
 from functools import partial
-from typing import Any, Dict, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import chex
 import flax
@@ -30,6 +30,7 @@ from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
+from mava.evaluator import get_eval_fn, get_num_eval_envs, make_sable_act_fn
 from mava.networks import SableNetwork
 from mava.systems.sable.types import (
     ExecutionApply,
@@ -41,7 +42,7 @@ from mava.systems.sable.types import (
 from mava.types import ExperimentOutput, LearnerFn, MarlEnv
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax_utils import unreplicate_batch_dim
+from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.sable_utils import concat_time_and_agents, get_init_hidden_state
 from mava.utils.total_timestep_checker import check_total_timesteps
@@ -411,7 +412,7 @@ def get_learner_fn(
 
 def learner_setup(
     env: MarlEnv, keys: chex.Array, config: DictConfig
-) -> Tuple[LearnerFn[LearnerState], SableNetwork, LearnerState]:
+) -> Tuple[LearnerFn[LearnerState], Callable, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
@@ -529,7 +530,7 @@ def learner_setup(
         hidden_state=init_hstates,
     )
 
-    return learn, sable_network, init_learner_state
+    return learn, apply_fns[0], init_learner_state
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -545,13 +546,13 @@ def run_experiment(_config: DictConfig) -> float:
     key, key_e, net_key = jax.random.split(jax.random.PRNGKey(config.system.seed), num=3)
 
     # Setup learner.
-    learn, sable_network, learner_state = learner_setup(env, (key, net_key), config)
+    learn, sable_execution_fn, learner_state = learner_setup(env, (key, net_key), config)
 
     # Setup evaluator.
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
-    """eval_act_fn = make_ff_eval_act_fn(sable_network.apply, config)
-    evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)"""
+    eval_act_fn = make_sable_act_fn(sable_execution_fn)
+    evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
@@ -584,6 +585,11 @@ def run_experiment(_config: DictConfig) -> float:
             **config.logger.checkpointing.save_args,  # Checkpoint args
         )
 
+    # Create an initial hidden state used for resetting memory for evaluation
+    eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
+    eval_hs = get_init_hidden_state(config.network, eval_batch_size)
+    eval_hs = tree.map(lambda x: x[jnp.newaxis], eval_hs)
+
     # Run experiment for a total number of evaluations.
     max_episode_return = -jnp.inf
     best_params = None
@@ -612,7 +618,7 @@ def run_experiment(_config: DictConfig) -> float:
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
         # Evaluate.
-        """eval_metrics = evaluator(trained_params, eval_keys, {})
+        eval_metrics = evaluator(trained_params, eval_keys, {"hidden_state": eval_hs})
         logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
         episode_return = jnp.mean(eval_metrics["episode_return"])
 
@@ -626,28 +632,31 @@ def run_experiment(_config: DictConfig) -> float:
 
         if config.arch.absolute_metric and max_episode_return <= episode_return:
             best_params = copy.deepcopy(trained_params)
-            max_episode_return = episode_return"""
+            max_episode_return = episode_return
 
         # Update runner state to continue training.
         learner_state = learner_output.learner_state
 
     # Record the performance for the final evaluation run.
-    """eval_performance = float(jnp.mean(eval_metrics[config.env.eval_metric]))"""
+    eval_performance = float(jnp.mean(eval_metrics[config.env.eval_metric]))
 
     # Measure absolute metric.
-    """if config.arch.absolute_metric:
+    if config.arch.absolute_metric:
+        eval_batch_size = get_num_eval_envs(config, absolute_metric=True)
+        abs_hs = get_init_hidden_state(config.network, eval_batch_size)
+        abs_hs = tree.map(lambda x: x[jnp.newaxis], abs_hs)
         abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=True)
         eval_keys = jax.random.split(key, n_devices)
 
-        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {})
+        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {"hidden_state": abs_hs})
 
         t = int(steps_per_rollout * (eval_step + 1))
-        logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)"""
+        logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop the logger.
     logger.stop()
 
-    return 0  # eval_performance
+    return eval_performance
 
 
 @hydra.main(
