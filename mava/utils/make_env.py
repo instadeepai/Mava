@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
+from typing import Dict, Tuple, Type
 
 import jaxmarl
 import jumanji
@@ -40,6 +40,7 @@ from mava.wrappers import (
     CleanerWrapper,
     ConnectorWrapper,
     GigastepWrapper,
+    JaxMarlWrapper,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
@@ -62,7 +63,11 @@ _jumanji_registry = {
 
 # Registry mapping environment names directly to the corresponding wrapper classes.
 _matrax_registry = {"Matrax": MatraxWrapper}
-_jaxmarl_registry = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper, "MPE": MPEWrapper}
+_jaxmarl_registry: Dict[str, Type[JaxMarlWrapper]] = {
+    "Smax": SmaxWrapper,
+    "MaBrax": MabraxWrapper,
+    "MPE": MPEWrapper,
+}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 
