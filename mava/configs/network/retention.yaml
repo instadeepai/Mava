@@ -1,10 +1,9 @@
 # --- Network params ---
-actor_network:
-  n_block: 1 # Number of blocks
-  embed_dim: 64 # Embedding dimension
-  n_head: 1 # Number of heads
-  decay_scaling_factor: 0.8 # Decay scaling factor for the kappa parameter: kappa = kappa * decay_scaling_factor
-  obs_prenorm_fn_name: rmsnorm # Observation pre-normalisation function name [layernorm, rmsnorm, identity]
+n_block: 1 # Number of blocks
+embed_dim: 64 # Embedding dimension
+n_head: 1 # Number of heads
+decay_scaling_factor: 0.8 # Decay scaling factor for the kappa parameter: kappa = kappa * decay_scaling_factor
+obs_prenorm_fn_name: rmsnorm # Observation pre-normalisation function name [layernorm, rmsnorm, identity]
 
 #TODO: update this once we merge scaling
 chunkwise:

@@ -24,27 +24,21 @@ import jax
 import jax.numpy as jnp
 import optax
 from colorama import Fore, Style
-from flax.core.frozen_dict import FrozenDict
+from flax.core.frozen_dict import FrozenDict as Params
 from jax import tree
 from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
-from typing_extensions import NamedTuple
 
-from mava.networks.sable_network import SableNetwork
+from mava.networks import SableNetwork
 from mava.systems.sable.types import (
-    ActorApply,
-    CriticApply,
-    ExperimentOutput,
-    LearnerFn,
-    OptStates,
-    Params,
-    PPOTransition,
-    State,
-    TimeStep,
-    ValueNormParams,
+    ExecutionApply,
+    HiddenStates,
+    LearnerState,
+    TrainingApply,
+    Transition,
 )
-from mava.types import MarlEnv
+from mava.types import ExperimentOutput, LearnerFn, MarlEnv
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import unreplicate_batch_dim
@@ -55,22 +49,10 @@ from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
 
-class LearnerState(NamedTuple):
-    """State of the learner."""
-
-    params: Params
-    opt_states: OptStates
-    key: chex.PRNGKey
-    env_state: State
-    timestep: TimeStep
-    value_norm_params: ValueNormParams
-    hidden_state: chex.Array
-
-
 def get_learner_fn(
     env: Environment,
-    apply_fns: Tuple[ActorApply, CriticApply],
-    update_fn: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
+    apply_fns: Tuple[ExecutionApply, TrainingApply],
+    update_fn: optax.TransformUpdateFn,
     config: DictConfig,
 ) -> LearnerFn[LearnerState]:
     """Get the learner function."""
@@ -89,26 +71,26 @@ def get_learner_fn(
         Args:
         ----
             learner_state (NamedTuple):
-                - params (Params): The current model parameters.
-                - opt_states (OptStates): The current optimizer states.
+                - params (FrozenDict): The current model parameters.
+                - opt_states (OptState): The current optimizer states.
                 - key (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
-                - hidden_states (HiddenStates): The hidden state of the network.
+                - hstates (HiddenStates): The hidden state of the network.
             _ (Any): The current metrics info.
 
         """
 
-        def _env_step(learner_state: LearnerState, _: int) -> Tuple[LearnerState, PPOTransition]:
+        def _env_step(learner_state: LearnerState, _: int) -> Tuple[LearnerState, Transition]:
             """Step the environment."""
-            params, opt_states, key, env_state, last_timestep, _, hstates = learner_state
+            params, opt_states, key, env_state, last_timestep, hstates = learner_state
 
             # SELECT ACTION
             key, policy_key = jax.random.split(key)
 
             # Apply the actor network to get the action, log_prob, value and updated hstates.
             last_obs = last_timestep.observation
-            action, log_prob, value, _, hstates = sable_action_select_fn(  # type: ignore
+            action, log_prob, value, hstates = sable_action_select_fn(  # type: ignore
                 params,
                 last_obs.agents_view,
                 last_obs.action_mask,
@@ -138,7 +120,7 @@ def get_learner_fn(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
                 last_timestep.last(),
             )
-            transition = PPOTransition(
+            transition = Transition(
                 prev_done,
                 action,
                 value,
@@ -147,9 +129,7 @@ def get_learner_fn(
                 last_timestep.observation,
                 info,
             )
-            learner_state = LearnerState(
-                params, opt_states, key, env_state, timestep, None, hstates
-            )
+            learner_state = LearnerState(params, opt_states, key, env_state, timestep, hstates)
             return learner_state, transition
 
         # COPY OLD HIDDEN STATES: TO BE USED IN THE TRAINING LOOP
@@ -164,9 +144,9 @@ def get_learner_fn(
         )
 
         # CALCULATE ADVANTAGE
-        params, opt_states, key, env_state, last_timestep, _, updated_hstates = learner_state
+        params, opt_states, key, env_state, last_timestep, updated_hstates = learner_state
         key, last_val_key = jax.random.split(key)
-        _, _, current_val, _, _ = sable_action_select_fn(  # type: ignore
+        _, _, current_val, _ = sable_action_select_fn(  # type: ignore
             params,
             last_timestep.observation.agents_view,
             last_timestep.observation.action_mask,
@@ -180,14 +160,14 @@ def get_learner_fn(
         )
 
         def _calculate_gae(
-            traj_batch: PPOTransition,
+            traj_batch: Transition,
             current_val: chex.Array,
             current_done: chex.Array,
         ) -> Tuple[chex.Array, chex.Array]:
             """Calculate the GAE."""
 
             def _get_advantages(
-                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: PPOTransition
+                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: Transition
             ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
                 """Calculate the GAE for a single transition."""
                 gae, next_value, next_done = carry
@@ -222,11 +202,11 @@ def get_learner_fn(
                 traj_batch, advantages, targets, prev_hstates = batch_info
 
                 def _loss_fn(
-                    params: FrozenDict,
-                    traj_batch: PPOTransition,
+                    params: Params,
+                    traj_batch: Transition,
                     gae: chex.Array,
                     value_targets: chex.Array,
-                    prev_hstates: chex.Array,  # TODO: add hiddenstate named tuple
+                    prev_hstates: HiddenStates,
                 ) -> Tuple:
                     """Calculate Sable loss."""
                     # RERUN NETWORK
@@ -319,7 +299,6 @@ def get_learner_fn(
                 advantages,
                 targets,
                 key,
-                _,
                 prev_hstates,
             ) = update_state
 
@@ -367,7 +346,6 @@ def get_learner_fn(
                 advantages,
                 targets,
                 key,
-                None,
                 prev_hstates,
             )
             return update_state, loss_info
@@ -379,7 +357,6 @@ def get_learner_fn(
             advantages,
             targets,
             key,
-            None,
             prev_hstates,
         )
 
@@ -388,14 +365,13 @@ def get_learner_fn(
             _update_epoch, update_state, None, config.system.ppo_epochs
         )
 
-        params, opt_states, traj_batch, advantages, targets, key, _, _ = update_state
+        params, opt_states, traj_batch, advantages, targets, key, _ = update_state
         learner_state = LearnerState(
             params,
             opt_states,
             key,
             env_state,
             last_timestep,
-            None,
             updated_hstates,
         )
         metric = traj_batch.info
@@ -411,8 +387,8 @@ def get_learner_fn(
         Args:
         ----
             learner_state (NamedTuple):
-                - params (Params): The initial model parameters.
-                - opt_state (OptStates): The initial optimizer state.
+                - params (FrozenDict): The initial model parameters.
+                - opt_state (OptState): The initial optimizer state.
                 - key (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
@@ -453,13 +429,13 @@ def learner_setup(
     config.system.num_actions = action_dim
 
     # Define network.
-    actor_network = SableNetwork(
-        n_block=config.network.actor_network.n_block,
-        embed_dim=config.network.actor_network.embed_dim,
-        n_head=config.network.actor_network.n_head,
+    sable_network = SableNetwork(
+        n_block=config.network.n_block,
+        embed_dim=config.network.embed_dim,
+        n_head=config.network.n_head,
         n_agents=n_agents,
         action_dim=action_dim,
-        decay_scaling_factor=config.network.actor_network.decay_scaling_factor,
+        decay_scaling_factor=config.network.decay_scaling_factor,
         action_space_type="discrete",
     )
 
@@ -474,12 +450,12 @@ def learner_setup(
     init_obs = env.observation_spec().generate_value()
     init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs)  # Add batch dim
     init_action = jnp.zeros((1, n_agents), dtype=jnp.int32)
-    init_hs = get_init_hidden_state(config.network.actor_network, config.arch.num_envs)
+    init_hs = get_init_hidden_state(config.network, config.arch.num_envs)
     init_hs = tree.map(lambda x: x[0, jnp.newaxis], init_hs)
     init_dones = jnp.zeros((1, n_agents), dtype=bool)
 
     # Initialise params and optimiser state.
-    params = actor_network.init(
+    params = sable_network.init(
         net_key,
         init_obs.agents_view,
         init_action,
@@ -491,8 +467,8 @@ def learner_setup(
 
     # Pack apply and update functions.
     apply_fns = (
-        partial(actor_network.apply, method="get_actions"),  # Execution function
-        actor_network.apply,  # Training function
+        partial(sable_network.apply, method="get_actions"),  # Execution function
+        sable_network.apply,  # Training function
     )
     update_fn = optim.update
 
@@ -515,7 +491,7 @@ def learner_setup(
     timesteps = tree.map(reshape_states, timesteps)
 
     # Initialise hidden state.
-    init_hstates = get_init_hidden_state(config.network.actor_network, config.arch.num_envs)
+    init_hstates = get_init_hidden_state(config.network, config.arch.num_envs)
 
     # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
@@ -543,18 +519,17 @@ def learner_setup(
 
     # Initialise learner state.
     params, opt_state, step_keys = replicate_learner
-    # TODO: update learner state
+
     init_learner_state = LearnerState(
         params=params,
         opt_states=opt_state,
         key=step_keys,
         env_state=env_states,
         timestep=timesteps,
-        value_norm_params=None,
         hidden_state=init_hstates,
     )
 
-    return learn, actor_network, init_learner_state
+    return learn, sable_network, init_learner_state
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -570,12 +545,12 @@ def run_experiment(_config: DictConfig) -> float:
     key, key_e, net_key = jax.random.split(jax.random.PRNGKey(config.system.seed), num=3)
 
     # Setup learner.
-    learn, actor_network, learner_state = learner_setup(env, (key, net_key), config)
+    learn, sable_network, learner_state = learner_setup(env, (key, net_key), config)
 
     # Setup evaluator.
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
-    """eval_act_fn = make_ff_eval_act_fn(actor_network.apply, config)
+    """eval_act_fn = make_ff_eval_act_fn(sable_network.apply, config)
     evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)"""
 
     # Calculate total timesteps.

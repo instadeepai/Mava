@@ -510,12 +510,12 @@ def learner_setup(
 
     # Define network and optimiser.
     actor_network = SableNetwork(
-        n_block=config.network.actor_network.n_block,
-        embed_dim=config.network.actor_network.embed_dim,
-        n_head=config.network.actor_network.n_head,
+        n_block=config.network.n_block,
+        embed_dim=config.network.embed_dim,
+        n_head=config.network.n_head,
         n_agents=num_agents,
         action_dim=num_actions,
-        decay_scaling_factor=config.network.actor_network.decay_scaling_factor,
+        decay_scaling_factor=config.network.decay_scaling_factor,
         action_space_type="discrete",
     )
 
@@ -775,6 +775,7 @@ def run_experiment(_config: DictConfig) -> float:
     logger.stop()
 
     return 0  # eval_performance
+
 
 @hydra.main(
     config_path="../../../configs/default",

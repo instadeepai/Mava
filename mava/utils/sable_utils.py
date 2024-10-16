@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple
 
 import chex
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
+from omegaconf import DictConfig
+
+from mava.systems.sable.types import HiddenStates
 
 
 class SwiGLU(nn.Module):
@@ -65,9 +67,7 @@ def concat_time_and_agents(x: chex.Array) -> chex.Array:
     return x
 
 
-def get_init_hidden_state(
-    actor_net_config: Dict, batch_size: int
-) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
+def get_init_hidden_state(actor_net_config: DictConfig, batch_size: int) -> HiddenStates:
     """Initializes the hidden states for the encoder and decoder."""
     # Compute the hidden state size based on embedding dimension and number of heads
     hidden_size = actor_net_config.embed_dim // actor_net_config.n_head
@@ -85,5 +85,7 @@ def get_init_hidden_state(
     dec_hs_self_retm = jnp.zeros(hidden_state_shape)
     dec_hs_cross_retn = jnp.zeros(hidden_state_shape)
     enc_hs = jnp.zeros(hidden_state_shape)
-
-    return enc_hs, (dec_hs_self_retm, dec_hs_cross_retn)
+    hidden_states = HiddenStates(
+        encoder_hstate=enc_hs, decoder_hstate=(dec_hs_self_retm, dec_hs_cross_retn)
+    )
+    return hidden_states

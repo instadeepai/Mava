@@ -22,6 +22,7 @@ from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
 from mava.networks.retention import MultiScaleRetention
+from mava.systems.sable.types import HiddenStates
 from mava.utils.sable_utils import SwiGLU
 
 
@@ -440,7 +441,7 @@ class SableNetwork(nn.Module):
         obs: chex.Array,
         action: chex.Array,
         legal_actions: chex.Array,
-        hstates: Tuple[chex.Array, Tuple[chex.Array, chex.Array]],  # TODO: make hstates named tuple
+        hstates: HiddenStates,
         dones: chex.Array,
         rng_key: Optional[chex.PRNGKey] = None,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
@@ -465,9 +466,9 @@ class SableNetwork(nn.Module):
         self,
         obs: chex.Array,
         legal_actions: chex.Array,
-        hstates: Tuple[chex.Array, Tuple[chex.Array, chex.Array]],
+        hstates: HiddenStates,
         key: chex.PRNGKey,
-    ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, Tuple[chex.Array, chex.Array]]:
+    ) -> Tuple[chex.Array, chex.Array, chex.Array, HiddenStates]:
         """Inference phase."""
         # Decay the hidden states
         decayed_hstates = jax.tree.map(
@@ -485,17 +486,9 @@ class SableNetwork(nn.Module):
             key=key,
         )
 
-        # TODO: find a way to remove raw action from the output
-        # Always returning None for the raw action now since we will never use it for Sable.
-        # We still need to do this though since this is the way the networks work for MAT and
-        # changing this will break the evaluator API.
-        return (
-            output_actions,
-            output_actions_log,
-            v_loc,
-            None,
-            (updated_enc_hs, updated_dec_hs),
-        )
+        # Pack the hidden states
+        updated_hs = HiddenStates(encoder_hstate=updated_enc_hs, decoder_hstate=updated_dec_hs)
+        return (output_actions, output_actions_log, v_loc, updated_hs)
 
 
 def discrete_parallel_act(
