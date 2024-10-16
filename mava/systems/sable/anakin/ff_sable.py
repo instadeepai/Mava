@@ -15,7 +15,7 @@
 import copy
 import time
 from functools import partial
-from typing import Any, Dict, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import chex
 import flax
@@ -24,67 +24,41 @@ import jax
 import jax.numpy as jnp
 import optax
 from colorama import Fore, Style
-from flax.core.frozen_dict import FrozenDict
+from flax.core.frozen_dict import FrozenDict as Params
+from jax import tree
 from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
-from optax._src.base import OptState
 from rich.pretty import pprint
-from typing_extensions import NamedTuple
 
-from mava.networks import FeedForwardActor as Actor
-from mava.networks.sable_network import SableNetwork
+from mava.evaluator import get_eval_fn, get_num_eval_envs, make_ff_sable_act_fn
+from mava.networks import SableNetwork
 from mava.systems.sable.types import (
-    ActorApply,
-    CriticApply,
-    ExperimentOutput,
-    LearnerFn,
-    OptStates,
-    Params,
-    PPOTransition,
-    State,
-    TimeStep,
-    ValueNormParams,
+    ExecutionApply,
+    TrainingApply,
+    Transition,
 )
+from mava.systems.sable.types import FFLearnerState as LearnerState
+from mava.types import ExperimentOutput, LearnerFn, MarlEnv
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
+from mava.utils.jax_utils import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.sable_utils import concat_time_and_agents, get_init_hidden_state
+from mava.utils.sable_utils import get_init_hidden_state
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
-# jax.config.update("jax_debug_nans", True)
-
-
-class LearnerState(NamedTuple):
-    """State of the learner."""
-
-    params: Params
-    opt_states: OptStates
-    key: chex.PRNGKey
-    env_state: State
-    timestep: TimeStep
-    value_norm_params: ValueNormParams
-    hidden_state: chex.Array
-
-
-def huber_loss(value: chex.Array, target: chex.Array, delta: float = 10.0) -> chex.Array:
-    """Huber loss."""
-    error = jnp.abs(target - value)
-    return jnp.where(error <= delta, 0.5 * error**2, delta * (error - 0.5 * delta))
-
 
 def get_learner_fn(
     env: Environment,
-    apply_fns: Tuple[ActorApply, CriticApply],
-    update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
+    apply_fns: Tuple[ExecutionApply, TrainingApply],
+    update_fn: optax.TransformUpdateFn,
     config: DictConfig,
 ) -> LearnerFn[LearnerState]:
     """Get the learner function."""
 
-    # Get apply and update functions for actor and critic networks.
-    actor_action_select_fn, actor_apply_fn = apply_fns
-    actor_update_fn, _ = update_fns
+    # Get apply functions for executing and training the network.
+    sable_action_select_fn, sable_apply_fn = apply_fns
 
     def _update_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, Tuple]:
         """A single update of the network.
@@ -95,40 +69,31 @@ def get_learner_fn(
         losses.
 
         Args:
+        ----
             learner_state (NamedTuple):
-                - params (Params): The current model parameters.
-                - opt_states (OptStates): The current optimizer states.
+                - params (FrozenDict): The current model parameters.
+                - opt_states (OptState): The current optimizer states.
                 - key (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
             _ (Any): The current metrics info.
+
         """
 
-        def _env_step(
-            learner_state: LearnerState, rollout_idx: int
-        ) -> Tuple[LearnerState, PPOTransition]:
+        def _env_step(learner_state: LearnerState, _: int) -> Tuple[LearnerState, Transition]:
             """Step the environment."""
-            (
-                params,
-                opt_states,
-                key,
-                env_state,
-                last_timestep,
-                value_norm_params,
-                hidden_state,
-            ) = learner_state
+            params, opt_states, key, env_state, last_timestep = learner_state
 
             # SELECT ACTION
-            key, policy_key, perm_key = jax.random.split(key, 3)
+            key, policy_key = jax.random.split(key)
 
+            # Apply the actor network to get the action, log_prob, value and updated hstates.
             last_obs = last_timestep.observation
-
-            action, log_prob, value, _, hidden_state = actor_action_select_fn(  # type: ignore
-                params.actor_params,
-                last_obs.agents_view,
-                last_obs.action_mask,
-                hidden_state,
-                policy_key,
+            action, log_prob, value, _ = sable_action_select_fn(  # type: ignore
+                params,
+                obs=last_obs.agents_view,
+                legal_actions=last_obs.action_mask,
+                key=policy_key,
             )
             action = jnp.squeeze(action, axis=-1)
             log_prob = jnp.squeeze(log_prob, axis=-1)
@@ -138,26 +103,18 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # LOG EPISODE METRICS
-            prev_done = jax.tree_util.tree_map(
-                lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
-                last_timestep.last(),
-            )
-            # reset hidden state at last timestep
-            # need the same number of dims as hidden state
-            done = timestep.last()
-            done = jnp.expand_dims(done, (1, 2, 3, 4))
-            hidden_state = jax.tree_map(
-                lambda hs: jnp.where(done, jnp.zeros_like(hs), hs), hidden_state
-            )
-
-            # all envs returns to be n_agents lenght
-            info = jax.tree_util.tree_map(
+            info = tree.map(
                 lambda x: jnp.repeat(x[..., jnp.newaxis], config.system.num_agents, axis=-1),
                 timestep.extras["episode_metrics"],
             )
 
-            transition = PPOTransition(
-                prev_done,
+            # SET TRANSITION
+            done = tree.map(
+                lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
+                timestep.last(),
+            )
+            transition = Transition(
+                done,
                 action,
                 value,
                 timestep.reward,
@@ -165,18 +122,9 @@ def get_learner_fn(
                 last_timestep.observation,
                 info,
             )
-            learner_state = LearnerState(
-                params,
-                opt_states,
-                key,
-                env_state,
-                timestep,
-                value_norm_params,
-                hidden_state,
-            )
+            learner_state = LearnerState(params, opt_states, key, env_state, timestep)
             return learner_state, transition
 
-        prev_hs = jax.tree_map(lambda x: jnp.copy(x), learner_state.hidden_state)
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
         learner_state, traj_batch = jax.lax.scan(
             _env_step,
@@ -186,93 +134,71 @@ def get_learner_fn(
         )
 
         # CALCULATE ADVANTAGE
-        (
-            params,
-            opt_states,
-            key,
-            env_state,
-            last_timestep,
-            value_norm_params,
-            hidden_state,
-        ) = learner_state
-
+        params, opt_states, key, env_state, last_timestep = learner_state
         key, last_val_key = jax.random.split(key)
-        _, _, last_val, _, _ = actor_action_select_fn(  # type: ignore
-            params.actor_params,
-            last_timestep.observation.agents_view,
-            last_timestep.observation.action_mask,
-            hidden_state,
-            last_val_key,
+        _, _, current_val, _ = sable_action_select_fn(  # type: ignore
+            params,
+            obs=last_timestep.observation.agents_view,
+            legal_actions=last_timestep.observation.action_mask,
+            key=last_val_key,
         )
-
-        last_val = jnp.squeeze(last_val, axis=-1)
-        last_done = jax.tree_util.tree_map(
-            lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
-            last_timestep.last(),
-        )
+        current_val = jnp.squeeze(current_val, axis=-1)
 
         def _calculate_gae(
-            traj_batch: PPOTransition,
-            last_val: chex.Array,
-            last_done: chex.Array,
-            value_norm_params: ValueNormParams,
+            traj_batch: Transition,
+            current_val: chex.Array,
         ) -> Tuple[chex.Array, chex.Array]:
             """Calculate the GAE."""
-            normalize_vals = False
 
-            def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
+            def _get_advantages(
+                carry: Tuple[chex.Array, chex.Array], transition: Transition
+            ) -> Tuple[Tuple[chex.Array, chex.Array], chex.Array]:
                 """Calculate the GAE for a single transition."""
-                gae, next_value, next_done = gae_and_next_value
+                gae, next_value = carry
                 done, value, reward = (
                     transition.done,
                     transition.value,
                     transition.reward,
                 )
                 gamma = config.system.gamma
-
-                delta = reward + gamma * next_value * (1 - next_done) - value
-                gae = delta + gamma * config.system.gae_lambda * (1 - next_done) * gae
-                return (gae, value, done), gae
+                delta = reward + gamma * next_value * (1 - done) - value
+                gae = delta + gamma * config.system.gae_lambda * (1 - done) * gae
+                return (gae, value), gae
 
             _, advantages = jax.lax.scan(
                 _get_advantages,
-                (jnp.zeros_like(last_val), last_val, last_done),
+                (jnp.zeros_like(current_val), current_val),
                 traj_batch,
                 reverse=True,
                 unroll=16,
             )
+            return advantages, advantages + traj_batch.value
 
-            return advantages, advantages
-
-        advantages, targets = _calculate_gae(traj_batch, last_val, last_done, value_norm_params)
+        advantages, targets = _calculate_gae(traj_batch, current_val)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
 
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
-
                 # UNPACK TRAIN STATE AND BATCH INFO
-                params, opt_states, value_norm_params = train_state
-                traj_batch, advantages, targets, prev_hs = batch_info
+                params, opt_state = train_state
+                traj_batch, advantages, targets = batch_info
 
-                def _actor_loss_fn(
-                    actor_params: FrozenDict,
-                    actor_opt_state: OptState,
-                    traj_batch: PPOTransition,
+                def _loss_fn(
+                    params: Params,
+                    traj_batch: Transition,
                     gae: chex.Array,
                     value_targets: chex.Array,
-                    prev_hs,
                 ) -> Tuple:
-                    """Calculate the actor loss."""
+                    """Calculate Sable loss."""
                     # RERUN NETWORK
-                    log_prob, value, entropy = actor_apply_fn(  # type: ignore
-                        actor_params,
-                        traj_batch.obs.agents_view,
-                        traj_batch.action,
-                        traj_batch.obs.action_mask,
-                        prev_hs,
-                        traj_batch.done,
+                    log_prob, value, entropy = sable_apply_fn(  # type: ignore
+                        params,
+                        obs=traj_batch.obs.agents_view,
+                        action=traj_batch.action,
+                        legal_actions=traj_batch.obs.action_mask,
+                        dones=traj_batch.done,
                     )
                     log_prob = jnp.squeeze(log_prob, axis=-1)
                     value = jnp.squeeze(value, axis=-1)
@@ -280,10 +206,7 @@ def get_learner_fn(
 
                     # CALCULATE ACTOR LOSS
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
-
-                    # Nomalise advantage at minibatch level
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
-
                     loss_actor1 = ratio * gae
                     loss_actor2 = (
                         jnp.clip(
@@ -307,6 +230,7 @@ def get_learner_fn(
                     value_losses_clipped = jnp.square(value_pred_clipped - value_targets)
                     value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
+                    # TOTAL LOSS
                     total_loss = (
                         loss_actor
                         - config.system.ent_coef * entropy
@@ -315,39 +239,31 @@ def get_learner_fn(
                     return total_loss, (loss_actor, entropy, value_loss)
 
                 # CALCULATE ACTOR LOSS
-                actor_grad_fn = jax.value_and_grad(_actor_loss_fn, has_aux=True)
-                actor_loss_info, actor_grads = actor_grad_fn(
-                    params.actor_params,
-                    opt_states.actor_opt_state,
+                grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
+                loss_info, grads = grad_fn(
+                    params,
                     traj_batch,
                     advantages,
                     targets,
-                    prev_hs,
                 )
 
-                actor_grads, actor_loss_info = jax.lax.pmean(
-                    (actor_grads, actor_loss_info), axis_name="batch"
-                )
+                # Compute the parallel mean (pmean) over the batch.
+                # This calculation is inspired by the Anakin architecture demo notebook.
+                # available at https://tinyurl.com/26tdzs5x
+                # This pmean could be a regular mean as the batch axis is on the same device.
+                grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="batch")
                 # pmean over devices.
-                actor_grads, actor_loss_info = jax.lax.pmean(
-                    (actor_grads, actor_loss_info), axis_name="device"
-                )
+                grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="device")
 
-                # UPDATE ACTOR PARAMS AND OPTIMISER STATE
-                actor_updates, actor_new_opt_state = actor_update_fn(
-                    actor_grads, opt_states.actor_opt_state
-                )
-                actor_new_params = optax.apply_updates(params.actor_params, actor_updates)
-
-                # PACK NEW PARAMS AND OPTIMISER STATE
-                new_params = Params(actor_new_params, None)
-                new_opt_state = OptStates(actor_new_opt_state, None)
+                # UPDATE PARAMS AND OPTIMISER STATE
+                updates, new_opt_state = update_fn(grads, opt_state)
+                new_params = optax.apply_updates(params, updates)
 
                 # PACK LOSS INFO
-                total_loss = actor_loss_info[0]
-                value_loss = actor_loss_info[1][2]
-                actor_loss = actor_loss_info[1][0]
-                entropy = actor_loss_info[1][1]
+                total_loss = loss_info[0]
+                actor_loss = loss_info[1][0]
+                entropy = loss_info[1][1]
+                value_loss = loss_info[1][2]
                 loss_info = {
                     "total_loss": total_loss,
                     "value_loss": value_loss,
@@ -355,7 +271,7 @@ def get_learner_fn(
                     "entropy": entropy,
                 }
 
-                return (new_params, new_opt_state, value_norm_params), loss_info
+                return (new_params, new_opt_state), loss_info
 
             (
                 params,
@@ -364,41 +280,35 @@ def get_learner_fn(
                 advantages,
                 targets,
                 key,
-                value_norm_params,
-                prev_hs,
             ) = update_state
-            key, batch_shuffle_key, agent_shuffle_key = jax.random.split(key, 3)
 
             # SHUFFLE MINIBATCHES
-            batch_size = config.arch.num_envs
-            batch_perm = jax.random.permutation(batch_shuffle_key, batch_size)
+            key, batch_shuffle_key, agent_shuffle_key = jax.random.split(key, 3)
 
-            # (T, B, A, ...)
+            # Shuffle batch
+            batch_size = config.system.rollout_length * config.arch.num_envs
+            permutation = jax.random.permutation(batch_shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
-            batch = jax.tree_util.tree_map(lambda x: jnp.take(x, batch_perm, axis=1), batch)
+            batch = tree.map(lambda x: merge_leading_dims(x, 2), batch)
+            shuffled_batch = tree.map(lambda x: jnp.take(x, permutation, axis=0), batch)
 
+            # Shuffle agents
             agent_perm = jax.random.permutation(agent_shuffle_key, config.system.num_agents)
-            batch = jax.tree_util.tree_map(lambda x: jnp.take(x, agent_perm, axis=2), batch)
+            shuffled_batch = jax.tree_util.tree_map(
+                lambda x: jnp.take(x, agent_perm, axis=1), shuffled_batch
+            )
 
-            prev_hs = jax.tree_util.tree_map(lambda x: jnp.take(x, batch_perm, axis=0), prev_hs)
-            # (B, TxA, ...)
-            batch = jax.tree_util.tree_map(concat_time_and_agents, batch)
-            # (num Mb, B/Mb, TxA, ...)
+            # SPLIT INTO MINIBATCHES
             minibatches = jax.tree_util.tree_map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
-                batch,
-            )
-            # also minibatch HS
-            prev_hs_minibatch = jax.tree_util.tree_map(
-                lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
-                prev_hs,
+                shuffled_batch,
             )
 
             # UPDATE MINIBATCHES
-            (params, opt_states, value_norm_params), loss_info = jax.lax.scan(
+            (params, opt_states), loss_info = jax.lax.scan(
                 _update_minibatch,
-                (params, opt_states, value_norm_params),
-                (*minibatches, prev_hs_minibatch),
+                (params, opt_states),
+                minibatches,
             )
 
             update_state = (
@@ -408,13 +318,8 @@ def get_learner_fn(
                 advantages,
                 targets,
                 key,
-                value_norm_params,
-                prev_hs,
             )
             return update_state, loss_info
-
-        # Before the epochs update the value norm params with all the batch data
-        # to get the running mean and variance.
 
         update_state = (
             params,
@@ -423,8 +328,6 @@ def get_learner_fn(
             advantages,
             targets,
             key,
-            value_norm_params,
-            prev_hs,
         )
 
         # UPDATE EPOCHS
@@ -432,28 +335,15 @@ def get_learner_fn(
             _update_epoch, update_state, None, config.system.ppo_epochs
         )
 
-        (
-            params,
-            opt_states,
-            traj_batch,
-            advantages,
-            targets,
-            key,
-            value_norm_params,
-            _,
-        ) = update_state
+        params, opt_states, traj_batch, advantages, targets, key = update_state
         learner_state = LearnerState(
             params,
             opt_states,
             key,
             env_state,
             last_timestep,
-            value_norm_params,
-            hidden_state,
         )
-
         metric = traj_batch.info
-
         return learner_state, (metric, loss_info)
 
     def learner_fn(learner_state: LearnerState) -> ExperimentOutput[LearnerState]:
@@ -464,14 +354,16 @@ def get_learner_fn(
         updates. The `_update_step` function is vectorized over a batch of inputs.
 
         Args:
+        ----
             learner_state (NamedTuple):
-                - params (Params): The initial model parameters.
-                - opt_states (OptStates): The initial optimizer state.
+                - params (FrozenDict): The initial model parameters.
+                - opt_state (OptState): The initial optimizer state.
                 - key (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
-        """
+                - hstates (HiddenStates): The initial hidden states of the network.
 
+        """
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
         learner_state, (episode_info, loss_info) = jax.lax.scan(
@@ -487,76 +379,79 @@ def get_learner_fn(
 
 
 def learner_setup(
-    env: Environment, keys: chex.Array, config: DictConfig
-) -> Tuple[LearnerFn[LearnerState], Actor, LearnerState]:
+    env: MarlEnv, keys: chex.Array, config: DictConfig
+) -> Tuple[LearnerFn[LearnerState], Callable, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
-    # Get number of actions and agents.
-    num_actions = int(env.action_spec().num_values[0])
-    num_agents = env.action_spec().shape[0]
-    config.system.num_agents = num_agents
-    config.system.num_actions = num_actions
+    # Get number of agents.
+    config.system.num_agents = env.num_agents
 
     # PRNG keys.
-    key, actor_net_key, _ = keys
+    key, net_key = keys
 
-    # Initialise observation: Obs for all agents.
-    init_x = env.observation_spec().generate_value()
-    init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
-    init_dones = jnp.zeros((1, num_agents), dtype=bool)
-    init_action = jnp.zeros((1, num_agents), dtype=jnp.int32)
+    # Get number of agents and actions.
+    action_dim = int(env.action_spec().num_values[0])
+    n_agents = env.action_spec().shape[0]
+    config.system.num_agents = n_agents
+    config.system.num_actions = action_dim
 
-    # Define network and optimiser.
-    actor_network = SableNetwork(
+    # Define network.
+    sable_network = SableNetwork(
         n_block=config.network.n_block,
         embed_dim=config.network.embed_dim,
         n_head=config.network.n_head,
-        n_agents=num_agents,
-        action_dim=num_actions,
-        decay_scaling_factor=config.network.decay_scaling_factor,
+        n_agents=n_agents,
+        action_dim=action_dim,
         action_space_type="discrete",
     )
 
-    actor_lr = make_learning_rate(config.system.actor_lr, config)
-    actor_optim = optax.chain(
+    # Define optimiser.
+    lr = make_learning_rate(config.system.actor_lr, config)
+    optim = optax.chain(
         optax.clip_by_global_norm(config.system.max_grad_norm),
-        optax.adam(actor_lr, eps=1e-5),
+        optax.adam(lr, eps=1e-5),
     )
 
-    init_hs = get_init_hidden_state(config.network.actor_network, config.arch.num_envs)
-    init_hs = jax.tree_map(lambda x: x[0, jnp.newaxis], init_hs)
+    # Get mock inputs to initialise network.
+    init_obs = env.observation_spec().generate_value()
+    init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs)  # Add batch dim
+    init_action = jnp.zeros((1, n_agents), dtype=jnp.int32)
+    init_hs = get_init_hidden_state(config.network, config.arch.num_envs)
+    init_hs = tree.map(lambda x: x[0, jnp.newaxis], init_hs)
+    init_dones = jnp.zeros((1, n_agents), dtype=bool)
 
-    # Initialise actor params and optimiser state.
-    actor_params = actor_network.init(
-        actor_net_key,
-        init_x.agents_view,
+    # Initialise params and optimiser state.
+    params = sable_network.init(
+        net_key,
+        init_obs.agents_view,
         init_action,
-        init_x.action_mask,
+        init_obs.action_mask,
         init_hs,
         init_dones,
     )
-    actor_opt_state = actor_optim.init(actor_params)
+    opt_state = optim.init(params)
 
-    # Pack params.
-    params = Params(actor_params, None)
+    # Create fake hstates
+    minibatch_size = (
+        config.arch.num_envs * config.system.rollout_length // config.system.num_minibatches
+    )
+    dummy_executor_hs = get_init_hidden_state(config.network, config.arch.num_envs)
+    dummy_trainer_hs = get_init_hidden_state(config.network, minibatch_size)
 
     # Pack apply and update functions.
-    if config.network.chunkwise.use_chunkwise:
-        apply_fns = (
-            partial(actor_network.apply, method="get_actions"),
-            partial(actor_network.apply, method="chunkwise_training"),
-        )
-    else:
-        apply_fns = (
-            partial(actor_network.apply, method="get_actions"),
-            actor_network.apply,
-        )
-    update_fns = (actor_optim.update, None)
+    apply_fns = (
+        partial(
+            sable_network.apply, method="get_actions", hstates=dummy_executor_hs
+        ),  # Execution function
+        partial(sable_network.apply, hstates=dummy_trainer_hs),  # Training function
+    )
+    update_fn = optim.update
+    eval_apply_fn = partial(sable_network.apply, method="get_actions")
 
     # Get batched iterated update and replicate it to pmap it over cores.
-    learn = get_learner_fn(env, apply_fns, update_fns, config)
+    learn = get_learner_fn(env, apply_fns, update_fn, config)
     learn = jax.pmap(learn, axis_name="device")
 
     # Initialise environment states and timesteps: across devices and batches.
@@ -569,12 +464,9 @@ def learner_setup(
     reshape_states = lambda x: x.reshape(
         (n_devices, config.system.update_batch_size, config.arch.num_envs) + x.shape[1:]
     )
-
     # (devices, update batch size, num_envs, ...)
-    env_states = jax.tree_map(reshape_states, env_states)
-    timesteps = jax.tree_map(reshape_states, timesteps)
-
-    init_hidden_state = get_init_hidden_state(config.network.actor_network, config.arch.num_envs)
+    env_states = tree.map(reshape_states, env_states)
+    timesteps = tree.map(reshape_states, timesteps)
 
     # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
@@ -589,67 +481,56 @@ def learner_setup(
 
     # Define params to be replicated across devices and batches.
     key, step_keys = jax.random.split(key)
-    opt_states = OptStates(actor_opt_state, None)
-    replicate_learner = (params, opt_states, step_keys)
+    replicate_learner = (params, opt_state, step_keys)
 
     # Duplicate learner for update_batch_size.
-    broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size,) + x.shape)
-    replicate_learner = jax.tree_map(broadcast, replicate_learner)
-    init_hidden_state = jax.tree_map(broadcast, init_hidden_state)
-
-    value_norm_params = ValueNormParams()
-    broadcast_scalar = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size,))
-    value_norm_params = jax.tree_map(broadcast_scalar, value_norm_params)
+    broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
+    replicate_learner = tree.map(broadcast, replicate_learner)
 
     # Duplicate learner across devices.
     replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())
-    value_norm_params = flax.jax_utils.replicate(value_norm_params, devices=jax.devices())
-    init_hidden_state = flax.jax_utils.replicate(init_hidden_state, devices=jax.devices())
 
     # Initialise learner state.
-    params, opt_states, step_keys = replicate_learner
+    params, opt_state, step_keys = replicate_learner
+
     init_learner_state = LearnerState(
-        params,
-        opt_states,
-        step_keys,
-        env_states,
-        timesteps,
-        value_norm_params,
-        init_hidden_state,
+        params=params,
+        opt_states=opt_state,
+        key=step_keys,
+        env_state=env_states,
+        timestep=timesteps,
     )
 
-    return learn, actor_network, init_learner_state
+    return learn, eval_apply_fn, init_learner_state
 
 
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
     config = copy.deepcopy(_config)
 
+    n_devices = len(jax.devices())
+
     # Create the enviroments for train and eval.
     env, eval_env = environments.make(config)
 
     # PRNG keys.
-    key, key_e, actor_net_key, critic_net_key = jax.random.split(
-        jax.random.PRNGKey(config["system"]["seed"]), num=4
-    )
+    key, key_e, net_key = jax.random.split(jax.random.PRNGKey(config.system.seed), num=3)
 
     # Setup learner.
-    learn, actor_network, learner_state = learner_setup(
-        env, (key, actor_net_key, critic_net_key), config
-    )
+    learn, sable_execution_fn, learner_state = learner_setup(env, (key, net_key), config)
 
     # Setup evaluator.
-    """evaluator, absolute_metric_evaluator = make_eval_fns(
-        eval_env=eval_env,
-        network_apply_fn=actor_network.apply,
-        config=config,
-        use_recurrent_net=True,
-        use_mat=True,
-        action_space_type="discrete",
-    )"""
+    # One key per device for evaluation.
+    eval_keys = jax.random.split(key_e, n_devices)
+    # Define Apply fn for evaluation.
+    # Create a fake hstate: will not be updated during steps
+    eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
+    eval_hs = get_init_hidden_state(config.network, eval_batch_size)
+    eval_act_fn = make_ff_sable_act_fn(sable_execution_fn, eval_hs)
+    # Create evaluator
+    evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
 
     # Calculate total timesteps.
-    n_devices = len(jax.devices())
     config = check_total_timesteps(config)
     assert (
         config.system.num_updates > config.arch.num_evaluation
@@ -692,7 +573,7 @@ def run_experiment(_config: DictConfig) -> float:
 
         # Log the results of the training.
         elapsed_time = time.time() - start_time
-        t = steps_per_rollout * (eval_step + 1)
+        t = int(steps_per_rollout * (eval_step + 1))
         episode_metrics, ep_completed = get_final_step_metrics(learner_output.episode_metrics)
         episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
 
@@ -703,83 +584,55 @@ def run_experiment(_config: DictConfig) -> float:
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.
-        start_time = time.time()
-        trained_params = jax.tree_util.tree_map(
-            lambda x: x[:, 0, ...],
-            learner_output.learner_state.params.actor_params,  # Select only actor params
-        )
+        trained_params = unreplicate_batch_dim(learner_state.params)
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
-
         # Evaluate.
-        """evaluator_output = evaluator(trained_params, eval_keys)
-        jax.block_until_ready(evaluator_output)
-
-        # Log the results of the evaluation.
-        elapsed_time = time.time() - start_time
-        episode_return = jnp.mean(evaluator_output.episode_metrics["episode_return"])
-
-        steps_per_eval = int(
-            jnp.sum(evaluator_output.episode_metrics["episode_length"])
-        )
-        evaluator_output.episode_metrics["steps_per_second"] = (
-            steps_per_eval / elapsed_time
-        )
-        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.EVAL)
+        eval_metrics = evaluator(trained_params, eval_keys, {})
+        logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
+        episode_return = jnp.mean(eval_metrics["episode_return"])
 
         if save_checkpoint:
             # Save checkpoint of learner state
             checkpointer.save(
                 timestep=steps_per_rollout * (eval_step + 1),
-                unreplicated_learner_state=unreplicate_n_dims(
-                    learner_output.learner_state
-                ),
+                unreplicated_learner_state=unreplicate_n_dims(learner_output.learner_state),
                 episode_return=episode_return,
             )
 
         if config.arch.absolute_metric and max_episode_return <= episode_return:
             best_params = copy.deepcopy(trained_params)
-            max_episode_return = episode_return"""
+            max_episode_return = episode_return
 
         # Update runner state to continue training.
         learner_state = learner_output.learner_state
 
-    # Prep metrics to return for sweeping
-    """eval_performance = float(
-        jnp.mean(evaluator_output.episode_metrics[config.env.eval_metric])
-    )
+    # Record the performance for the final evaluation run.
+    eval_performance = float(jnp.mean(eval_metrics[config.env.eval_metric]))
 
     # Measure absolute metric.
     if config.arch.absolute_metric:
-        start_time = time.time()
+        eval_batch_size = get_num_eval_envs(config, absolute_metric=True)
+        abs_hs = get_init_hidden_state(config.network, eval_batch_size)
+        eval_act_fn = make_ff_sable_act_fn(sable_execution_fn, abs_hs)
+        abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=True)
+        eval_keys = jax.random.split(key, n_devices)
 
-        key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
-        eval_keys = jnp.stack(eval_keys)
-        eval_keys = eval_keys.reshape(n_devices, -1)
+        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {})
 
-        evaluator_output = absolute_metric_evaluator(best_params, eval_keys)
-        jax.block_until_ready(evaluator_output)
-
-        elapsed_time = time.time() - start_time
-        steps_per_eval = int(
-            jnp.sum(evaluator_output.episode_metrics["episode_length"])
-        )
         t = int(steps_per_rollout * (eval_step + 1))
-        evaluator_output.episode_metrics["steps_per_second"] = (
-            steps_per_eval / elapsed_time
-        )
-        logger.log(evaluator_output.episode_metrics, t, eval_step, LogEvent.ABSOLUTE)"""
+        logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
 
     # Stop the logger.
     logger.stop()
 
-    return 0  # eval_performance
+    return eval_performance
 
 
 @hydra.main(
     config_path="../../../configs/default",
-    config_name="rec_sable.yaml",
+    config_name="ff_sable.yaml",
     version_base="1.2",
 )
 def hydra_entry_point(cfg: DictConfig) -> float:
@@ -789,11 +642,9 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     cfg.logger.system_name = "rec_sable"
 
     # Run experiment.
-
     eval_performance = run_experiment(cfg)
-    jax.block_until_ready(eval_performance)
-    print(f"{Fore.CYAN}{Style.BRIGHT}Sable experiment completed{Style.RESET_ALL}")
-    return float(eval_performance)
+    print(f"{Fore.CYAN}{Style.BRIGHT}Sable Memory experiment completed{Style.RESET_ALL}")
+    return eval_performance
 
 
 if __name__ == "__main__":

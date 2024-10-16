@@ -28,8 +28,8 @@ class HiddenStates(NamedTuple):
     decoder_hstate: Tuple[Array, Array]
 
 
-class LearnerState(NamedTuple):
-    """State of the learner."""
+class RecLearnerState(NamedTuple):
+    """State of the learner for Memory Sable"""
 
     params: FrozenDict
     opt_states: OptState
@@ -37,6 +37,16 @@ class LearnerState(NamedTuple):
     env_state: Array
     timestep: TimeStep
     hidden_state: HiddenStates
+
+
+class FFLearnerState(NamedTuple):
+    """State of the learner for Non-Memory Sable"""
+
+    params: FrozenDict
+    opt_states: OptState
+    key: PRNGKey
+    env_state: Array
+    timestep: TimeStep
 
 
 class Transition(NamedTuple):

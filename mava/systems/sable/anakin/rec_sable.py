@@ -30,15 +30,15 @@ from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import get_eval_fn, get_num_eval_envs, make_sable_act_fn
+from mava.evaluator import get_eval_fn, get_num_eval_envs, make_rec_sable_act_fn
 from mava.networks import SableNetwork
 from mava.systems.sable.types import (
     ExecutionApply,
     HiddenStates,
-    LearnerState,
     TrainingApply,
     Transition,
 )
+from mava.systems.sable.types import RecLearnerState as LearnerState
 from mava.types import ExperimentOutput, LearnerFn, MarlEnv
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
@@ -551,7 +551,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Setup evaluator.
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
-    eval_act_fn = make_sable_act_fn(sable_execution_fn)
+    eval_act_fn = make_rec_sable_act_fn(sable_execution_fn)
     evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
 
     # Calculate total timesteps.
