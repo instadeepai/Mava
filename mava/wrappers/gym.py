@@ -16,6 +16,7 @@ import sys
 import traceback
 import warnings
 from dataclasses import field
+from enum import IntEnum
 from multiprocessing import Queue
 from multiprocessing.connection import Connection
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Union
@@ -40,7 +41,7 @@ warnings.filterwarnings("ignore", module="gymnasium.utils.passive_env_checker")
 
 
 # needed to avoid host -> device transfers when calling TimeStep.last()
-class StepType:
+class StepType(IntEnum):
     """Coppy of Jumanji's step type but with numpy arrays"""
 
     FIRST = 0
@@ -53,7 +54,7 @@ class TimeStep:
     step_type: StepType
     reward: NDArray
     discount: NDArray
-    observation: Observation
+    observation: Union[Observation, ObservationGlobalState]
     extras: Dict = field(default_factory=dict)
 
     def first(self) -> bool:
@@ -94,7 +95,9 @@ class GymWrapper(gymnasium.Wrapper):
     def reset(
         self, seed: Optional[int] = None, options: Optional[dict] = None
     ) -> Tuple[NDArray, Dict]:
-        if seed is not None:
+        # todo: maybe we should just remove this? I think the hasattr could be slow and the
+        # `OrderEnforcingWrapper` blocks the seed call :/
+        if seed is not None and hasattr(self.env, "seed"):
             self.env.seed(seed)
 
         agents_view, info = self._env.reset()

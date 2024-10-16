@@ -1,16 +1,18 @@
 # ---Environment Configs---
 defaults:
   - _self_
-  - scenario: gym-lbf-8x8-2p-2f-coop # [gym-lbf-2s-8x8-2p-2f-coop, gym-lbf-8x8-2p-2f-coop, gym-lbf-2s-10x10-3p-3f, gym-lbf-10x10-3p-3f, gym-lbf-15x15-3p-5f, gym-lbf-15x15-4p-3f, gym-lbf-15x15-4p-5f]
 
 env_name: LevelBasedForaging  # Used for logging purposes.
+scenario:
+  name: lbforaging
+  task_name: Foraging-8x8-2p-1f-v3
 
 # Defines the metric that will be used to evaluate the performance of the agent.
 # This metric is returned at the end of an experiment and can be used for hyperparameter tuning.
 eval_metric: episode_return
 
 # Whether the add agents IDs to the observations returned by the environment.
-add_agent_id : False
+add_agent_id: False
 
 # Whether or not to log the winrate of this environment.
 log_win_rate: False

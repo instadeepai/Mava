@@ -15,6 +15,7 @@
 from typing import Dict, Tuple, Type
 
 import gymnasium
+import gymnasium as gym
 import gymnasium.vector
 import gymnasium.wrappers
 import jaxmarl
@@ -34,9 +35,7 @@ from jumanji.environments.routing.lbf.generator import (
 from jumanji.environments.routing.robot_warehouse.generator import (
     RandomGenerator as RwareRandomGenerator,
 )
-from lbforaging.foraging import ForagingEnv as gym_ForagingEnv
 from omegaconf import DictConfig
-from rware.warehouse import Warehouse as gym_Warehouse
 
 from mava.types import MarlEnv
 from mava.wrappers import (
@@ -76,8 +75,8 @@ _jaxmarl_registry: Dict[str, Type[JaxMarlWrapper]] = {"Smax": SmaxWrapper, "MaBr
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 _gym_registry = {
-    "RobotWarehouse": (gym_Warehouse, GymWrapper),
-    "LevelBasedForaging": (gym_ForagingEnv, GymWrapper),
+    "RobotWarehouse": GymWrapper,
+    "LevelBasedForaging": GymWrapper,
 }
 
 
@@ -243,10 +242,11 @@ def make_gym_env(
     Returns:
         Async environments.
     """
-    env_maker, wrapper = _gym_registry[config.env.scenario.name]
+    wrapper = _gym_registry[config.env.env_name]
 
     def create_gym_env(config: DictConfig, add_global_state: bool = False) -> gymnasium.Env:
-        env = env_maker(**config.env.scenario.task_config)
+        registered_name = f"{config.env.scenario.name}:{config.env.scenario.task_name}"
+        env = gym.make(registered_name, disable_env_checker=False)
         wrapped_env = wrapper(env, config.env.use_shared_rewards, add_global_state)
         if config.env.add_agent_id:
             wrapped_env = GymAgentIDWrapper(wrapped_env)
