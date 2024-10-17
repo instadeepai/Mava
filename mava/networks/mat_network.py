@@ -8,7 +8,7 @@ from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
 from mava.networks.attention import SelfAttention
-from mava.networks.distributions import IdentityTransformation
+from mava.networks.distributions import IdentityTransformation, TanhTransformedDistribution
 import tensorflow_probability.substrates.jax.distributions as tfd
 
 class SwiGLU(nn.Module):
@@ -356,12 +356,12 @@ def discrete_parallel_act(
 def continuous_parallel_act(
     decoder: Decoder,
     obs_rep: chex.Array,  # (batch, n_agent, n_embd)
-    obs: chex.Array,  # (batch, n_agent, obs_dim)
     action: chex.Array,  # (batch, n_agent, 1 <- should prob be action_dim)
     batch_size: int,  # (, )
     n_agent: int,  # (, )
     action_dim: int,  # (, )
     legal_actions: chex.Array,
+    key: chex.PRNGKey,
 ) -> Tuple[chex.Array, chex.Array]:
     shifted_action = jnp.zeros(
         (batch_size, n_agent, action_dim)
@@ -369,15 +369,16 @@ def continuous_parallel_act(
 
     shifted_action = shifted_action.at[:, 1:, :].set(action[:, :-1, :])
 
-    act_mean = decoder(shifted_action, obs_rep, obs)
+    act_mean = decoder(shifted_action, obs_rep)
     action_std = jax.nn.softplus(decoder.log_std)
 
-    distribution = tfd.MultivariateNormalDiag(loc=act_mean, scale_diag=action_std)
+    distribution = tfd.Normal(loc=act_mean, scale=action_std)
+    distribution = tfd.Independent(
+        TanhTransformedDistribution(distribution),
+        reinterpreted_batch_ndims=1,
+    )
     action_log_prob = distribution.log_prob(action)
-    action_log_prob -= jnp.sum(
-        2.0 * (jnp.log(2.0) - action - jax.nn.softplus(-2.0 * action)), axis=-1
-    )  # (batch, n_agent, 1)
-    entropy = distribution.entropy()
+    entropy = distribution.entropy(seed=key)
 
     return action_log_prob, entropy
 
@@ -447,7 +448,6 @@ def discrete_autoregressive_act(
 def continuous_autoregressive_act(
     decoder: Decoder,
     obs_rep: chex.Array,  # (batch, n_agent, n_embd)
-    obs: chex.Array,  # (batch, n_agent, obs_dim)
     batch_size: int,  # (, )
     n_agent: int,  # (, )
     action_dim: int,  # (, )
@@ -458,25 +458,22 @@ def continuous_autoregressive_act(
         (batch_size, n_agent, action_dim)
     )  # (batch, n_agent, action_dim)
     output_action = jnp.zeros((batch_size, n_agent, action_dim))
-    raw_output_action = jnp.zeros((batch_size, n_agent, action_dim))
     output_action_log = jnp.zeros((batch_size, n_agent))
 
     for i in range(n_agent):
-        act_mean = decoder(shifted_action, obs_rep, obs)[:, i, :]  # (batch, action_dim)
-        action_std = action_std = jax.nn.softplus(decoder.log_std)
+        act_mean = decoder(shifted_action, obs_rep)[:, i, :]  # (batch, action_dim)
+        action_std = jax.nn.softplus(decoder.log_std)
 
         key, sample_key = jax.random.split(key)
 
-        distribution = tfd.MultivariateNormalDiag(loc=act_mean, scale_diag=action_std)
-        raw_action = distribution.sample(seed=sample_key)
-        action_log = distribution.log_prob(raw_action)
-        action_log -= jnp.sum(
-            2.0 * (jnp.log(2.0) - raw_action - jax.nn.softplus(-2.0 * raw_action)),
-            axis=-1,
-        )  # (batch, 1)
-        action = jnp.tanh(raw_action)
+        distribution = tfd.Normal(loc=act_mean, scale=action_std)
+        distribution = tfd.Independent(
+            TanhTransformedDistribution(distribution),
+            reinterpreted_batch_ndims=1,
+        )
+        action = distribution.sample(seed=sample_key)
+        action_log = distribution.log_prob(action)
 
-        raw_output_action = raw_output_action.at[:, i, :].set(raw_action)
         output_action = output_action.at[:, i, :].set(action)
         output_action_log = output_action_log.at[:, i].set(action_log)
 
@@ -489,7 +486,7 @@ def continuous_autoregressive_act(
             lambda shifted_action=shifted_action: shifted_action,
         )
 
-    return output_action, output_action_log, raw_output_action
+    return output_action, output_action_log
 
 
 if __name__ == "__main__":

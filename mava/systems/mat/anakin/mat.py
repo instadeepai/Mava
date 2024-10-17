@@ -429,7 +429,12 @@ def learner_setup(
     init_x = env.observation_spec().generate_value()
     init_x = tree.map(lambda x: x[None, ...], init_x)
 
-    init_action = jnp.zeros((1, config.system.num_agents), dtype=jnp.int32)
+    if config.network.action_space_type == "discrete":
+        init_action = jnp.zeros((1, config.system.num_agents), dtype=jnp.int32)
+    elif config.network.action_space_type == "continuous":
+        init_action = jnp.zeros((1, config.system.num_agents, env.action_dim), dtype=jnp.float32)
+    else: 
+        raise ValueError("Invalid action space type")
 
     # Define network and optimiser.
     actor_network = MultiAgentTransformer(
