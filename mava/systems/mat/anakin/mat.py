@@ -86,10 +86,6 @@ def get_learner_fn(
                 last_timestep.observation.action_mask,
                 policy_key,
             )
-            action = jnp.squeeze(action, axis=-1)
-            log_prob = jnp.squeeze(log_prob, axis=-1)
-            value = jnp.squeeze(value, axis=-1)
-
             # STEP ENVIRONMENT
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
@@ -157,8 +153,6 @@ def get_learner_fn(
             last_val_key,
         )
 
-        last_val = jnp.squeeze(last_val, axis=-1)
-
         def _calculate_gae(
             traj_batch: PPOTransition,
             last_val: chex.Array,
@@ -223,10 +217,6 @@ def get_learner_fn(
                         traj_batch.action,
                         traj_batch.obs.action_mask,
                     )
-
-                    log_prob = jnp.squeeze(log_prob, axis=-1)
-                    value = jnp.squeeze(value, axis=-1)
-                    entropy = jnp.squeeze(entropy, axis=-1)
 
                     # CALCULATE ACTOR LOSS
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -565,11 +555,11 @@ def run_experiment(_config: DictConfig) -> float:
         # Note: The squeeze axis should be changed based on the action type.
         # continous action -> axis=0 || discrete action -> axis=(0, -1)
         # if action_space_type == "discrete":
-        action = jnp.squeeze(output_action, axis=-1)
+        # action = jnp.squeeze(output_action, axis=-1)
         # elif action_space_type == "continuous":
         # output_action = jnp.squeeze(output_action, axis=0)
 
-        return action, {}
+        return output_action, {}
 
     evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
 

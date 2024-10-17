@@ -107,7 +107,7 @@ class Encoder(nn.Module):
         rep = self.blocks(self.ln(x))
         v_loc = self.head(rep)
 
-        return v_loc, rep
+        return jnp.squeeze(v_loc, axis=-1), rep
 
 
 class DecodeBlock(nn.Module):
@@ -346,8 +346,7 @@ def discrete_parallel_act(
 
     distribution = IdentityTransformation(distribution=tfd.Categorical(logits=masked_logits))
     action_log_prob = distribution.log_prob(action)
-    action_log_prob = jnp.expand_dims(action_log_prob, axis=-1)  # (batch, n_agent, 1)
-    entropy = jnp.expand_dims(distribution.entropy(), axis=-1)  # (batch, n_agent, 1)
+    entropy = distribution.entropy()
 
     return action_log_prob, entropy
 
@@ -397,9 +396,9 @@ def discrete_autoregressive_act(
     # [[1, 0, 0, 0, 0, 0],
     #  [0, 0, 0, 0, 0, 0],
     #  [0, 0, 0, 0, 0, 0]]
-    output_action = jnp.zeros((batch_size, n_agent, 1))
+    output_action = jnp.zeros((batch_size, n_agent))
     output_action_log = jnp.zeros_like(output_action)
-    # both have shape (batch, n_agent, 1)
+    # both have shape (batch, n_agent)
 
     for i in range(n_agent):
         logit = decoder(shifted_action, obs_rep)[:, i, :]
@@ -415,12 +414,12 @@ def discrete_autoregressive_act(
         action = distribution.sample(seed=sample_key)
         action_log = distribution.log_prob(action)
 
-        output_action = output_action.at[:, i, :].set(
-            jnp.expand_dims(action, axis=-1)
-        )  # (batch, n_agent, 1)
-        output_action_log = output_action_log.at[:, i, :].set(
-            jnp.expand_dims(action_log, axis=-1)
-        )  # (batch, n_agent, 1)
+        output_action = output_action.at[:, i].set(
+            action
+        )  # (batch, n_agent)
+        output_action_log = output_action_log.at[:, i].set(
+            action_log
+        )  # (batch, n_agent)
 
         update_shifted_action = i + 1 < n_agent
         shifted_action = jax.lax.cond(
