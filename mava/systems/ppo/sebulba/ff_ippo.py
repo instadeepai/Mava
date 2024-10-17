@@ -50,7 +50,6 @@ from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifet
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
-
 def rollout(
     key: chex.PRNGKey,
     env,
@@ -80,8 +79,6 @@ def rollout(
     actor_apply_fn, critic_apply_fn = apply_fns
     num_agents, num_envs = config.system.num_agents, config.arch.num_envs
     move_to_device = lambda x: jax.device_put(x, device=actor_device)
-
-    key = move_to_device(key)
 
     @jax.jit
     def act_fn(
@@ -579,6 +576,7 @@ def run_experiment(_config: DictConfig) -> float:
     params_sources_lifetime = ThreadLifetime()
 
     # Unfortunately we have to do this here, because creating envs inside the actor threads causes deadlocks
+    # todo: see what happens if we do this in the thread creating loop
     envs = [[] for i in range(len(actor_devices))]
     print(
         f"{Fore.BLUE}{Style.BRIGHT}Starting up environments, this may take a while...{Style.RESET_ALL}"
@@ -633,7 +631,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Acting and learning is happening in their own threads.
     # This loop waits for the learner to finish an update before evaluation and logging.
     for eval_step in range(config.arch.num_evaluation):
-        # Get the next set of params and metrics from the learner
+        # Sync with the learner - the get() is blocking so it keeps eval and learning in step.
         episode_metrics, train_metrics, learner_state, time_metrics = eval_queue.get()
 
         t = int(steps_per_rollout * (eval_step + 1))
@@ -653,7 +651,7 @@ def run_experiment(_config: DictConfig) -> float:
 
         unreplicated_actor_params = unreplicate(learner_state.params.actor_params)
         key, eval_key = jax.random.split(key, 2)
-        eval_metrics = evaluator(unreplicated_actor_params, eval_key, {})
+        eval_metrics = evaluator(jax.device_get(unreplicated_actor_params), eval_key, {})
         logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
 
         episode_return = np.mean(eval_metrics["episode_return"])
@@ -685,23 +683,18 @@ def run_experiment(_config: DictConfig) -> float:
         logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
         abs_metric_evaluator_envs.close()
 
-    # Stop the logger.
+    # Stop all the threads.
     logger.stop()
-    # Ask actors to stop before running the evaluator
     actor_lifetime.stop()
-    # We clear the pipeline before stopping the actor threads to avoid deadlock
-    pipe.clear()
-    print(f"{Fore.RED}{Style.BRIGHT}Pipe cleared: {pipe.qsize()}{Style.RESET_ALL}")
-
+    pipe.clear()  # We clear the pipeline before stopping the actor threads to avoid deadlock
+    print(f"{Fore.RED}{Style.BRIGHT}Pipe cleared{Style.RESET_ALL}")
     print(f"{Fore.RED}{Style.BRIGHT}Stopping actor threads...{Style.RESET_ALL}")
     for actor in actor_threads:
         actor.join()
         print(f"{Fore.RED}{Style.BRIGHT}{actor.name} stopped{Style.RESET_ALL}")
-
     print(f"{Fore.RED}{Style.BRIGHT}Stopping pipeline...{Style.RESET_ALL}")
     pipe_lifetime.stop()
     pipe.join()
-
     print(f"{Fore.RED}{Style.BRIGHT}Stopping params sources...{Style.RESET_ALL}")
     params_sources_lifetime.stop()
     for params_source in params_sources:

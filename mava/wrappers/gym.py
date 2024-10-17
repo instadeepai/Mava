@@ -95,10 +95,8 @@ class GymWrapper(gymnasium.Wrapper):
     def reset(
         self, seed: Optional[int] = None, options: Optional[dict] = None
     ) -> Tuple[NDArray, Dict]:
-        # todo: maybe we should just remove this? I think the hasattr could be slow and the
-        # `OrderEnforcingWrapper` blocks the seed call :/
-        if seed is not None and hasattr(self.env, "seed"):
-            self.env.seed(seed)
+        if seed is not None:
+            self.env.unwrapped.seed(seed)
 
         agents_view, info = self._env.reset()
 
