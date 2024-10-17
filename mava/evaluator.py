@@ -219,12 +219,15 @@ def make_rec_sable_act_fn(actor_apply_fn: ExecutionApply) -> EvalActFn:
         params: FrozenDict, timestep: TimeStep, key: PRNGKey, actor_state: ActorState
     ) -> Tuple[Action, Dict]:
         hidden_state = actor_state[_hidden_state]
-
+        pos_enc_info ={
+            "step": timestep.observation.step_count,
+        }
         output_action, _, _, hidden_state = actor_apply_fn(  # type: ignore
             params,
             timestep.observation.agents_view,
             timestep.observation.action_mask,
             hidden_state,
+            pos_enc_info,
             key,
         )
 
@@ -243,11 +246,15 @@ def make_ff_sable_act_fn(actor_apply_fn: ExecutionApply, dummy_hstates: HiddenSt
     def eval_act_fn(
         params: FrozenDict, timestep: TimeStep, key: PRNGKey, _: ActorState
     ) -> Tuple[Action, Dict]:
+        pos_enc_info ={
+            "step": timestep.observation.step_count,
+        }
         output_action, _, _, _ = actor_apply_fn(  # type: ignore
             params,
             timestep.observation.agents_view,
             timestep.observation.action_mask,
             dummy_hstates,
+            pos_enc_info,
             key,
         )
 

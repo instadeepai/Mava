@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import chex
 import distrax
@@ -60,17 +60,17 @@ class EncodeBlock(nn.Module):
         output = self.ln2(x + self.ffn(x))
         return output
 
-    def recurrent(self, x: chex.Array, hstate: chex.Array) -> chex.Array:
+    def recurrent(self, x: chex.Array, hstate: chex.Array, token_id: chex.Array) -> chex.Array:
         """Applies Recurrent MultiScaleRetention."""
-        ret, updated_hstate = self.retn.recurrent(key_n=x, query_n=x, value_n=x, hstate=hstate)
+        ret, updated_hstate = self.retn.recurrent(key_n=x, query_n=x, value_n=x, hstate=hstate, token_id=token_id)
         x = self.ln1(x + ret)
         output = self.ln2(x + self.ffn(x))
         return output, updated_hstate
 
-    def chunkwise(self, x: chex.Array, hstate: chex.Array, dones: chex.Array) -> chex.Array:
+    def chunkwise(self, x: chex.Array, hstate: chex.Array, dones: chex.Array, token_id: chex.Array) -> chex.Array:
         """Applies Chunkwise MultiScaleRetention."""
         ret, updated_hstate = self.retn.chunkwise(
-            key=x, query=x, value=x, hstate=hstate, dones=dones
+            key=x, query=x, value=x, hstate=hstate, dones=dones, token_id=token_id
         )
         x = self.ln1(x + ret)
         output = self.ln2(x + self.ffn(x))
@@ -136,7 +136,7 @@ class Encoder(nn.Module):
         return v_loc, obs_rep
 
     def recurrent(
-        self, obs: chex.Array, hstate: chex.Array
+        self, obs: chex.Array, hstate: chex.Array, token_id: chex.Array
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         """Apply recurrent encoding."""
         # Initialize the updated hidden state
@@ -149,7 +149,7 @@ class Encoder(nn.Module):
             # Get the hidden state for the current block
             hs = hstate[:, :, i]
             # Apply the recurrent encoder block
-            obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs)
+            obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs, token_id)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
         # Compute the value function
@@ -158,7 +158,7 @@ class Encoder(nn.Module):
         return v_loc, obs_rep, updated_hstate
 
     def chunkwise(
-        self, obs: chex.Array, hstate: chex.Array, dones: chex.Array
+        self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, token_id: chex.Array
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         """Apply chunkwise encoding."""
         # Initialize the updated hidden state
@@ -171,7 +171,7 @@ class Encoder(nn.Module):
             # Get the hidden state for the current block
             hs = hstate[:, :, i]
             # Apply the chunkwise encoder block
-            obs_rep, hs_new = block.chunkwise(self.ln(obs_rep), hs, dones)
+            obs_rep, hs_new = block.chunkwise(self.ln(obs_rep), hs, dones, token_id)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
         # Compute the value function
@@ -226,16 +226,17 @@ class DecodeBlock(nn.Module):
         x: chex.Array,
         obs_rep: chex.Array,
         hstates: Tuple[chex.Array, chex.Array],
+        token_id: chex.Array,
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Applies Recurrent MultiScaleRetention."""
         hs1, hs2 = hstates
 
         # Apply the self-retention over actions
-        ret, hs1_new = self.retn1.recurrent(key_n=x, query_n=x, value_n=x, hstate=hs1)
+        ret, hs1_new = self.retn1.recurrent(key_n=x, query_n=x, value_n=x, hstate=hs1, token_id=token_id)
         ret = self.ln1(x + ret)
 
         # Apply the cross-retention over obs x action
-        ret2, hs2_new = self.retn2.recurrent(key_n=ret, query_n=obs_rep, value_n=ret, hstate=hs2)
+        ret2, hs2_new = self.retn2.recurrent(key_n=ret, query_n=obs_rep, value_n=ret, hstate=hs2, token_id=token_id)
         y = self.ln2(obs_rep + ret2)
         output = self.ln3(y + self.ffn(y))
 
@@ -247,12 +248,13 @@ class DecodeBlock(nn.Module):
         obs_rep: chex.Array,
         hstates: Tuple[chex.Array, chex.Array],
         dones: chex.Array,
+        token_id: chex.Array,
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Applies Chunkwise MultiScaleRetention."""
         hs1, hs2 = hstates
 
         # Apply the self-retention over actions
-        ret, hs1_new = self.retn1.chunkwise(key=x, query=x, value=x, hstate=hs1, dones=dones)
+        ret, hs1_new = self.retn1.chunkwise(key=x, query=x, value=x, hstate=hs1, dones=dones, token_id=token_id)
         ret = self.ln1(x + ret)
 
         # Apply the cross-retention over obs x action
@@ -262,6 +264,7 @@ class DecodeBlock(nn.Module):
             value=ret,
             hstate=hs2,
             dones=dones,
+            token_id=token_id,
         )
         y = self.ln2(obs_rep + ret2)
         output = self.ln3(y + self.ffn(y))
@@ -343,6 +346,7 @@ class Decoder(nn.Module):
         action: chex.Array,
         obs_rep: chex.Array,
         hstates: Tuple[chex.Array, chex.Array],
+        token_id: chex.Array,
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Apply recurrent decoding."""
         # Initialize the updated hidden states
@@ -354,7 +358,7 @@ class Decoder(nn.Module):
         # Apply the decoder blocks
         for i, block in enumerate(self.blocks):
             hs = jax.tree.map(lambda x, i=i: x[:, :, i], hstates)
-            x, hs_new = block.recurrent(x=x, obs_rep=obs_rep, hstates=hs)
+            x, hs_new = block.recurrent(x=x, obs_rep=obs_rep, hstates=hs, token_id=token_id)
             updated_hstates = jax.tree.map(
                 lambda x, y: x.at[:, :, i].set(y), updated_hstates, hs_new
             )
@@ -370,6 +374,7 @@ class Decoder(nn.Module):
         obs_rep: chex.Array,
         hstates: Tuple[chex.Array, chex.Array],
         dones: chex.Array,
+        token_id: chex.Array,
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Apply chunkwise decoding."""
         # Initialize the updated hidden states
@@ -381,7 +386,7 @@ class Decoder(nn.Module):
         # Apply the decoder blocks
         for i, block in enumerate(self.blocks):
             hs = jax.tree.map(lambda x, i=i: x[:, :, i], hstates)
-            x, hs_new = block.chunkwise(x=x, obs_rep=obs_rep, hstates=hs, dones=dones)
+            x, hs_new = block.chunkwise(x=x, obs_rep=obs_rep, hstates=hs, dones=dones, token_id=token_id)
             updated_hstates = jax.tree.map(
                 lambda x, y: x.at[:, :, i].set(y), updated_hstates, hs_new
             )
@@ -438,6 +443,9 @@ class SableNetwork(nn.Module):
         #    self.executor = ContinuousExecutor()
         #    self.trainer = ContinuousTrainer()
 
+        # Get util functions for positional encoding
+        self._get_token_id = self._setup_token_type()
+
         # Decay kappa for each head
         self.decay_kappas = 1 - jnp.exp(
             jnp.linspace(jnp.log(1 / 32), jnp.log(1 / 512), self.n_head)
@@ -455,11 +463,14 @@ class SableNetwork(nn.Module):
         legal_actions: chex.Array,
         hstates: HiddenStates,
         dones: chex.Array,
+        pos_enc_info: Dict[str, chex.Array],
         rng_key: Optional[chex.PRNGKey] = None,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         """Training phase."""
+        # Get token id for positional encoding
+        token_id = self._get_token_id(pos_enc_info)
         # Apply the encoder
-        v_loc, obs_rep, _ = self.encoder.chunkwise(obs=obs, hstate=hstates[0], dones=dones)
+        v_loc, obs_rep, _ = self.encoder.chunkwise(obs=obs, hstate=hstates[0], dones=dones, token_id=token_id)
         # Apply the decoder
         action_log, entropy = self.parallel_act(
             decoder=self.decoder,
@@ -469,6 +480,7 @@ class SableNetwork(nn.Module):
             legal_actions=legal_actions,
             hstates=hstates[1],
             dones=dones,
+            token_id=token_id,
             rng_key=rng_key,
         )
 
@@ -479,6 +491,7 @@ class SableNetwork(nn.Module):
         obs: chex.Array,
         legal_actions: chex.Array,
         hstates: HiddenStates,
+        pos_enc_info: Dict[str, chex.Array],
         key: chex.PRNGKey,
     ) -> Tuple[chex.Array, chex.Array, chex.Array, HiddenStates]:
         """Inference phase."""
@@ -486,8 +499,12 @@ class SableNetwork(nn.Module):
         decayed_hstates = jax.tree.map(
             lambda x: x * self.decay_kappas[None, :, None, None, None], hstates
         )
+
+        # Get token id for positional encoding
+        token_id = self._get_token_id(pos_enc_info)
+
         # Apply the encoder
-        v_loc, obs_rep, updated_enc_hs = self.encoder.recurrent(obs, decayed_hstates[0])
+        v_loc, obs_rep, updated_enc_hs = self.encoder.recurrent(obs, decayed_hstates[0], token_id)
 
         # Apply the decoder
         output_actions, output_actions_log, updated_dec_hs = self.autoregressive_act(
@@ -495,12 +512,27 @@ class SableNetwork(nn.Module):
             obs_rep=obs_rep,
             legal_actions=legal_actions,
             hstates=decayed_hstates[1],
+            token_id=token_id,
             key=key,
         )
 
         # Pack the hidden states
         updated_hs = HiddenStates(encoder_hstate=updated_enc_hs, decoder_hstate=updated_dec_hs)
         return (output_actions, output_actions_log, v_loc, updated_hs)
+    
+    def _setup_token_type(self) -> Callable[[Dict[str, chex.Array]], chex.Array]:
+        """Setup the get_token_id function based on network type."""
+        def _get_step_id(pos_enc_info: Dict[str, chex.Array]) -> chex.Array:
+            """Get the step id."""
+            return pos_enc_info["step"]
+        def _get_agents_id(pos_enc_info: Dict[str, chex.Array]) -> chex.Array:
+            """Get the agents id."""
+            return pos_enc_info["agents_id"]
+        
+        if self.net_config.type=="rec_sable":
+            return _get_step_id
+        else:
+            return _get_agents_id
 
 
 def discrete_parallel_act(
@@ -511,6 +543,7 @@ def discrete_parallel_act(
     legal_actions: chex.Array,
     hstates: chex.Array,
     dones: chex.Array,
+    token_id: chex.Array,
     rng_key: Optional[chex.PRNGKey] = None,
 ) -> Tuple[chex.Array, chex.Array]:
     """Parallel action sampling for discrete action spaces."""
@@ -542,6 +575,7 @@ def discrete_parallel_act(
         obs_rep=obs_rep,
         hstates=hstates,
         dones=dones,
+        token_id=token_id,
     )
 
     # Mask the logits for illegal actions
@@ -569,6 +603,7 @@ def discrete_autoregressive_act(
     obs_rep: chex.Array,
     hstates: chex.Array,
     legal_actions: chex.Array,
+    token_id: chex.Array,
     key: chex.PRNGKey,
 ) -> Tuple[chex.Array, chex.Array, chex.Array]:
     # Get the batch size, sequence length, and action dimension
@@ -590,6 +625,7 @@ def discrete_autoregressive_act(
             action=shifted_actions[:, i : i + 1, :],
             obs_rep=obs_rep[:, i : i + 1, :],
             hstates=hstates,
+            token_id=token_id,
         )
         # Mask the logits for illegal actions
         masked_logits = jnp.where(

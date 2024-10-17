@@ -91,11 +91,15 @@ def get_learner_fn(
 
             # Apply the actor network to get the action, log_prob, value and updated hstates.
             last_obs = last_timestep.observation
+            pos_enc_info = {
+                "step": last_obs.step_count,
+            }
             action, log_prob, value, hstates = sable_action_select_fn(  # type: ignore
                 params,
                 last_obs.agents_view,
                 last_obs.action_mask,
                 hstates,
+                pos_enc_info,
                 policy_key,
             )
             action = jnp.squeeze(action, axis=-1)
@@ -147,12 +151,16 @@ def get_learner_fn(
         # CALCULATE ADVANTAGE
         params, opt_states, key, env_state, last_timestep, updated_hstates = learner_state
         key, last_val_key = jax.random.split(key)
+        pos_enc_info = {
+            "step": last_timestep.observation.step_count,
+        }
         _, _, current_val, _ = sable_action_select_fn(  # type: ignore
             params,
             last_timestep.observation.agents_view,
             last_timestep.observation.action_mask,
             updated_hstates,
-            last_val_key,
+            pos_enc_info,
+            last_val_key
         )
         current_val = jnp.squeeze(current_val, axis=-1)
         current_done = tree.map(
@@ -211,6 +219,9 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate Sable loss."""
                     # RERUN NETWORK
+                    pos_enc_info = {
+                        "step": traj_batch.obs.step_count,
+                    }
                     log_prob, value, entropy = sable_apply_fn(  # type: ignore
                         params,
                         traj_batch.obs.agents_view,
@@ -218,6 +229,7 @@ def get_learner_fn(
                         traj_batch.obs.action_mask,
                         prev_hstates,
                         traj_batch.done,
+                        pos_enc_info
                     )
                     log_prob = jnp.squeeze(log_prob, axis=-1)
                     value = jnp.squeeze(value, axis=-1)
@@ -467,6 +479,7 @@ def learner_setup(
         init_obs.action_mask,
         init_hs,
         init_dones,
+        {"step": init_obs.step_count},
     )
     opt_state = optim.init(params)
 

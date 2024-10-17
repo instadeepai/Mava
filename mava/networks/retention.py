@@ -250,7 +250,7 @@ class MultiScaleRetention(nn.Module):
         ]
 
         # Create an instance of the positional encoding
-        self.pe = PositionalEncoding(self.embed_dim)
+        self.pe = PositionalEncoding(self.net_config, self.embed_dim)
 
     def __call__(self, key: Array, query: Array, value: Array) -> Array:
         """Parallel (default) representation of the multi-scale retention mechanism."""
@@ -277,10 +277,13 @@ class MultiScaleRetention(nn.Module):
         return output
 
     def recurrent(
-        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array
+        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array, token_id: Array
     ) -> Tuple[Array, Array]:
         """Recurrent representation of the multi-scale retention mechanism"""
         batch, seq, _ = value_n.shape
+
+        # Set positional encoding
+        key_n, query_n, value_n = self.pe(key_n, query_n, value_n, token_id)
 
         # Per head retention
         Y = jnp.zeros((batch, seq, self.head_size), dtype=value_n.dtype)
@@ -300,10 +303,13 @@ class MultiScaleRetention(nn.Module):
         return output, h_ns
 
     def chunkwise(
-        self, key: Array, query: Array, value: Array, hstate: Array, dones: Array
+        self, key: Array, query: Array, value: Array, hstate: Array, dones: Array, token_id: Array
     ) -> Tuple[Array, Array]:
         """Chunkwise representation of the multi-scale retention mechanism"""
         batch, chunk_size, _ = value.shape
+
+        # Set positional encoding
+        key, query, value = self.pe(key, query, value, token_id)
 
         # Per head retention
         Y = jnp.zeros((batch, chunk_size, self.head_size), dtype=value.dtype)

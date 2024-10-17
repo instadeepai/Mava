@@ -12,5 +12,6 @@ chunkwise:
   chunk_size: 32 # Size of the chunk: calculated over timesteps dim.
 
 rec_config:
+  type: "rec_sable" # Type of the network.
   # --- Positional encoding ---
   timestep_positional_encoding: False # Timestamp positional encoding for Sable memory.
