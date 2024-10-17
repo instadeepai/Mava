@@ -206,7 +206,7 @@ class Decoder(nn.Module):
         )
 
     def __call__(
-        self, action: chex.Array, obs_rep: chex.Array, obs: chex.Array
+        self, action: chex.Array, obs_rep: chex.Array
     ) -> chex.Array:
         action_embeddings = self.action_encoder(action)
         x = self.ln(action_embeddings)
@@ -273,7 +273,6 @@ class MultiAgentTransformer(nn.Module):
         action_log, entropy = self.parallel_act(
             decoder=self.decoder,
             obs_rep=obs_rep,
-            obs=obs,
             batch_size=obs.shape[0],
             action=action,
             n_agent=self.n_agent,
@@ -294,7 +293,6 @@ class MultiAgentTransformer(nn.Module):
         output_action, output_action_log = self.autoregressive_act(
             decoder=self.decoder,
             obs_rep=obs_rep,
-            obs=obs,
             batch_size=obs.shape[0],
             n_agent=self.n_agent,
             action_dim=self.action_dim,
@@ -307,7 +305,6 @@ class MultiAgentTransformer(nn.Module):
 def discrete_parallel_act(
     decoder: Decoder,
     obs_rep: chex.Array,  # (batch, n_agent, n_embd)
-    obs: chex.Array,  # (batch, n_agent, obs_dim)
     action: chex.Array,  # (batch, n_agent, 1)
     batch_size: int,  # (, )
     n_agent: int,  # (, )
@@ -339,7 +336,7 @@ def discrete_parallel_act(
     #  [0, 0, 0, 1, 0, 0],
     #  [0, 0, 1, 0, 0, 0]]
 
-    logit = decoder(shifted_action, obs_rep, obs)  # (batch, n_agent, action_dim)
+    logit = decoder(shifted_action, obs_rep)  # (batch, n_agent, action_dim)
 
     masked_logits = jnp.where(
         legal_actions,
@@ -387,7 +384,6 @@ def continuous_parallel_act(
 def discrete_autoregressive_act(
     decoder: Decoder,
     obs_rep: chex.Array,
-    obs: chex.Array,
     batch_size: int,
     n_agent: int,
     action_dim: int,
@@ -406,7 +402,7 @@ def discrete_autoregressive_act(
     # both have shape (batch, n_agent, 1)
 
     for i in range(n_agent):
-        logit = decoder(shifted_action, obs_rep, obs)[:, i, :]
+        logit = decoder(shifted_action, obs_rep)[:, i, :]
         # logit: (batch, action_dim)
         masked_logits = jnp.where(
             legal_actions[:, i, :],
