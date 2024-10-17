@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
+from jax.sharding import Sharding
 from colorama import Fore, Style
 from jax import tree
 from jumanji.types import TimeStep
@@ -28,7 +29,7 @@ from jumanji.types import TimeStep
 # todo: remove the ppo dependencies
 from mava.systems.ppo.types import Params, PPOTransition
 
-QUEUE_PUT_TIMEOUT = 180
+QUEUE_PUT_TIMEOUT = 100
 
 
 class ThreadLifetime:
@@ -48,29 +49,29 @@ class ThreadLifetime:
 def _stack_trajectory(trajectory: List[PPOTransition]) -> PPOTransition:
     """Stack a list of parallel_env transitions into a single
     transition of shape [rollout_len, num_envs, ...]."""
-    return tree.map(lambda *x: jnp.stack(x, axis=0), *trajectory)  # type: ignore
+    return tree.map(lambda *x: jnp.stack(x, axis=0).swapaxes(0, 1), *trajectory)  # type: ignore
 
 
 # Modified from https://github.com/instadeepai/sebulba/blob/main/sebulba/core.py
 class Pipeline(threading.Thread):
     """
-    The `Pipeline` shards trajectories into `learner_devices`,
+    The `Pipeline` shards trajectories into learner devices,
     ensuring trajectories are consumed in the right order to avoid being off-policy
     and limit the max number of samples in device memory at one time to avoid OOM issues.
     """
 
-    def __init__(self, max_size: int, learner_devices: List[jax.Device], lifetime: ThreadLifetime):
+    def __init__(self, max_size: int, learner_sharding: Sharding, lifetime: ThreadLifetime):
         """
         Initializes the pipeline with a maximum size and the devices to shard trajectories across.
 
         Args:
             max_size: The maximum number of trajectories to keep in the pipeline.
-            learner_devices: The devices to shard trajectories across.
+            learner_sharding: The sharding used for the learner's update function.
             lifetime: A `ThreadLifetime` which is used to stop this thread.
         """
         super().__init__(name="Pipeline")
 
-        self.learner_devices = learner_devices
+        self.sharding = learner_sharding
         self.tickets_queue: queue.Queue = queue.Queue()
         self._queue: queue.Queue = queue.Queue(maxsize=max_size)
         self.lifetime = lifetime
@@ -97,22 +98,17 @@ class Pipeline(threading.Thread):
             self.tickets_queue.put((start_condition, end_condition))
             start_condition.wait()  # wait to be allowed to start
 
-        # [Transition(num_envs)] * rollout_len --> Transition[done=(rollout_len, num_envs, ...)]
+        # [Transition(num_envs)] * rollout_len -> Transition[done=(num_envs, rollout_len, ...)]
         traj = _stack_trajectory(traj)
-        # Split trajectory on the num envs axis so each learner device gets a valid full rollout
-        sharded_traj = jax.tree.map(lambda x: self.shard_split_playload(x, axis=1), traj)
+        sharded_traj, sharded_timestep = jax.device_put((traj, timestep), device=self.sharding, donate=True)
 
-        # Timestep[(num_envs, num_agents, ...), ...] -->
-        # [(num_envs / num_learner_devices, num_agents, ...)] * num_learner_devices
-        sharded_timestep = jax.tree.map(self.shard_split_playload, timestep)
-
-        # We block on the put to ensure that actors wait for the learners to catch up. This does two
-        # things:
+        # We block on the put to ensure that actors wait for the learners to catch up. 
+        # This does two things:
         # 1. It ensures that the actors don't get too far ahead of the learners, which could lead to
         # off-policy data.
         # 2. It ensures that the actors don't in a sense "waste" samples and their time by
         # generating samples that the learners can't consume.
-        # However, we put a timeout of 180 seconds to avoid deadlocks in case the learner
+        # However, we put a timeout of 100 seconds to avoid deadlocks in case the learner
         # is not consuming the data. This is a safety measure and should not be hit in normal
         # operation. We use a try-finally since the lock has to be released even if an exception
         # is raised.
@@ -149,6 +145,9 @@ class Pipeline(threading.Thread):
             except queue.Empty:
                 break
 
+    def shard(self, payload: Any):
+        ...
+    
     def shard_split_playload(self, payload: Any, axis: int = 0) -> Any:
         return self.shard_payload(self.split_payload(payload, axis))
 

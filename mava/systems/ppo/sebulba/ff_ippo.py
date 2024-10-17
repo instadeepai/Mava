@@ -26,6 +26,10 @@ import hydra
 import jax
 import jax.debug
 import jax.numpy as jnp
+from jax.sharding import Mesh, PartitionSpec as P
+from jax.sharding import NamedSharding
+from jax.experimental import mesh_utils
+from jax.experimental.shard_map import shard_map
 import numpy as np
 import optax
 from colorama import Fore, Style
@@ -409,8 +413,8 @@ def learner_thread(
                     rollout_times.append(rollout_time)
 
                 # Concatenate accumulated timesteps and trajectory batches on the num_envs axis
-                combined_traj_batch = jax.tree.map(lambda *x: jnp.concat(x, axis=2), *accumulated_traj_batches)
-                combined_timesteps = jax.tree.map(lambda *x: jnp.concat(x, axis=1), *accumulated_timesteps)
+                combined_traj_batch = jax.tree.map(lambda *x: jnp.concat(x, axis=0), *accumulated_traj_batches)
+                combined_timesteps = jax.tree.map(lambda *x: jnp.concat(x, axis=0), *accumulated_timesteps)
 
 
                 # Replace the timestep in the learner state with the latest timestep
@@ -453,6 +457,9 @@ def learner_setup(
     action_space = env.single_action_space
     config.system.num_agents = len(action_space)
     config.system.num_actions = int(action_space[0].n)
+
+    devices = mesh_utils.create_device_mesh((len(learner_devices),), devices=learner_devices)
+    mesh = Mesh(devices, axis_names=("learner_devices",))
 
     # PRNG keys.
     key, actor_key, critic_key = jax.random.split(key, 3)
@@ -500,7 +507,13 @@ def learner_setup(
     update_fns = (actor_optim.update, critic_optim.update)
 
     learn = get_learner_step_fn(apply_fns, update_fns, config)
-    learn = jax.pmap(learn, axis_name="learner_devices", devices=learner_devices)
+    learn = jax.jit(
+        shard_map(learn, 
+                  mesh=mesh, 
+                  in_specs=P("learner_devices"), 
+                  out_specs=P("learner_devices"))
+    )
+    # learn = jax.pmap(learn, axis_name="learner_devices", devices=learner_devices)
 
     # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
@@ -581,8 +594,12 @@ def run_experiment(_config: DictConfig) -> float:
     inital_params = unreplicate(learner_state.params)
 
     # the rollout queue/ the pipe between actor and learner
+    # todo: return this from/pass into: learner setup
+    devices = mesh_utils.create_device_mesh((len(learner_devices),), devices=learner_devices)
+    mesh = Mesh(devices, axis_names=("learner_devices",))
+    sharding = NamedSharding(mesh, P("learner_devices"))
     pipe_lifetime = ThreadLifetime()
-    pipe = Pipeline(config.arch.rollout_queue_size, learner_devices, pipe_lifetime)
+    pipe = Pipeline(config.arch.rollout_queue_size, sharding, pipe_lifetime)
     pipe.start()
 
     params_sources: List[ParamsSource] = []
