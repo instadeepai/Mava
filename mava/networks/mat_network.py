@@ -266,7 +266,7 @@ class MultiAgentTransformer(nn.Module):
             self.parallel_act = continuous_parallel_act
 
     def __call__(
-        self, obs: chex.Array, action: chex.Array, legal_actions: chex.Array
+        self, obs: chex.Array, action: chex.Array, legal_actions: chex.Array, key: chex.PRNGKey
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         v_loc, obs_rep = self.encoder(obs)
 
@@ -278,6 +278,7 @@ class MultiAgentTransformer(nn.Module):
             n_agent=self.n_agent,
             action_dim=self.action_dim,
             legal_actions=legal_actions,
+            key=key,
         )
 
         return action_log, v_loc, entropy
@@ -310,6 +311,7 @@ def discrete_parallel_act(
     n_agent: int,  # (, )
     action_dim: int,  # (, )
     legal_actions: chex.Array,
+    key: chex.PRNGKey,
 ) -> Tuple[chex.Array, chex.Array]:
     one_hot_action = jax.nn.one_hot(action, action_dim)  # (batch, n_agent, action_dim)
     shifted_action = jnp.zeros(
@@ -346,7 +348,7 @@ def discrete_parallel_act(
 
     distribution = IdentityTransformation(distribution=tfd.Categorical(logits=masked_logits))
     action_log_prob = distribution.log_prob(action)
-    entropy = distribution.entropy()
+    entropy = distribution.entropy(seed=key)
 
     return action_log_prob, entropy
 

@@ -198,7 +198,7 @@ def get_learner_fn(
                 """Update the network for a single minibatch."""
 
                 # UNPACK TRAIN STATE AND BATCH INFO
-                params, opt_state = train_state
+                params, opt_state, key = train_state
                 (traj_batch, advantages, targets) = batch_info
 
                 def _actor_loss_fn(
@@ -207,6 +207,7 @@ def get_learner_fn(
                     traj_batch: PPOTransition,
                     gae: chex.Array,
                     value_targets: chex.Array,
+                    entropy_key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
                     # RERUN NETWORK
@@ -216,6 +217,7 @@ def get_learner_fn(
                         traj_batch.obs.agents_view,
                         traj_batch.action,
                         traj_batch.obs.action_mask,
+                        entropy_key
                     )
 
                     # CALCULATE ACTOR LOSS
@@ -259,6 +261,7 @@ def get_learner_fn(
                     return total_loss, (loss_actor, entropy, value_loss)
 
                 # CALCULATE ACTOR LOSS
+                key, entropy_key = jax.random.split(key)
                 actor_grad_fn = jax.value_and_grad(_actor_loss_fn, has_aux=True)
                 actor_loss_info, actor_grads = actor_grad_fn(
                     params.actor_params,
@@ -266,6 +269,7 @@ def get_learner_fn(
                     traj_batch,
                     advantages,
                     targets,
+                    entropy_key,
                 )
 
                 actor_grads, actor_loss_info = jax.lax.pmean(
@@ -300,7 +304,7 @@ def get_learner_fn(
                     "entropy": entropy,
                 }
 
-                return (new_params, new_opt_state), loss_info
+                return (new_params, new_opt_state, key), loss_info
 
             (
                 params,
@@ -323,7 +327,7 @@ def get_learner_fn(
             )
 
             # Shuffle along the agent dimension as well
-            key, shuffle_key = jax.random.split(key)
+            key, shuffle_key, entropy_key = jax.random.split(key, 3)
             permutation = jax.random.permutation(shuffle_key, config.system.num_agents)
             shuffled_batch = tree.map(
                 lambda x: jnp.take(x, permutation, axis=1), shuffled_batch
@@ -337,8 +341,8 @@ def get_learner_fn(
             )
 
             # UPDATE MINIBATCHES
-            (params, opt_state), loss_info = jax.lax.scan(
-                _update_minibatch, (params, opt_state), minibatches
+            (params, opt_state, entropy_key), loss_info = jax.lax.scan(
+                _update_minibatch, (params, opt_state, entropy_key), minibatches
             )
 
             update_state = (
@@ -448,7 +452,7 @@ def learner_setup(
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(
-        actor_net_key, init_x.agents_view, init_action, init_x.action_mask
+        actor_net_key, init_x.agents_view, init_action, init_x.action_mask, jax.random.PRNGKey(0)
     )
     actor_opt_state = actor_optim.init(actor_params)
 
