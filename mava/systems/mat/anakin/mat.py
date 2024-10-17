@@ -79,7 +79,7 @@ def get_learner_fn(
 
             # SELECT ACTION
             key, policy_key = jax.random.split(key)
-            action, log_prob, value, _ = actor_action_select_fn(  # type: ignore
+            action, log_prob, value = actor_action_select_fn(  # type: ignore
                 params.actor_params,
                 last_timestep.observation.agents_view,
                 last_timestep.observation.action_mask,
@@ -148,7 +148,7 @@ def get_learner_fn(
         )
 
         key, last_val_key = jax.random.split(key)
-        _, _, last_val, _ = actor_action_select_fn(  # type: ignore
+        _, _, last_val = actor_action_select_fn(  # type: ignore
             params.actor_params,
             last_timestep.observation.agents_view,
             last_timestep.observation.action_mask,
@@ -445,6 +445,7 @@ def learner_setup(
         n_agent=config.system.num_agents,
         use_rmsnorm=config.network.use_rmsnorm,
         use_swiglu=config.network.use_swiglu,
+        action_space_type=config.network.action_space_type
     )
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
@@ -551,7 +552,7 @@ def run_experiment(_config: DictConfig) -> float:
         A custom function is needed for epsilon-greedy acting.
         """
 
-        output_action, _, _, _ = actor_network.apply(  # type: ignore
+        output_action, _, _ = actor_network.apply(  # type: ignore
             params,
             timestep.observation.agents_view,
             timestep.observation.action_mask,

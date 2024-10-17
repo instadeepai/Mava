@@ -6,3 +6,4 @@ actor_network:
 
 use_rmsnorm: False
 use_swiglu: False
+action_space_type: discrete # discrete, continuous

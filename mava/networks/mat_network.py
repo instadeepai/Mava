@@ -8,7 +8,7 @@ from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
 from mava.networks.attention import SelfAttention
-from mava.distributions import IdentityTransformation
+from mava.networks.distributions import IdentityTransformation
 import tensorflow_probability.substrates.jax.distributions as tfd
 
 class SwiGLU(nn.Module):
@@ -97,14 +97,6 @@ class Encoder(nn.Module):
                 nn.gelu,
                 ln(),
                 nn.Dense(1, kernel_init=orthogonal(0.01)),
-            ],
-        )
-        self.act_head = nn.Sequential(
-            [
-                nn.Dense(self.n_embd, kernel_init=orthogonal(jnp.sqrt(2))),
-                nn.gelu,
-                ln(),
-                nn.Dense(self.action_dim, kernel_init=orthogonal(0.01)),
             ],
         )
 
@@ -299,7 +291,7 @@ class MultiAgentTransformer(nn.Module):
         # v_loc: (batch, n_agent, 1)
 
         v_loc, obs_rep = self.encoder(obs)
-        output_action, output_action_log, raw_action = self.autoregressive_act(
+        output_action, output_action_log = self.autoregressive_act(
             decoder=self.decoder,
             obs_rep=obs_rep,
             obs=obs,
@@ -309,11 +301,7 @@ class MultiAgentTransformer(nn.Module):
             legal_actions=legal_actions,
             key=key,
         )
-        return output_action, output_action_log, v_loc, raw_action
-
-    def get_values(self, obs: chex.Array) -> chex.Array:
-        v_loc, _ = self.encoder(obs)
-        return v_loc
+        return output_action, output_action_log, v_loc
 
 
 def discrete_parallel_act(
@@ -456,7 +444,7 @@ def discrete_autoregressive_act(
         # An important note, the shifted actions are not really relevant,
         # they are just used to act autoregreesively.
 
-    return output_action.astype(jnp.int32), output_action_log, None
+    return output_action.astype(jnp.int32), output_action_log
 
 
 def continuous_autoregressive_act(
