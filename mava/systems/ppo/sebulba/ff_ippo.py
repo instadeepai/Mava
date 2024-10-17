@@ -396,23 +396,38 @@ def learner_thread(
 
         with RecordTimeTo(learn_times["learner_time_per_eval"]):
             for _ in range(config.system.num_updates_per_eval):
-                # Get the trajectory batch from the pipeline
-                # This is blocking so it will wait until the pipeline has data.
-                with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, timestep, rollout_time = pipeline.get(block=True)
+                # Accumulate the batches, timesteps, and rollout times
+                accumulated_traj_batches = []
+                accumulated_timesteps = []
+
+                for _ in range(config.arch.n_learner_accumulate):
+                    # Get the trajectory batch from the pipeline
+                    # This is blocking so it will wait until the pipeline has data.
+                    with RecordTimeTo(learn_times["rollout_get_time"]):
+                        traj_batch, timestep, rollout_time = pipeline.get(block=True)
+
+                    # Store the retrieved data
+                    accumulated_traj_batches.append(traj_batch)
+                    accumulated_timesteps.append(timestep)
+                    rollout_times.append(rollout_time)
+
+                # Concatenate accumulated timesteps and trajectory batches on the num_envs axis
+                combined_traj_batch = jax.tree.map(lambda *x: jnp.concat(x, axis=2), *accumulated_traj_batches)
+                combined_timesteps = jax.tree.map(lambda *x: jnp.concat(x, axis=1), *accumulated_timesteps)
+
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
                 # an additional timestep which it can use to bootstrap.
-                learner_state = learner_state._replace(timestep=timestep)
+                learner_state = learner_state._replace(timestep=combined_timesteps)
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
                     learner_state, episode_metrics, train_metrics = learn_fn(
-                        learner_state, traj_batch
+                        learner_state, combined_traj_batch
                     )
-
+                    
                 metrics.append((episode_metrics, train_metrics))
-                rollout_times.append(rollout_time)
+                
 
                 # Update all the params sources so all actors can get the latest params
                 unreplicated_params = unreplicate(learner_state.params)

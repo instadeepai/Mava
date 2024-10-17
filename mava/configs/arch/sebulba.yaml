@@ -18,6 +18,7 @@ absolute_metric: True # Whether the absolute metric should be computed. For more
 n_threads_per_executor: 2  # num of different threads/env batches per actor
 actor_device_ids: [0] # ids of actor devices
 learner_device_ids: [0] # ids of learner devices
+n_learner_accumulate: 1  # Number of envoirnments to accumulate before updating the parameters. This determines the num_envs for learning updates which equals (num_envs * n_learner_accumulate) / len(learner_device_ids).
 rollout_queue_size : 5
 # The size of the pipeline queue determines the extent of off-policy training allowed. A larger value permits more off-policy training.
 # Too large of a value with too many actors will lead to all of the updates getting wasted in old episodes
