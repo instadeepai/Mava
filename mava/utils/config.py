@@ -46,9 +46,11 @@ def check_total_timesteps(config: DictConfig) -> DictConfig:
     if config.arch.architecture_name == "anakin":
         n_devices = len(jax.devices())
         update_batch_size = config.system.update_batch_size
+        n_accumulate = 1 # We dont accumulate envs in anakin
     else:
         n_devices = 1  # We only use a single device's output when updating.
         update_batch_size = 1
+        n_accumulate = config.arch.n_learner_accumulate
 
     if config.system.total_timesteps is None:
         config.system.num_updates = int(config.system.num_updates)
@@ -58,6 +60,7 @@ def check_total_timesteps(config: DictConfig) -> DictConfig:
             * config.system.rollout_length
             * update_batch_size
             * config.arch.num_envs
+            * n_accumulate
         )
     else:
         config.system.total_timesteps = int(config.system.total_timesteps)
@@ -67,6 +70,7 @@ def check_total_timesteps(config: DictConfig) -> DictConfig:
             // update_batch_size
             // config.arch.num_envs
             // n_devices
+            // n_accumulate
         )
         print(
             f"{Fore.RED}{Style.BRIGHT} Changing the number of updates "

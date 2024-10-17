@@ -559,7 +559,7 @@ def run_experiment(_config: DictConfig) -> float:
     check_sebulba_config(config)
 
     steps_per_rollout = (
-        config.system.rollout_length * config.arch.num_envs * config.system.num_updates_per_eval
+        config.system.rollout_length * config.arch.num_envs * config.system.num_updates_per_eval * config.arch.n_learner_accumulate
     )
 
     # Logger setup
