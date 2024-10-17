@@ -19,6 +19,9 @@ import jax
 import jax.numpy as jnp
 from chex import Array
 from colorama import Fore, Style
+from omegaconf import DictConfig
+
+from mava.utils.sable_utils import PositionalEncoding
 
 
 class SimpleRetention(nn.Module):
@@ -29,6 +32,7 @@ class SimpleRetention(nn.Module):
     n_agents: int
     full_self_retention: bool
     decay_kappa: float
+    net_config: DictConfig
 
     def setup(self) -> None:
         # Initialize the weights
@@ -197,6 +201,7 @@ class MultiScaleRetention(nn.Module):
     embed_dim: int
     n_head: int
     n_agents: int
+    net_config: DictConfig
     full_self_retention: bool = False
     decay_scaling_factor: float = 1.0
 
@@ -239,9 +244,13 @@ class MultiScaleRetention(nn.Module):
                 self.n_agents,
                 self.full_self_retention,
                 decay_kappa,
+                self.net_config,
             )
             for decay_kappa in self.decay_kappas
         ]
+
+        # Create an instance of the positional encoding
+        self.pe = PositionalEncoding(self.embed_dim)
 
     def __call__(self, key: Array, query: Array, value: Array) -> Array:
         """Parallel (default) representation of the multi-scale retention mechanism."""

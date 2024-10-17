@@ -20,6 +20,7 @@ import jax
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
+from omegaconf import DictConfig
 
 from mava.networks.retention import MultiScaleRetention
 from mava.systems.sable.types import HiddenStates
@@ -32,6 +33,7 @@ class EncodeBlock(nn.Module):
     embed_dim: int
     n_head: int
     n_agents: int
+    net_config: DictConfig
     decay_scaling_factor: float
 
     def setup(self) -> None:
@@ -45,6 +47,7 @@ class EncodeBlock(nn.Module):
             n_head=self.n_head,
             n_agents=self.n_agents,
             full_self_retention=True,  # Full retention for the encoder
+            net_config=self.net_config,
             decay_scaling_factor=self.decay_scaling_factor,
         )
 
@@ -81,6 +84,7 @@ class Encoder(nn.Module):
     embed_dim: int
     n_head: int
     n_agents: int
+    net_config: DictConfig
     decay_scaling_factor: float = 1.0
 
     def setup(self) -> None:
@@ -110,6 +114,7 @@ class Encoder(nn.Module):
                 self.embed_dim,
                 self.n_head,
                 self.n_agents,
+                self.net_config,
                 self.decay_scaling_factor,
                 name=f"encoder_block_{block_id}",
             )
@@ -181,8 +186,8 @@ class DecodeBlock(nn.Module):
     embed_dim: int
     n_head: int
     n_agents: int
+    net_config: DictConfig
     decay_scaling_factor: float
-    use_swiglu: bool = False
 
     def setup(self) -> None:
         # Initialize the RMSNorm layer normalization
@@ -194,6 +199,7 @@ class DecodeBlock(nn.Module):
             n_head=self.n_head,
             n_agents=self.n_agents,
             full_self_retention=False,  # Masked retention for the decoder
+            net_config=self.net_config,
             decay_scaling_factor=self.decay_scaling_factor,
         )
         self.retn2 = MultiScaleRetention(
@@ -201,6 +207,7 @@ class DecodeBlock(nn.Module):
             n_head=self.n_head,
             n_agents=self.n_agents,
             full_self_retention=False,  # Masked retention for the decoder
+            net_config=self.net_config,
             decay_scaling_factor=self.decay_scaling_factor,
         )
 
@@ -270,6 +277,7 @@ class Decoder(nn.Module):
     n_head: int
     n_agents: int
     action_dim: int
+    net_config: DictConfig
     decay_scaling_factor: float = 1.0
     action_space_type: str = "discrete"
 
@@ -308,6 +316,7 @@ class Decoder(nn.Module):
                 self.embed_dim,
                 self.n_head,
                 self.n_agents,
+                self.net_config,
                 self.decay_scaling_factor,
                 name=f"decoder_block_{block_id}",
             )
@@ -391,6 +400,7 @@ class SableNetwork(nn.Module):
     n_head: int
     n_agents: int
     action_dim: int
+    net_config: DictConfig
     decay_scaling_factor: float = 1.0
     action_space_type: str = "discrete"
 
@@ -406,6 +416,7 @@ class SableNetwork(nn.Module):
             self.embed_dim,
             self.n_head,
             self.n_agents,
+            self.net_config,
             self.decay_scaling_factor,
         )
         self.decoder = Decoder(
@@ -414,6 +425,7 @@ class SableNetwork(nn.Module):
             self.n_head,
             self.n_agents,
             self.action_dim,
+            self.net_config,
             self.decay_scaling_factor,
             self.action_space_type,
         )

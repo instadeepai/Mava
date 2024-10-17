@@ -1,4 +1,4 @@
-# --- Network params ---
+# ---  Retention for Non-memory Sable ---
 n_block: 1 # Number of blocks
 embed_dim: 64 # Embedding dimension
 n_head: 1 # Number of heads
@@ -10,3 +10,8 @@ chunkwise:
   # Chunking the sequence into smaller parts to fit into memory.
   use_chunkwise: False # Whether to chunk the sequence.
   chunk_size: 32 # Size of the chunk: calculated over timesteps dim.
+
+ff_config:
+  # --- Positional encoding ---
+  agents_positional_encoding: True # Agents positional encoding for Sable non-memory.
+  # It is recommended to enable either it or 'add_agent_id', but not both simultaneously to prevent redundancy and conflict.

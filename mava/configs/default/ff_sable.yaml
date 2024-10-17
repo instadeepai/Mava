@@ -2,7 +2,7 @@ defaults:
   - logger: logger
   - arch: anakin
   - system: sable/ff_sable
-  - network: retention
+  - network: ff_retention
   - env: rware  # [cleaner, connector, gigastep, lbf, mabrax, matrax, rware, smax]
   - _self_
 

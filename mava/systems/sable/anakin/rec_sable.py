@@ -429,6 +429,9 @@ def learner_setup(
     config.system.num_agents = n_agents
     config.system.num_actions = action_dim
 
+    # Get network configs.
+    net_config: DictConfig = config.network.rec_config
+
     # Define network.
     sable_network = SableNetwork(
         n_block=config.network.n_block,
@@ -436,6 +439,7 @@ def learner_setup(
         n_head=config.network.n_head,
         n_agents=n_agents,
         action_dim=action_dim,
+        net_config=net_config,
         decay_scaling_factor=config.network.decay_scaling_factor,
         action_space_type="discrete",
     )

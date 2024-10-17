@@ -396,6 +396,17 @@ def learner_setup(
     config.system.num_agents = n_agents
     config.system.num_actions = action_dim
 
+    # Get network configuration.
+    net_config: DictConfig = config.network.ff_config
+    # Check if both positional encoding and agent id are enabled.
+    if net_config.agents_positional_encoding and config.system.add_agent_id:
+        print(
+            f"{Fore.RED}{Style.BRIGHT}Warning: Both 'agents_positional_encoding'"
+            + " and 'add_agent_id' are enabled. These options are mutually exclusive"
+            + " because they serve similar purposes in distinguishing agents."
+            + f" Recommeneded to enable only one.{Style.RESET_ALL}"
+        )
+
     # Define network.
     sable_network = SableNetwork(
         n_block=config.network.n_block,
@@ -403,6 +414,7 @@ def learner_setup(
         n_head=config.network.n_head,
         n_agents=n_agents,
         action_dim=action_dim,
+        net_config=net_config,
         action_space_type="discrete",
     )
 
