@@ -625,7 +625,7 @@ def discrete_autoregressive_act(
             action=shifted_actions[:, i : i + 1, :],
             obs_rep=obs_rep[:, i : i + 1, :],
             hstates=hstates,
-            token_id=token_id,
+            token_id=token_id[:, i : i + 1],
         )
         # Mask the logits for illegal actions
         masked_logits = jnp.where(

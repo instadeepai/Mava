@@ -113,13 +113,7 @@ class PositionalEncoding(nn.Module):
         """Computes positional encoding for a given sequence of positions."""
         # Check if positional encoding is enabled
         if self.do_pos_enc:
-            seq_len = position.shape[0]
-
-            # Calculate positional encoding using sine for even indices and cosine for odd indices.
-            x = position[:, jnp.newaxis] * self.div_term
-            pe = jnp.zeros((seq_len, self.d_model))
-            pe = pe.at[:, 0::2].set(jnp.sin(x))
-            pe = pe.at[:, 1::2].set(jnp.cos(x))
+            pe = jax.vmap(self._get_pos_encoding)(position)
 
             # Add positional encoding to the input tensors
             key += pe
@@ -127,3 +121,15 @@ class PositionalEncoding(nn.Module):
             value += pe
 
         return key, query, value
+    
+    def _get_pos_encoding(self, position: chex.Array) -> chex.Array:
+        """Computes positional encoding for a given the index of the token."""
+        seq_len = position.shape[0]
+
+        # Calculate positional encoding using sine for even indices and cosine for odd indices.
+        x = position[:, jnp.newaxis] * self.div_term
+        pe = jnp.zeros((seq_len, self.d_model))
+        pe = pe.at[:, 0::2].set(jnp.sin(x))
+        pe = pe.at[:, 1::2].set(jnp.cos(x))
+
+        return pe
