@@ -38,6 +38,7 @@ from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
+from jax import tree
 
 def get_learner_fn(
     env: Environment,
@@ -93,29 +94,30 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # LOG EPISODE METRICS
-            done = jax.tree_util.tree_map(
+            done = tree.map(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(
                     config.arch.num_envs, -1
                 ),
                 timestep.last(),
             )
 
-            # shuffling along the agent dimension during training with tree_map. Otherwise
+            # Repeat along the agent dimension. This is needed to handle the
+            # shuffling along the agent dimension during training. Otherwise
             # it breaks.
             info = {
-                "episode_return": jax.tree_util.tree_map(
+                "episode_return": tree.map(
                     lambda x: jnp.repeat(x, config.system.num_agents).reshape(
                         config.arch.num_envs, -1
                     ),
                     timestep.extras["episode_metrics"]["episode_return"],
                 ),
-                "episode_length": jax.tree_util.tree_map(
+                "episode_length": tree.map(
                     lambda x: jnp.repeat(x, config.system.num_agents).reshape(
                         config.arch.num_envs, -1
                     ),
                     timestep.extras["episode_metrics"]["episode_length"],
                 ),
-                "is_terminal_step": jax.tree_util.tree_map(
+                "is_terminal_step": tree.map(
                     lambda x: jnp.repeat(x, config.system.num_agents).reshape(
                         config.arch.num_envs, -1
                     ),
@@ -325,19 +327,19 @@ def get_learner_fn(
             permutation = jax.random.permutation(shuffle_key, batch_size)
 
             batch = (traj_batch, advantages, targets)
-            batch = jax.tree_util.tree_map(lambda x: merge_leading_dims(x, 2), batch)
-            shuffled_batch = jax.tree_util.tree_map(
+            batch = tree.map(lambda x: merge_leading_dims(x, 2), batch)
+            shuffled_batch = tree.map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
             )
 
             # Shuffle along the agent dimension as well
             key, shuffle_key = jax.random.split(key)
             permutation = jax.random.permutation(shuffle_key, config.system.num_agents)
-            shuffled_batch = jax.tree_util.tree_map(
+            shuffled_batch = tree.map(
                 lambda x: jnp.take(x, permutation, axis=1), shuffled_batch
             )
 
-            minibatches = jax.tree_util.tree_map(
+            minibatches = tree.map(
                 lambda x: jnp.reshape(
                     x, [config.system.num_minibatches, -1] + list(x.shape[1:])
                 ),
@@ -431,7 +433,7 @@ def learner_setup(
 
     # Initialise observation: Obs for all agents.
     init_x = env.observation_spec().generate_value()
-    init_x = jax.tree_util.tree_map(lambda x: x[None, ...], init_x)
+    init_x = tree.map(lambda x: x[None, ...], init_x)
 
     init_action = jnp.zeros((1, config.system.num_agents), dtype=jnp.int32)
 
@@ -483,8 +485,8 @@ def learner_setup(
         (n_devices, config.system.update_batch_size, config.arch.num_envs) + x.shape[1:]
     )
     # (devices, update batch size, num_envs, ...)
-    env_states = jax.tree_map(reshape_states, env_states)
-    timesteps = jax.tree_map(reshape_states, timesteps)
+    env_states = tree.map(reshape_states, env_states)
+    timesteps = tree.map(reshape_states, timesteps)
 
     # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
@@ -506,7 +508,7 @@ def learner_setup(
     broadcast = lambda x: jnp.broadcast_to(
         x, (config.system.update_batch_size,) + x.shape
     )
-    replicate_learner = jax.tree_map(broadcast, replicate_learner)
+    replicate_learner = tree.map(broadcast, replicate_learner)
 
     # Duplicate learner across devices.
     replicate_learner = flax.jax_utils.replicate(
