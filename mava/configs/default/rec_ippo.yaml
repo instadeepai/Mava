@@ -3,7 +3,7 @@ defaults:
   - arch: anakin
   - system: ppo/rec_ippo
   - network: rnn  # [rnn, rcnn]
-  - env: rware  # [cleaner, connector, gigastep, lbf, mabrax, matrax, rware, smax]
+  - env: rware  # [cleaner, connector, gigastep, lbf, mabrax, matrax, rware, smax, mpe]
   - _self_
 
 hydra:
