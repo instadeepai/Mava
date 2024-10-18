@@ -12,24 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Mapping of environments to their respective action heads.
-action_head_per_env = {
-    "Cleaner": "mava.networks.heads.DiscreteActionHead",
-    "MaConnector": "mava.networks.heads.DiscreteActionHead",
-    "LevelBasedForaging": "mava.networks.heads.DiscreteActionHead",
-    "Matrax": "mava.networks.heads.DiscreteActionHead",
-    "RobotWarehouse": "mava.networks.heads.DiscreteActionHead",
-    "Smax": "mava.networks.heads.DiscreteActionHead",
-    "Gigastep": "mava.networks.heads.DiscreteActionHead",
-    "MaBrax": "mava.networks.heads.ContinuousActionHead",
-}
+from typing import Dict
+
+from jumanji.specs import DiscreteArray, MultiDiscreteArray
+
+from mava.types import MarlEnv
 
 
-def get_action_head(env_name: str) -> dict:
-    """Returns the appropriate action head config based on the environment name."""
-    action_head = action_head_per_env.get(env_name)
+def get_action_head(env: MarlEnv) -> Dict[str, str]:
+    """Returns the appropriate action head config based on the environment action_spec."""
+    if isinstance(env.action_spec(), (DiscreteArray, MultiDiscreteArray)):
+        return {"_target_": "mava.networks.heads.DiscreteActionHead"}
 
-    if action_head is None:
-        raise ValueError(f"Environment {env_name} is not recognized.")
-
-    return {"_target_": action_head}
+    return {"_target_": "mava.networks.heads.ContinuousActionHead"}
