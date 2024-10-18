@@ -102,16 +102,13 @@ class Pipeline(threading.Thread):
         traj = _stack_trajectory(traj)
         sharded_traj, sharded_timestep = jax.device_put((traj, timestep), device=self.sharding, donate=True)
 
-        # We block on the put to ensure that actors wait for the learners to catch up. 
-        # This does two things:
-        # 1. It ensures that the actors don't get too far ahead of the learners, which could lead to
-        # off-policy data.
-        # 2. It ensures that the actors don't in a sense "waste" samples and their time by
-        # generating samples that the learners can't consume.
+        # We block on the `put` to ensure that actors wait for the learners to catch up. 
+        # This ensures two things:
+        #  The actors don't get too far ahead of the learners, which could lead to off-policy data.
+        #  The actors don't "waste" samples by generating samples that the learners can't consume.
         # However, we put a timeout of 100 seconds to avoid deadlocks in case the learner
-        # is not consuming the data. This is a safety measure and should not be hit in normal
-        # operation. We use a try-finally since the lock has to be released even if an exception
-        # is raised.
+        # is not consuming the data. This is a safety measure and should not occur in normal
+        # operation. We use a try-finally so the lock is released even if an exception is raised.
         try:
             self._queue.put(
                 (sharded_traj, sharded_timestep, time_dict),
@@ -144,19 +141,6 @@ class Pipeline(threading.Thread):
                 self._queue.get(block=False)
             except queue.Empty:
                 break
-
-    def shard(self, payload: Any):
-        ...
-    
-    def shard_split_playload(self, payload: Any, axis: int = 0) -> Any:
-        return self.shard_payload(self.split_payload(payload, axis))
-
-    @partial(jax.jit, static_argnums=(0, 2))
-    def split_payload(self, payload: Any, axis: int = 0):
-        return jnp.split(payload, len(self.learner_devices), axis=axis)
-
-    def shard_payload(self, payload: Any):
-        return jax.device_put_sharded(payload, devices=self.learner_devices)
 
 
 class ParamsSource(threading.Thread):

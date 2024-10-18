@@ -109,8 +109,7 @@ def rollout(
         with RecordTimeTo(actor_timings["rollout_time"]):
             for _ in range(config.system.rollout_length):
                 with RecordTimeTo(actor_timings["get_params_time"]):
-                    # Get the latest parameters from the learner
-                    params = params_source.get()
+                    params = params_source.get()  # Get the latest parameters from the learner
 
                 obs_tpu = tree.map(move_to_device, timestep.observation)
 
@@ -320,6 +319,7 @@ def get_learner_step_fn(
                     "actor_loss": actor_loss,
                     "entropy": entropy,
                 }
+                # todo: don't return ent key, only pass in
                 return (new_params, new_opt_state, entropy_key), loss_info
 
             params, opt_states, traj_batch, advantages, targets, key = update_state
@@ -353,6 +353,7 @@ def get_learner_step_fn(
         metric = traj_batch.info
         return learner_state, (metric, loss_info)
 
+    # todo: shardmap decorator here?
     def learner_fn(
         learner_state: LearnerState, traj_batch: PPOTransition
     ) -> ExperimentOutput[LearnerState]:
@@ -370,6 +371,9 @@ def get_learner_step_fn(
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The last timestep of the rollout.
         """
+        # This function is shard mapped on the batch axis, but `_update_step` needs
+        # the first axis to be time
+        traj_batch = tree.map(lambda x: x.swapaxes(0, 1), traj_batch)
         learner_state, (episode_info, loss_info) = _update_step(learner_state, traj_batch)
 
         return ExperimentOutput(
@@ -431,9 +435,8 @@ def learner_thread(
                 
 
                 # Update all the params sources so all actors can get the latest params
-                unreplicated_params = unreplicate(learner_state.params)
                 for source in params_sources:
-                    source.update(unreplicated_params)
+                    source.update(learner_state.params)
 
         # Pass all the metrics and  params to the main thread (evaluator) for logging and evaluation
         episode_metrics, train_metrics = tree.map(lambda *x: np.asarray(x), *metrics)
@@ -460,6 +463,10 @@ def learner_setup(
 
     devices = mesh_utils.create_device_mesh((len(learner_devices),), devices=learner_devices)
     mesh = Mesh(devices, axis_names=("learner_devices",))
+    model_spec = P()
+    data_spec = P("learner_devices",)
+    model_sharding = NamedSharding(mesh, model_spec)  # todo: return these
+    data_sharding = NamedSharding(mesh, data_spec)
 
     # PRNG keys.
     key, actor_key, critic_key = jax.random.split(key, 3)
@@ -506,12 +513,15 @@ def learner_setup(
     apply_fns = (actor_network.apply, critic_network.apply)
     update_fns = (actor_optim.update, critic_optim.update)
 
+    learn_state_spec = LearnerState(model_spec, model_spec, model_spec, None, data_spec)
     learn = get_learner_step_fn(apply_fns, update_fns, config)
     learn = jax.jit(
-        shard_map(learn, 
-                  mesh=mesh, 
-                  in_specs=P("learner_devices"), 
-                  out_specs=P("learner_devices"))
+        shard_map(
+            learn, 
+            mesh=mesh, 
+            in_specs=(learn_state_spec, data_spec), 
+            out_specs=ExperimentOutput(learn_state_spec, data_spec, data_spec),
+        )
     )
     # learn = jax.pmap(learn, axis_name="learner_devices", devices=learner_devices)
 
@@ -529,13 +539,11 @@ def learner_setup(
     # Define params to be replicated across devices and batches.
     key, step_keys = jax.random.split(key)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
-    replicate_learner = (params, opt_states, step_keys)
 
     # Duplicate learner across Learner devices.
-    replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=learner_devices)
+    params, opt_states, step_keys = jax.device_put((params, opt_states, step_keys), model_sharding)
 
     # Initialise learner state.
-    params, opt_states, step_keys = replicate_learner
     init_learner_state = LearnerState(params, opt_states, step_keys, None, None)
     env.close()
 
@@ -591,7 +599,7 @@ def run_experiment(_config: DictConfig) -> float:
         )
 
     # Executor setup and launch.
-    inital_params = unreplicate(learner_state.params)
+    inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
     # the rollout queue/ the pipe between actor and learner
     # todo: return this from/pass into: learner setup
@@ -657,7 +665,7 @@ def run_experiment(_config: DictConfig) -> float:
     ).start()
 
     max_episode_return = -np.inf
-    best_params = inital_params.actor_params
+    best_params_cpu = jax.device_get(inital_params.actor_params)
 
     # This is the main loop, all it does is evaluation and logging.
     # Acting and learning is happening in their own threads.
@@ -681,9 +689,9 @@ def run_experiment(_config: DictConfig) -> float:
         ) / time_metrics["learner_time_per_eval"]
         logger.log(train_metrics, t, eval_step, LogEvent.TRAIN)
 
-        unreplicated_actor_params = unreplicate(learner_state.params.actor_params)
+        learner_state_cpu = jax.device_get(learner_state)
         key, eval_key = jax.random.split(key, 2)
-        eval_metrics = evaluator(jax.device_get(unreplicated_actor_params), eval_key, {})
+        eval_metrics = evaluator(learner_state_cpu.params.actor_params, eval_key, {})
         logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
 
         episode_return = np.mean(eval_metrics["episode_return"])
@@ -691,12 +699,12 @@ def run_experiment(_config: DictConfig) -> float:
         if save_checkpoint:  # Save a checkpoint of the learner state
             checkpointer.save(
                 timestep=steps_per_rollout * (eval_step + 1),
-                unreplicated_learner_state=unreplicate_n_dims(learner_state),
+                unreplicated_learner_state=learner_state_cpu,
                 episode_return=episode_return,
             )
 
         if config.arch.absolute_metric and max_episode_return <= episode_return:
-            best_params = copy.deepcopy(unreplicated_actor_params)
+            best_params_cpu = copy.deepcopy(learner_state_cpu.params.actor_params)
             max_episode_return = episode_return
 
     evaluator_envs.close()
@@ -709,7 +717,7 @@ def run_experiment(_config: DictConfig) -> float:
             environments.make_gym_env, eval_act_fn, config, np_rng, absolute_metric=True
         )
         key, eval_key = jax.random.split(key, 2)
-        eval_metrics = abs_metric_evaluator(best_params, eval_key, {})
+        eval_metrics = abs_metric_evaluator(best_params_cpu, eval_key, {})
 
         t = int(steps_per_rollout * (eval_step + 1))
         logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
