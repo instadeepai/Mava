@@ -34,9 +34,9 @@ ppo_systems = [
 q_learning_systems = ["q_learning.anakin.rec_iql"]
 sac_systems = ["sac.anakin.ff_isac", "sac.anakin.ff_masac"]
 
-discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax", "mpe"]
+discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax"]
 cnn_envs = ["cleaner", "connector"]
-continuous_envs = ["mabrax", "mpe"]  # todo: test mpe only in cont or disc envs?
+continuous_envs = ["mabrax", "mpe"]
 
 
 def _run_system(system_name: str, cfg: DictConfig) -> float:
@@ -94,12 +94,9 @@ def test_sac_system(fast_config: dict, system_path: str) -> None:
     """Test all SAC systems on random envs."""
     _, _, system_name = system_path.split(".")
     env = random.choice(continuous_envs)
-    overrides = [f"env={env}"]
-    if env == "mpe":
-        overrides.append("env.kwargs.action_type=Continuous")
 
     with initialize(version_base=None, config_path=config_path):
-        cfg = compose(config_name=f"{system_name}", overrides=overrides)
+        cfg = compose(config_name=f"{system_name}", overrides=[f"env={env}"])
         cfg = _get_fast_config(cfg, fast_config)
 
     _run_system(system_path, cfg)
@@ -141,9 +138,6 @@ def test_continuous_env(fast_config: dict, env_name: str) -> None:
     _, _, system_name = system_path.split(".")
     action_head = "mava.networks.heads.ContinuousActionHead "
     overrides = [f"env={env_name}", f"network.action_head._target_={action_head}"]
-
-    if "mpe" in env_name:
-        overrides.append("env.kwargs.action_type=Continuous")
 
     with initialize(version_base=None, config_path=config_path):
         cfg = compose(config_name=f"{system_name}", overrides=overrides)

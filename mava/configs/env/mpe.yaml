@@ -15,4 +15,4 @@ implicit_agent_id: False
 log_win_rate: False
 
 kwargs:
-  action_type: Discrete # Whether agent action spaces are "Discrete" (default) or "Continuous"
+  action_type: Continuous # Whether agent action spaces are Continuous or "Discrete".
