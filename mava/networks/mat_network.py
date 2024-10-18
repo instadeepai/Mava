@@ -286,9 +286,7 @@ class MultiAgentTransformer(nn.Module):
         action_log, entropy = self.parallel_act(
             decoder=self.decoder,
             obs_rep=obs_rep,
-            batch_size=obs.shape[0],
             action=action,
-            n_agent=self.n_agent,
             action_dim=self.action_dim,
             legal_actions=legal_actions,
             key=key,
@@ -306,8 +304,6 @@ class MultiAgentTransformer(nn.Module):
         output_action, output_action_log = self.autoregressive_act(
             decoder=self.decoder,
             obs_rep=obs_rep,
-            batch_size=obs.shape[0],
-            n_agent=self.n_agent,
             action_dim=self.action_dim,
             legal_actions=legal_actions,
             key=key,
@@ -319,8 +315,6 @@ def discrete_parallel_act(
     decoder: Decoder,
     obs_rep: chex.Array,  # (B, N, E)
     action: chex.Array,  # (B, N)
-    batch_size: int,  # (, )
-    n_agent: int,  # (, )
     action_dim: int,  # (, )
     legal_actions: chex.Array,  # (B, N, A)
     key: chex.PRNGKey,
@@ -349,14 +343,13 @@ def continuous_parallel_act(
     decoder: Decoder,
     obs_rep: chex.Array,  # (B, N, E)
     action: chex.Array,  # (B, N, A)
-    batch_size: int,  # (, )
-    n_agent: int,  # (, )
     action_dim: int,  # (, )
     legal_actions: chex.Array,  # (B, N, A)
     key: chex.PRNGKey,
 ) -> Tuple[chex.Array, chex.Array]:
     # We don't need legal_actions for continuous actions but keep it to keep the APIs consistent.
     del legal_actions
+    batch_size, n_agent, _ = obs_rep.shape
     shifted_action = jnp.zeros((batch_size, n_agent, action_dim))
 
     shifted_action = shifted_action.at[:, 1:, :].set(action[:, :-1, :])
@@ -378,12 +371,11 @@ def continuous_parallel_act(
 def discrete_autoregressive_act(
     decoder: Decoder,
     obs_rep: chex.Array,  # (B, N, E)
-    batch_size: int,  # (, )
-    n_agent: int,  # (, )
     action_dim: int,  # (, )
     legal_actions: chex.Array,  # (B, N, A)
     key: chex.PRNGKey,
 ) -> Tuple[chex.Array, chex.Array]:
+    batch_size, n_agent, _ = obs_rep.shape
     shifted_action = jnp.zeros((batch_size, n_agent, action_dim + 1))
     shifted_action = shifted_action.at[:, 0, 0].set(1)
     output_action = jnp.zeros((batch_size, n_agent))
@@ -420,14 +412,13 @@ def discrete_autoregressive_act(
 def continuous_autoregressive_act(
     decoder: Decoder,
     obs_rep: chex.Array,  # (B, N, E)
-    batch_size: int,  # (, )
-    n_agent: int,  # (, )
     action_dim: int,  # (, )
     legal_actions: Union[chex.Array, None],
     key: chex.PRNGKey,
 ) -> Tuple[chex.Array, chex.Array]:
     # We don't need legal_actions for continuous actions but keep it to keep the APIs consistent.
     del legal_actions
+    batch_size, n_agent, _ = obs_rep.shape
     shifted_action = jnp.zeros((batch_size, n_agent, action_dim))
     output_action = jnp.zeros((batch_size, n_agent, action_dim))
     output_action_log = jnp.zeros((batch_size, n_agent))
