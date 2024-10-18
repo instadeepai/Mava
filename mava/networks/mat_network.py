@@ -1,3 +1,17 @@
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from typing import Optional, Tuple, Union
 
 import chex
@@ -9,24 +23,18 @@ from flax.linen.initializers import orthogonal
 
 from mava.networks.attention import SelfAttention
 from mava.networks.distributions import IdentityTransformation, TanhTransformedDistribution
-import tensorflow_probability.substrates.jax.distributions as tfd
+
 
 class SwiGLU(nn.Module):
     ffn_dim: int
     embed_dim: int
 
     def setup(self) -> None:
-        self.W_1 = self.param(
-            "W_1", nn.initializers.zeros, (self.embed_dim, self.ffn_dim)
-        )
-        self.W_G = self.param(
-            "W_G", nn.initializers.zeros, (self.embed_dim, self.ffn_dim)
-        )
-        self.W_2 = self.param(
-            "W_2", nn.initializers.zeros, (self.ffn_dim, self.embed_dim)
-        )
+        self.W_1 = self.param("W_1", nn.initializers.zeros, (self.embed_dim, self.ffn_dim))
+        self.W_G = self.param("W_G", nn.initializers.zeros, (self.embed_dim, self.ffn_dim))
+        self.W_2 = self.param("W_2", nn.initializers.zeros, (self.ffn_dim, self.embed_dim))
 
-    def __call__(self, x):
+    def __call__(self, x: chex.Array) -> chex.Array:
         return (jax.nn.swish(x @ self.W_G) * (x @ self.W_1)) @ self.W_2
 
 
@@ -162,9 +170,7 @@ class Decoder(nn.Module):
         if self.action_space_type == "discrete":
             self.action_encoder = nn.Sequential(
                 [
-                    nn.Dense(
-                        self.n_embd, use_bias=False, kernel_init=orthogonal(jnp.sqrt(2))
-                    ),
+                    nn.Dense(self.n_embd, use_bias=False, kernel_init=orthogonal(jnp.sqrt(2))),
                     nn.gelu,
                 ],
             )
@@ -172,9 +178,7 @@ class Decoder(nn.Module):
             self.action_encoder = nn.Sequential(
                 [nn.Dense(self.n_embd, kernel_init=orthogonal(jnp.sqrt(2))), nn.gelu],
             )
-            self.log_std = self.param(
-                "log_std", nn.initializers.zeros, (self.action_dim,)
-            )
+            self.log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
 
         # Always initialize log_std but set to None for discrete action spaces
         # This ensures the attribute exists but signals it should not be used.
@@ -205,9 +209,7 @@ class Decoder(nn.Module):
             ],
         )
 
-    def __call__(
-        self, action: chex.Array, obs_rep: chex.Array
-    ) -> chex.Array:
+    def __call__(self, action: chex.Array, obs_rep: chex.Array) -> chex.Array:
         action_embeddings = self.action_encoder(action)
         x = self.ln(action_embeddings)
 
@@ -231,6 +233,13 @@ class MultiAgentTransformer(nn.Module):
     action_space_type: str = "discrete"
     use_swiglu: bool = False
     use_rmsnorm: bool = False
+
+    # General shapes legend:
+    # B: batch size
+    # N: number of agents
+    # O: observation dimension
+    # A: action dimension
+    # E: model embedding dimension
 
     def setup(self) -> None:
         if self.action_space_type not in ["discrete", "continuous"]:
@@ -266,7 +275,11 @@ class MultiAgentTransformer(nn.Module):
             self.parallel_act = continuous_parallel_act
 
     def __call__(
-        self, obs: chex.Array, action: chex.Array, legal_actions: chex.Array, key: chex.PRNGKey
+        self,
+        obs: chex.Array,  # (B, N, O)
+        action: chex.Array,  # (B, N, A)
+        legal_actions: chex.Array,  # (B, N, A)
+        key: chex.PRNGKey,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         v_loc, obs_rep = self.encoder(obs)
 
@@ -284,12 +297,11 @@ class MultiAgentTransformer(nn.Module):
         return action_log, v_loc, entropy
 
     def get_actions(
-        self, obs: chex.Array, legal_actions: chex.Array, key: chex.PRNGKey
-    ) -> Tuple[chex.Array, chex.Array, chex.Array, Optional[chex.Array]]:
-        # obs: (batch, n_agent, obs_dim)
-        # obs_rep: (batch, n_agent, n_embd)
-        # v_loc: (batch, n_agent, 1)
-
+        self,
+        obs: chex.Array,  # (B, N, O)
+        legal_actions: chex.Array,  # (B, N, A)
+        key: chex.PRNGKey,
+    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         v_loc, obs_rep = self.encoder(obs)
         output_action, output_action_log = self.autoregressive_act(
             decoder=self.decoder,
@@ -305,40 +317,20 @@ class MultiAgentTransformer(nn.Module):
 
 def discrete_parallel_act(
     decoder: Decoder,
-    obs_rep: chex.Array,  # (batch, n_agent, n_embd)
-    action: chex.Array,  # (batch, n_agent, 1)
+    obs_rep: chex.Array,  # (B, N, E)
+    action: chex.Array,  # (B, N)
     batch_size: int,  # (, )
     n_agent: int,  # (, )
     action_dim: int,  # (, )
-    legal_actions: chex.Array,
+    legal_actions: chex.Array,  # (B, N, A)
     key: chex.PRNGKey,
 ) -> Tuple[chex.Array, chex.Array]:
-    one_hot_action = jax.nn.one_hot(action, action_dim)  # (batch, n_agent, action_dim)
-    shifted_action = jnp.zeros(
-        (batch_size, n_agent, action_dim + 1)
-    )  # (batch, n_agent, action_dim + 1)
+    batch_size, n_agent, _ = obs_rep.shape
+    one_hot_action = jax.nn.one_hot(action, action_dim)  # (B, A)
+    shifted_action = jnp.zeros((batch_size, n_agent, action_dim + 1))  # (B, N, A +1)
     shifted_action = shifted_action.at[:, 0, 0].set(1)
-    # This should look like this for all batches:
-    # [[1, 0, 0, 0, 0, 0],
-    #  [0, 0, 0, 0, 0, 0],
-    #  [0, 0, 0, 0, 0, 0]]
     shifted_action = shifted_action.at[:, 1:, 1:].set(one_hot_action[:, :-1, :])
-    # If the action is:
-    # [[2],
-    #  [1],
-    #  [0]]
-
-    # The one hot action is:
-    # [[0, 0, 1, 0, 0],
-    #  [0, 1, 0, 0, 0],
-    #  [1, 0, 0, 0, 0]]
-
-    # The shifted action will be:
-    # [[1, 0, 0, 0, 0, 0],
-    #  [0, 0, 0, 1, 0, 0],
-    #  [0, 0, 1, 0, 0, 0]]
-
-    logit = decoder(shifted_action, obs_rep)  # (batch, n_agent, action_dim)
+    logit = decoder(shifted_action, obs_rep)  # (B, N, A)
 
     masked_logits = jnp.where(
         legal_actions,
@@ -350,26 +342,26 @@ def discrete_parallel_act(
     action_log_prob = distribution.log_prob(action)
     entropy = distribution.entropy(seed=key)
 
-    return action_log_prob, entropy
+    return action_log_prob, entropy  # (B, N), (B, N)
 
 
 def continuous_parallel_act(
     decoder: Decoder,
-    obs_rep: chex.Array,  # (batch, n_agent, n_embd)
-    action: chex.Array,  # (batch, n_agent, 1 <- should prob be action_dim)
+    obs_rep: chex.Array,  # (B, N, E)
+    action: chex.Array,  # (B, N, A)
     batch_size: int,  # (, )
     n_agent: int,  # (, )
     action_dim: int,  # (, )
-    legal_actions: chex.Array,
+    legal_actions: chex.Array,  # (B, N, A)
     key: chex.PRNGKey,
 ) -> Tuple[chex.Array, chex.Array]:
-    shifted_action = jnp.zeros(
-        (batch_size, n_agent, action_dim)
-    )  # (batch, n_agent, action_dim)
+    # We don't need legal_actions for continuous actions but keep it to keep the APIs consistent.
+    del legal_actions
+    shifted_action = jnp.zeros((batch_size, n_agent, action_dim))
 
     shifted_action = shifted_action.at[:, 1:, :].set(action[:, :-1, :])
 
-    act_mean = decoder(shifted_action, obs_rep)
+    act_mean = decoder(shifted_action, obs_rep)  # (B, N, A)
     action_std = jax.nn.softplus(decoder.log_std)
 
     distribution = tfd.Normal(loc=act_mean, scale=action_std)
@@ -380,32 +372,25 @@ def continuous_parallel_act(
     action_log_prob = distribution.log_prob(action)
     entropy = distribution.entropy(seed=key)
 
-    return action_log_prob, entropy
+    return action_log_prob, entropy  # (B, N), (B, N)
 
 
 def discrete_autoregressive_act(
     decoder: Decoder,
-    obs_rep: chex.Array,
-    batch_size: int,
-    n_agent: int,
-    action_dim: int,
-    legal_actions: chex.Array,
+    obs_rep: chex.Array,  # (B, N, E)
+    batch_size: int,  # (, )
+    n_agent: int,  # (, )
+    action_dim: int,  # (, )
+    legal_actions: chex.Array,  # (B, N, A)
     key: chex.PRNGKey,
-) -> Tuple[chex.Array, chex.Array, None]:
-    shifted_action = jnp.zeros((batch_size, n_agent, action_dim + 1))  
-    # (batch, n_agent, action_dim + 1)
+) -> Tuple[chex.Array, chex.Array]:
+    shifted_action = jnp.zeros((batch_size, n_agent, action_dim + 1))
     shifted_action = shifted_action.at[:, 0, 0].set(1)
-    # This should look like:
-    # [[1, 0, 0, 0, 0, 0],
-    #  [0, 0, 0, 0, 0, 0],
-    #  [0, 0, 0, 0, 0, 0]]
     output_action = jnp.zeros((batch_size, n_agent))
     output_action_log = jnp.zeros_like(output_action)
-    # both have shape (batch, n_agent)
 
     for i in range(n_agent):
-        logit = decoder(shifted_action, obs_rep)[:, i, :]
-        # logit: (batch, action_dim)
+        logit = decoder(shifted_action, obs_rep)[:, i, :]  # (B, A)
         masked_logits = jnp.where(
             legal_actions[:, i, :],
             logit,
@@ -414,15 +399,11 @@ def discrete_autoregressive_act(
         key, sample_key = jax.random.split(key)
 
         distribution = IdentityTransformation(distribution=tfd.Categorical(logits=masked_logits))
-        action = distribution.sample(seed=sample_key)
-        action_log = distribution.log_prob(action)
+        action = distribution.sample(seed=sample_key)  # (B, )
+        action_log = distribution.log_prob(action)  # (B, )
 
-        output_action = output_action.at[:, i].set(
-            action
-        )  # (batch, n_agent)
-        output_action_log = output_action_log.at[:, i].set(
-            action_log
-        )  # (batch, n_agent)
+        output_action = output_action.at[:, i].set(action)
+        output_action_log = output_action_log.at[:, i].set(action_log)
 
         update_shifted_action = i + 1 < n_agent
         shifted_action = jax.lax.cond(
@@ -433,35 +414,26 @@ def discrete_autoregressive_act(
             lambda shifted_action=shifted_action: shifted_action,
         )
 
-        # An example of a shifted action:
-        # [[1, 0, 0, 0, 0, 0],
-        #  [0, 0, 0, 0, 0, 1],
-        #  [0, 0, 0, 1, 0, 0]]
-
-        # Assuming the actions where [4, 2, 4]
-        # An important note, the shifted actions are not really relevant,
-        # they are just used to act autoregreesively.
-
-    return output_action.astype(jnp.int32), output_action_log
+    return output_action.astype(jnp.int32), output_action_log  # (B, N), (B, N)
 
 
 def continuous_autoregressive_act(
     decoder: Decoder,
-    obs_rep: chex.Array,  # (batch, n_agent, n_embd)
+    obs_rep: chex.Array,  # (B, N, E)
     batch_size: int,  # (, )
     n_agent: int,  # (, )
     action_dim: int,  # (, )
     legal_actions: Union[chex.Array, None],
     key: chex.PRNGKey,
-) -> Tuple[chex.Array, chex.Array, chex.Array]:
-    shifted_action = jnp.zeros(
-        (batch_size, n_agent, action_dim)
-    )  # (batch, n_agent, action_dim)
+) -> Tuple[chex.Array, chex.Array]:
+    # We don't need legal_actions for continuous actions but keep it to keep the APIs consistent.
+    del legal_actions
+    shifted_action = jnp.zeros((batch_size, n_agent, action_dim))
     output_action = jnp.zeros((batch_size, n_agent, action_dim))
     output_action_log = jnp.zeros((batch_size, n_agent))
 
     for i in range(n_agent):
-        act_mean = decoder(shifted_action, obs_rep)[:, i, :]  # (batch, action_dim)
+        act_mean = decoder(shifted_action, obs_rep)[:, i, :]  # (B, A)
         action_std = jax.nn.softplus(decoder.log_std)
 
         key, sample_key = jax.random.split(key)
@@ -471,8 +443,8 @@ def continuous_autoregressive_act(
             TanhTransformedDistribution(distribution),
             reinterpreted_batch_ndims=1,
         )
-        action = distribution.sample(seed=sample_key)
-        action_log = distribution.log_prob(action)
+        action = distribution.sample(seed=sample_key)  # (B, A)
+        action_log = distribution.log_prob(action)  # (B,)
 
         output_action = output_action.at[:, i, :].set(action)
         output_action_log = output_action_log.at[:, i].set(action_log)
@@ -486,28 +458,4 @@ def continuous_autoregressive_act(
             lambda shifted_action=shifted_action: shifted_action,
         )
 
-    return output_action, output_action_log
-
-
-if __name__ == "__main__":
-    obs_dim = 21
-    action_dim = 5
-    n_block = 2
-    n_embed = 12
-    n_head = 6
-    n_agent = 3
-    mat = MultiAgentTransformer(obs_dim, action_dim, n_block, n_embed, n_head, n_agent)
-    mock_obs = jnp.zeros((1, n_agent, obs_dim))
-    mock_action = jnp.array([[4, 2, 4]])
-    mock_legal_action = jnp.ones((1, n_agent, action_dim))
-    params = mat.init(jax.random.PRNGKey(0), mock_obs, mock_action, mock_legal_action)
-    output_action, output_action_log_prob, v_loc = mat.apply(
-        params,
-        mock_obs,
-        mock_legal_action,
-        jax.random.PRNGKey(42),
-        method=mat.get_actions,
-    )
-    print(output_action.shape, output_action_log_prob.shape, v_loc.shape)
-    value = mat.apply(params, mock_obs, method=mat.get_values)
-    print(value.shape)
+    return output_action, output_action_log  # (B, N, A), (B, N)
