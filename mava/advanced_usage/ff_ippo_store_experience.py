@@ -43,6 +43,7 @@ from mava.utils.jax_utils import (
 )
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.make_env import make
+from mava.utils.network_utils import get_action_head
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
 StoreExpLearnerFn = Callable[[MavaState], Tuple[ExperimentOutput[MavaState], PPOTransition]]
@@ -361,7 +362,9 @@ def learner_setup(
 
     # Define network and optimiser.
     actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
-    actor_action_head = hydra.utils.instantiate(config.network.action_head, action_dim=num_actions)
+    actor_action_head = hydra.utils.instantiate(
+        get_action_head(config.env.env_name), action_dim=num_actions
+    )
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 
     actor_network = Actor(torso=actor_torso, action_head=actor_action_head)
