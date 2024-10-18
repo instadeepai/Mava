@@ -91,15 +91,10 @@ def get_learner_fn(
 
             # Apply the actor network to get the action, log_prob, value and updated hstates.
             last_obs = last_timestep.observation
-            pos_enc_info = {
-                "step": last_obs.step_count,
-            }
             action, log_prob, value, hstates = sable_action_select_fn(  # type: ignore
                 params,
-                last_obs.agents_view,
-                last_obs.action_mask,
+                last_obs,
                 hstates,
-                pos_enc_info,
                 policy_key,
             )
             action = jnp.squeeze(action, axis=-1)
@@ -151,16 +146,8 @@ def get_learner_fn(
         # CALCULATE ADVANTAGE
         params, opt_states, key, env_state, last_timestep, updated_hstates = learner_state
         key, last_val_key = jax.random.split(key)
-        pos_enc_info = {
-            "step": last_timestep.observation.step_count,
-        }
         _, _, current_val, _ = sable_action_select_fn(  # type: ignore
-            params,
-            last_timestep.observation.agents_view,
-            last_timestep.observation.action_mask,
-            updated_hstates,
-            pos_enc_info,
-            last_val_key
+            params, last_timestep.observation, updated_hstates, last_val_key
         )
         current_val = jnp.squeeze(current_val, axis=-1)
         current_done = tree.map(
@@ -219,17 +206,12 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate Sable loss."""
                     # RERUN NETWORK
-                    pos_enc_info = {
-                        "step": traj_batch.obs.step_count,
-                    }
                     log_prob, value, entropy = sable_apply_fn(  # type: ignore
                         params,
-                        traj_batch.obs.agents_view,
+                        traj_batch.obs,
                         traj_batch.action,
-                        traj_batch.obs.action_mask,
                         prev_hstates,
                         traj_batch.done,
-                        pos_enc_info
                     )
                     log_prob = jnp.squeeze(log_prob, axis=-1)
                     value = jnp.squeeze(value, axis=-1)
@@ -441,9 +423,6 @@ def learner_setup(
     config.system.num_agents = n_agents
     config.system.num_actions = action_dim
 
-    # Get network configs.
-    net_config: DictConfig = config.network.rec_config
-
     # Define network.
     sable_network = SableNetwork(
         n_block=config.network.n_block,
@@ -451,7 +430,7 @@ def learner_setup(
         n_head=config.network.n_head,
         n_agents=n_agents,
         action_dim=action_dim,
-        net_config=net_config,
+        net_config=config.network.rec_config,
         decay_scaling_factor=config.network.decay_scaling_factor,
         action_space_type="discrete",
     )
@@ -474,12 +453,10 @@ def learner_setup(
     # Initialise params and optimiser state.
     params = sable_network.init(
         net_key,
-        init_obs.agents_view,
+        init_obs,
         init_action,
-        init_obs.action_mask,
         init_hs,
         init_dones,
-        {"step": init_obs.step_count},
     )
     opt_state = optim.init(params)
 

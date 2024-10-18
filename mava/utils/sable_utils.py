@@ -13,12 +13,14 @@
 # limitations under the License.
 
 
+from typing import Tuple
+
 import chex
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
 from omegaconf import DictConfig
-from typing import Tuple
+
 from mava.systems.sable.types import HiddenStates
 
 
@@ -93,6 +95,7 @@ def get_init_hidden_state(actor_net_config: DictConfig, batch_size: int) -> Hidd
 
 class PositionalEncoding(nn.Module):
     """Positional Encoding for Sable. Encodes position information into sequences"""
+
     net_config: DictConfig
     d_model: int
 
@@ -107,9 +110,11 @@ class PositionalEncoding(nn.Module):
         if self.net_config.type == "rec_sable":
             self.do_pos_enc = self.net_config.timestep_positional_encoding
         else:
-            self.do_pos_enc = self.agents_positional_encoding
+            self.do_pos_enc = False
 
-    def __call__(self, key: chex.Array, query: chex.Array, value: chex.Array, position: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
+    def __call__(
+        self, key: chex.Array, query: chex.Array, value: chex.Array, position: chex.Array
+    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         """Computes positional encoding for a given sequence of positions."""
         # Check if positional encoding is enabled
         if self.do_pos_enc:
@@ -121,7 +126,7 @@ class PositionalEncoding(nn.Module):
             value += pe
 
         return key, query, value
-    
+
     def _get_pos_encoding(self, position: chex.Array) -> chex.Array:
         """Computes positional encoding for a given the index of the token."""
         seq_len = position.shape[0]

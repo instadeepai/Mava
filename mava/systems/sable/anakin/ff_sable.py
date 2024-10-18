@@ -91,8 +91,7 @@ def get_learner_fn(
             last_obs = last_timestep.observation
             action, log_prob, value, _ = sable_action_select_fn(  # type: ignore
                 params,
-                obs=last_obs.agents_view,
-                legal_actions=last_obs.action_mask,
+                obs_carry=last_obs,
                 key=policy_key,
             )
             action = jnp.squeeze(action, axis=-1)
@@ -138,8 +137,7 @@ def get_learner_fn(
         key, last_val_key = jax.random.split(key)
         _, _, current_val, _ = sable_action_select_fn(  # type: ignore
             params,
-            obs=last_timestep.observation.agents_view,
-            legal_actions=last_timestep.observation.action_mask,
+            obs_carry=last_timestep.observation,
             key=last_val_key,
         )
         current_val = jnp.squeeze(current_val, axis=-1)
@@ -195,9 +193,8 @@ def get_learner_fn(
                     # RERUN NETWORK
                     log_prob, value, entropy = sable_apply_fn(  # type: ignore
                         params,
-                        obs=traj_batch.obs.agents_view,
+                        obs_carry=traj_batch.obs,
                         action=traj_batch.action,
-                        legal_actions=traj_batch.obs.action_mask,
                         dones=traj_batch.done,
                     )
                     log_prob = jnp.squeeze(log_prob, axis=-1)
@@ -396,17 +393,6 @@ def learner_setup(
     config.system.num_agents = n_agents
     config.system.num_actions = action_dim
 
-    # Get network configuration.
-    net_config: DictConfig = config.network.ff_config
-    # Check if both positional encoding and agent id are enabled.
-    if net_config.agents_positional_encoding and config.system.add_agent_id:
-        print(
-            f"{Fore.RED}{Style.BRIGHT}Warning: Both 'agents_positional_encoding'"
-            + " and 'add_agent_id' are enabled. These options are mutually exclusive"
-            + " because they serve similar purposes in distinguishing agents."
-            + f" Recommeneded to enable only one.{Style.RESET_ALL}"
-        )
-
     # Define network.
     sable_network = SableNetwork(
         n_block=config.network.n_block,
@@ -414,7 +400,7 @@ def learner_setup(
         n_head=config.network.n_head,
         n_agents=n_agents,
         action_dim=action_dim,
-        net_config=net_config,
+        net_config=config.network.ff_config,
         action_space_type="discrete",
     )
 
@@ -436,9 +422,8 @@ def learner_setup(
     # Initialise params and optimiser state.
     params = sable_network.init(
         net_key,
-        init_obs.agents_view,
+        init_obs,
         init_action,
-        init_obs.action_mask,
         init_hs,
         init_dones,
     )
@@ -452,6 +437,7 @@ def learner_setup(
     dummy_trainer_hs = get_init_hidden_state(config.network, minibatch_size)
 
     # Pack apply and update functions.
+    # Using dummy hstates, since we are not updating the hstates during training.
     apply_fns = (
         partial(
             sable_network.apply, method="get_actions", hstates=dummy_executor_hs

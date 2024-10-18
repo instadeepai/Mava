@@ -13,6 +13,3 @@ chunkwise:
 
 ff_config:
   type: "ff_sable" # Type of the network.
-  # --- Positional encoding ---
-  agents_positional_encoding: True # Agents positional encoding for Sable non-memory.
-  # It is recommended to enable either it or 'add_agent_id', but not both simultaneously to prevent redundancy and conflict.
