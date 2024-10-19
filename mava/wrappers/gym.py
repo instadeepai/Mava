@@ -29,7 +29,7 @@ from gymnasium.spaces.utils import is_space_dtype_shape_equiv
 from gymnasium.vector.utils import write_to_shared_memory
 from numpy.typing import NDArray
 
-from mava.types import Observation, ObservationGlobalState
+from mava.types import MarlEnv, Observation, ObservationGlobalState
 
 if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
     from dataclasses import dataclass
@@ -217,19 +217,17 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
 
 
 class GymToJumanji:
-    """Converts from the Gym API to the dm_env API, using Jumanji's Timestep type."""
+    """Converts from the Gym API to the dm_env API."""
 
-    def __init__(self, env: gymnasium.vector.async_vector_env):
+    def __init__(self, env: gymnasium.vector.VectorEnv):
         self.env = env
         self.single_action_space = env.unwrapped.single_action_space
         self.single_observation_space = env.unwrapped.single_observation_space
 
-    def reset(
-        self, seed: Optional[list[int]] = None, options: Optional[list[dict]] = None
-    ) -> TimeStep:
-        obs, info = self.env.reset(seed=seed, options=options)
+    def reset(self, seed: Optional[list[int]] = None, options: Optional[dict] = None) -> TimeStep:
+        obs, info = self.env.reset(seed=seed, options=options)  # type: ignore
 
-        num_agents = len(self.env.single_action_space)
+        num_agents = len(self.env.single_action_space)  # type: ignore
         num_envs = self.env.num_envs
 
         ep_done = np.zeros(num_envs, dtype=float)
@@ -269,16 +267,16 @@ class GymToJumanji:
     def _create_timestep(
         self, obs: NDArray, ep_done: NDArray, terminated: NDArray, rewards: NDArray, info: Dict
     ) -> TimeStep:
-        obs = self._format_observation(obs, info)
+        observation = self._format_observation(obs, info)
         # Filter out the masks and auxiliary data
         extras = {key: value for key, value in info["metrics"].items() if key[0] != "_"}
         step_type = np.where(ep_done, StepType.LAST, StepType.MID)
 
         return TimeStep(
-            step_type=step_type,
+            step_type=step_type,  # type: ignore
             reward=rewards,
             discount=1.0 - terminated,
-            observation=obs,
+            observation=observation,
             extras=extras,
         )
 

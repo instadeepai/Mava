@@ -47,7 +47,6 @@ from mava.types import (
     ActorApply,
     CriticApply,
     ExperimentOutput,
-    MarlEnv,
     Observation,
     SebulbaLearnerFn,
 )
@@ -59,11 +58,12 @@ from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
+from mava.wrappers.gym import GymToJumanji
 
 
 def rollout(
     key: chex.PRNGKey,
-    env: MarlEnv,
+    env: GymToJumanji,
     config: DictConfig,
     rollout_queue: Pipeline,
     params_source: ParamsSource,
@@ -101,7 +101,8 @@ def rollout(
         actor_policy = actor_apply_fn(params.actor_params, observation)
         action = actor_policy.sample(seed=key)
         log_prob = actor_policy.log_prob(action)
-
+        # It may be faster to calculate the values in the learner as
+        # then we won't need to pass critic params to actors.
         value = critic_apply_fn(params.critic_params, observation).squeeze()
         return action, log_prob, value
 
