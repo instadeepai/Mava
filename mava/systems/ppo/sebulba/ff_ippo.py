@@ -26,13 +26,14 @@ import jax
 import jax.debug
 import jax.numpy as jnp
 import numpy as np
+from numpy.typing import NDArray
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from jax import tree
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
-from jax.sharding import Mesh, NamedSharding
+from jax.sharding import Mesh, NamedSharding, Sharding
 from jax.sharding import PartitionSpec as P
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
@@ -42,11 +43,18 @@ from mava.evaluator import make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
-from mava.types import ActorApply, CriticApply, ExperimentOutput, MarlEnv, Observation, SebulbaLearnerFn
+from mava.types import (
+    ActorApply,
+    CriticApply,
+    ExperimentOutput,
+    MarlEnv,
+    Observation,
+    SebulbaLearnerFn,
+)
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_sebulba_config, check_total_timesteps
-from mava.utils.jax_utils import merge_leading_dims
+from mava.utils.jax_utils import merge_leading_dims, switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
 from mava.utils.training import make_learning_rate
@@ -351,7 +359,6 @@ def get_learner_step_fn(
         metric = traj_batch.info
         return learner_state, (metric, loss_info)
 
-    # todo: shardmap decorator here?
     def learner_fn(
         learner_state: LearnerState, traj_batch: PPOTransition
     ) -> ExperimentOutput[LearnerState]:
@@ -371,7 +378,7 @@ def get_learner_step_fn(
         """
         # This function is shard mapped on the batch axis, but `_update_step` needs
         # the first axis to be time
-        traj_batch = tree.map(lambda x: x.swapaxes(0, 1), traj_batch)
+        traj_batch = tree.map(switch_leading_axes, traj_batch)
         learner_state, (episode_info, loss_info) = _update_step(learner_state, traj_batch)
 
         return ExperimentOutput(
@@ -403,6 +410,7 @@ def learner_thread(
                 accumulated_traj_batches = []
                 accumulated_timesteps = []
 
+                # Possibly get many rollouts for 1 learn step - allows learning with large batches
                 for _ in range(config.arch.n_learner_accumulate):
                     # Get the trajectory batch from the pipeline
                     # This is blocking so it will wait until the pipeline has data.
@@ -414,43 +422,42 @@ def learner_thread(
                     accumulated_timesteps.append(timestep)
                     rollout_times.append(rollout_time)
 
-                # Concatenate accumulated timesteps and trajectory batches on the num_envs axis
-                combined_traj_batch = jax.tree.map(lambda *x: jnp.concat(x, axis=0), *accumulated_traj_batches)
-                combined_timesteps = jax.tree.map(lambda *x: jnp.concat(x, axis=0), *accumulated_timesteps)
-
+                # Concatenate the accumulated timesteps and trajectory batches on the num_envs axis
+                traj_batches = tree.map(lambda *x: jnp.concat(x, axis=0), *accumulated_traj_batches)
+                timesteps = tree.map(lambda *x: jnp.concat(x, axis=0), *accumulated_timesteps)
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
                 # an additional timestep which it can use to bootstrap.
-                learner_state = learner_state._replace(timestep=combined_timesteps)
+                learner_state = learner_state._replace(timestep=timesteps)
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
-                    learner_state, episode_metrics, train_metrics = learn_fn(
-                        learner_state, combined_traj_batch
-                    )
+                    learner_state, ep_metrics, train_metrics = learn_fn(learner_state, traj_batches)
 
-                metrics.append((episode_metrics, train_metrics))
-
+                metrics.append((ep_metrics, train_metrics))
 
                 # Update all the params sources so all actors can get the latest params
                 for source in params_sources:
                     source.update(learner_state.params)
 
         # Pass all the metrics and  params to the main thread (evaluator) for logging and evaluation
-        episode_metrics, train_metrics = tree.map(lambda *x: np.asarray(x), *metrics)
-        rollout_times = tree.map(lambda *x: np.mean(x), *rollout_times)
+        ep_metrics, train_metrics = tree.map(lambda *x: np.asarray(x), *metrics)
+        rollout_times: Dict[str, NDArray] = tree.map(lambda *x: np.mean(x), *rollout_times)
         timing_dict = rollout_times | learn_times
         timing_dict = tree.map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
 
-        eval_queue.put((episode_metrics, train_metrics, learner_state, timing_dict))
+        eval_queue.put((ep_metrics, train_metrics, learner_state, timing_dict))
 
 
 def learner_setup(
     key: chex.PRNGKey, config: DictConfig, learner_devices: List
 ) -> Tuple[
-    SebulbaLearnerFn[LearnerState, PPOTransition], Tuple[ActorApply, CriticApply], LearnerState
+    SebulbaLearnerFn[LearnerState, PPOTransition],
+    Tuple[ActorApply, CriticApply],
+    LearnerState,
+    Sharding,
 ]:
-    """Initialise learner_fn, network, optimiser, environment and states."""
+    """Initialise learner_fn, network and learner state."""
 
     # create temporory envoirnments.
     env = environments.make_gym_env(config, config.arch.num_envs)
@@ -462,9 +469,8 @@ def learner_setup(
     devices = mesh_utils.create_device_mesh((len(learner_devices),), devices=learner_devices)
     mesh = Mesh(devices, axis_names=("learner_devices",))
     model_spec = P()
-    data_spec = P("learner_devices",)
-    model_sharding = NamedSharding(mesh, model_spec)  # todo: return these
-    data_sharding = NamedSharding(mesh, data_spec)
+    data_spec = P("learner_devices")
+    learner_sharding = NamedSharding(mesh, model_spec)
 
     # PRNG keys.
     key, actor_key, critic_key = jax.random.split(key, 3)
@@ -511,6 +517,7 @@ def learner_setup(
     apply_fns = (actor_network.apply, critic_network.apply)
     update_fns = (actor_optim.update, critic_optim.update)
 
+    # defines how the learner state is sharded: params, opt and key = replicated, timestep = sharded
     learn_state_spec = LearnerState(model_spec, model_spec, model_spec, None, data_spec)
     learn = get_learner_step_fn(apply_fns, update_fns, config)
     learn = jax.jit(
@@ -521,7 +528,6 @@ def learner_setup(
             out_specs=ExperimentOutput(learn_state_spec, data_spec, data_spec),
         )
     )
-    # learn = jax.pmap(learn, axis_name="learner_devices", devices=learner_devices)
 
     # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
@@ -539,13 +545,15 @@ def learner_setup(
     opt_states = OptStates(actor_opt_state, critic_opt_state)
 
     # Duplicate learner across Learner devices.
-    params, opt_states, step_keys = jax.device_put((params, opt_states, step_keys), model_sharding)
+    params, opt_states, step_keys = jax.device_put(
+        (params, opt_states, step_keys), learner_sharding
+    )
 
     # Initialise learner state.
-    init_learner_state = LearnerState(params, opt_states, step_keys, None, None)
+    init_learner_state = LearnerState(params, opt_states, step_keys, None, None)  # type: ignore
     env.close()
 
-    return learn, apply_fns, init_learner_state
+    return learn, apply_fns, init_learner_state, learner_sharding  # type: ignore
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -564,7 +572,7 @@ def run_experiment(_config: DictConfig) -> float:
     np_rng = np.random.default_rng(config.system.seed)
 
     # Setup learner.
-    learn, apply_fns, learner_state = learner_setup(key, config, learner_devices)
+    learn, apply_fns, learner_state, learner_sharding = learner_setup(key, config, learner_devices)
 
     # Setup evaluator.
     # One key per device for evaluation.
@@ -578,7 +586,10 @@ def run_experiment(_config: DictConfig) -> float:
     check_sebulba_config(config)
 
     steps_per_rollout = (
-        config.system.rollout_length * config.arch.num_envs * config.system.num_updates_per_eval * config.arch.n_learner_accumulate
+        config.system.rollout_length
+        * config.arch.num_envs
+        * config.system.num_updates_per_eval
+        * config.arch.n_learner_accumulate
     )
 
     # Logger setup
@@ -600,12 +611,8 @@ def run_experiment(_config: DictConfig) -> float:
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
     # the rollout queue/ the pipe between actor and learner
-    # todo: return this from/pass into: learner setup
-    devices = mesh_utils.create_device_mesh((len(learner_devices),), devices=learner_devices)
-    mesh = Mesh(devices, axis_names=("learner_devices",))
-    sharding = NamedSharding(mesh, P("learner_devices"))
     pipe_lifetime = ThreadLifetime()
-    pipe = Pipeline(config.arch.rollout_queue_size, sharding, pipe_lifetime)
+    pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding, pipe_lifetime)
     pipe.start()
 
     params_sources: List[ParamsSource] = []
@@ -613,20 +620,9 @@ def run_experiment(_config: DictConfig) -> float:
     actor_lifetime = ThreadLifetime()
     params_sources_lifetime = ThreadLifetime()
 
-    # Unfortunately we have to do this here, because creating envs inside the actor threads causes deadlocks
-    # todo: see what happens if we do this in the thread creating loop
-    envs = [[] for i in range(len(actor_devices))]
-    print(
-        f"{Fore.BLUE}{Style.BRIGHT}Starting up environments, this may take a while...{Style.RESET_ALL}"
-    )
-    for i in range(len(actor_devices)):
-        for _ in range(config.arch.n_threads_per_executor):
-            env = environments.make_gym_env(config, config.arch.num_envs)
-            envs[i].append(env)
-    print(f"{Fore.BLUE}{Style.BRIGHT}All environments created{Style.RESET_ALL}")
-
     # Create the actor threads
-    for dev_idx, actor_device in enumerate(actor_devices):
+    print(f"{Fore.BLUE}{Style.BRIGHT}Starting up actor threads...{Style.RESET_ALL}")
+    for actor_device in actor_devices:
         # Create 1 params source per device
         params_source = ParamsSource(inital_params, actor_device, params_sources_lifetime)
         params_source.start()
@@ -641,7 +637,8 @@ def run_experiment(_config: DictConfig) -> float:
                 target=rollout,
                 args=(
                     act_key,
-                    envs[dev_idx][thread_id],
+                    # We have to do this here, creating envs inside actor threads causes deadlocks
+                    environments.make_gym_env(config, config.arch.num_envs),
                     config,
                     pipe,
                     params_source,

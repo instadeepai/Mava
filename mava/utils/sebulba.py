@@ -25,7 +25,7 @@ from jax import tree
 from jax.sharding import Sharding
 from jumanji.types import TimeStep
 
-# todo: remove the ppo dependencies
+# todo: remove the ppo dependencies when we make sebulba for other systems
 from mava.systems.ppo.types import Params, PPOTransition
 
 QUEUE_PUT_TIMEOUT = 100
@@ -99,22 +99,22 @@ class Pipeline(threading.Thread):
 
         # [Transition(num_envs)] * rollout_len -> Transition[done=(num_envs, rollout_len, ...)]
         traj = _stack_trajectory(traj)
-        sharded_traj, sharded_timestep = jax.device_put((traj, timestep), device=self.sharding, donate=True)
+        traj, timestep = jax.device_put((traj, timestep), device=self.sharding, donate=True)
 
         # We block on the `put` to ensure that actors wait for the learners to catch up.
         # This ensures two things:
         #  The actors don't get too far ahead of the learners, which could lead to off-policy data.
         #  The actors don't "waste" samples by generating samples that the learners can't consume.
         # However, we put a timeout of 100 seconds to avoid deadlocks in case the learner
-        # is not consuming the data. This is a safety measure and should not occur in normal
-        # operation. We use a try-finally so the lock is released even if an exception is raised.
+        # is not consuming the data. This is a safety measure and should not normally occur.
+        # We use a try-finally so the lock is released even if an exception is raised.
         try:
             self._queue.put(
-                (sharded_traj, sharded_timestep, time_dict),
+                (traj, timestep, time_dict),
                 block=True,
                 timeout=QUEUE_PUT_TIMEOUT,
             )
-        except queue.Full:  # todo: check if this is needed because we catch this exception outside
+        except queue.Full:
             print(
                 f"{Fore.RED}{Style.BRIGHT}Pipeline is full and actor has timed out, "
                 f"this should not happen. A deadlock might be occurring{Style.RESET_ALL}"
