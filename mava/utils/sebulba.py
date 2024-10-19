@@ -16,14 +16,13 @@
 import queue
 import threading
 import time
-from functools import partial
 from typing import Any, Dict, List, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-from jax.sharding import Sharding
 from colorama import Fore, Style
 from jax import tree
+from jax.sharding import Sharding
 from jumanji.types import TimeStep
 
 # todo: remove the ppo dependencies
@@ -102,7 +101,7 @@ class Pipeline(threading.Thread):
         traj = _stack_trajectory(traj)
         sharded_traj, sharded_timestep = jax.device_put((traj, timestep), device=self.sharding, donate=True)
 
-        # We block on the `put` to ensure that actors wait for the learners to catch up. 
+        # We block on the `put` to ensure that actors wait for the learners to catch up.
         # This ensures two things:
         #  The actors don't get too far ahead of the learners, which could lead to off-policy data.
         #  The actors don't "waste" samples by generating samples that the learners can't consume.

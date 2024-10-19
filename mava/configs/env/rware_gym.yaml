@@ -11,10 +11,11 @@ scenario:
 # This metric is returned at the end of an experiment and can be used for hyperparameter tuning.
 eval_metric: episode_return
 
-# Whether the add agents IDs to the observations returned by the environment.
-add_agent_id : False
-
-# Whether or not to log the winrate of this environment.
+# Whether the environment observations encode implicit agent IDs. If True, the AgentID wrapper is not used.
+# This should not be changed.
+implicit_agent_id: False
+# Whether or not to log the winrate of this environment. This should not be changed as not all
+# environments have a winrate metric.
 log_win_rate: False
 
 # Weather or not to sum the returned rewards over all of the agents.
