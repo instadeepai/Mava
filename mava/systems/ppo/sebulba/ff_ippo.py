@@ -21,21 +21,19 @@ from queue import Queue
 from typing import Any, Dict, List, Sequence, Tuple
 
 import chex
-import flax
 import hydra
 import jax
 import jax.debug
 import jax.numpy as jnp
-from jax.sharding import Mesh, PartitionSpec as P
-from jax.sharding import NamedSharding
-from jax.experimental import mesh_utils
-from jax.experimental.shard_map import shard_map
 import numpy as np
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
-from flax.jax_utils import unreplicate
 from jax import tree
+from jax.experimental import mesh_utils
+from jax.experimental.shard_map import shard_map
+from jax.sharding import Mesh, NamedSharding
+from jax.sharding import PartitionSpec as P
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
@@ -44,19 +42,20 @@ from mava.evaluator import make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
-from mava.types import ActorApply, CriticApply, ExperimentOutput, Observation, SebulbaLearnerFn
+from mava.types import ActorApply, CriticApply, ExperimentOutput, MarlEnv, Observation, SebulbaLearnerFn
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_sebulba_config, check_total_timesteps
-from mava.utils.jax_utils import merge_leading_dims, unreplicate_n_dims
+from mava.utils.jax_utils import merge_leading_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
+
 def rollout(
     key: chex.PRNGKey,
-    env,
+    env: MarlEnv,
     config: DictConfig,
     rollout_queue: Pipeline,
     params_source: ParamsSource,
@@ -319,8 +318,7 @@ def get_learner_step_fn(
                     "actor_loss": actor_loss,
                     "entropy": entropy,
                 }
-                # todo: don't return ent key, only pass in
-                return (new_params, new_opt_state, entropy_key), loss_info
+                return (new_params, new_opt_state, key), loss_info
 
             params, opt_states, traj_batch, advantages, targets, key = update_state
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
@@ -335,7 +333,7 @@ def get_learner_step_fn(
                 shuffled_batch,
             )
             # Update minibatches
-            (params, opt_states, entropy_key), loss_info = jax.lax.scan(
+            (params, opt_states, _), loss_info = jax.lax.scan(
                 _update_minibatch, (params, opt_states, entropy_key), minibatches
             )
 
@@ -430,9 +428,9 @@ def learner_thread(
                     learner_state, episode_metrics, train_metrics = learn_fn(
                         learner_state, combined_traj_batch
                     )
-                    
+
                 metrics.append((episode_metrics, train_metrics))
-                
+
 
                 # Update all the params sources so all actors can get the latest params
                 for source in params_sources:
@@ -517,9 +515,9 @@ def learner_setup(
     learn = get_learner_step_fn(apply_fns, update_fns, config)
     learn = jax.jit(
         shard_map(
-            learn, 
-            mesh=mesh, 
-            in_specs=(learn_state_spec, data_spec), 
+            learn,
+            mesh=mesh,
+            in_specs=(learn_state_spec, data_spec),
             out_specs=ExperimentOutput(learn_state_spec, data_spec, data_spec),
         )
     )
