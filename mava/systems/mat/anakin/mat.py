@@ -49,6 +49,7 @@ from mava.utils.jax_utils import (
     unreplicate_n_dims,
 )
 from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.network_utils import get_action_head
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
@@ -407,13 +408,15 @@ def learner_setup(
     init_x = env.observation_spec().generate_value()
     init_x = tree.map(lambda x: x[None, ...], init_x)
 
-    if config.network.action_space_type == "discrete":
+    _, action_space_type = get_action_head(env)
+    
+    if action_space_type == "discrete":
         init_action = jnp.zeros((1, config.system.num_agents), dtype=jnp.int32)
-    elif config.network.action_space_type == "continuous":
+    elif action_space_type == "continuous":
         init_action = jnp.zeros((1, config.system.num_agents, env.action_dim), dtype=jnp.float32)
     else:
         raise ValueError("Invalid action space type")
-
+    
     # Define network and optimiser.
     actor_network = MultiAgentTransformer(
         obs_dim=init_x.agents_view.shape[-1],
@@ -424,7 +427,7 @@ def learner_setup(
         n_agent=config.system.num_agents,
         use_rmsnorm=config.network.use_rmsnorm,
         use_swiglu=config.network.use_swiglu,
-        action_space_type=config.network.action_space_type,
+        action_space_type=action_space_type,
     )
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
