@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import copy
 import time
 from typing import Any, Dict, Tuple
@@ -36,11 +35,7 @@ from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransitio
 from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn, MarlEnv
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax_utils import (
-    merge_leading_dims,
-    unreplicate_batch_dim,
-    unreplicate_n_dims,
-)
+from mava.utils.jax_utils import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
@@ -54,7 +49,7 @@ def get_learner_fn(
     config: DictConfig,
 ) -> LearnerFn[LearnerState]:
     """Get the learner function."""
-    # Get apply and update functions for actor and critic networks.
+    # Unpack apply and update functions.
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
 
@@ -86,7 +81,6 @@ def get_learner_fn(
             key, policy_key = jax.random.split(key)
             actor_policy = actor_apply_fn(params.actor_params, last_timestep.observation)
             value = critic_apply_fn(params.critic_params, last_timestep.observation)
-
             action = actor_policy.sample(seed=policy_key)
             log_prob = actor_policy.log_prob(action)
 
@@ -101,13 +95,7 @@ def get_learner_fn(
             info = timestep.extras["episode_metrics"]
 
             transition = PPOTransition(
-                done,
-                action,
-                value,
-                timestep.reward,
-                log_prob,
-                last_timestep.observation,
-                info,
+                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
             learner_state = LearnerState(params, opt_states, key, env_state, timestep)
             return learner_state, transition
@@ -226,10 +214,7 @@ def get_learner_fn(
                 # CALCULATE CRITIC LOSS
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
                 critic_loss_info, critic_grads = critic_grad_fn(
-                    params.critic_params,
-                    opt_states.critic_opt_state,
-                    traj_batch,
-                    targets,
+                    params.critic_params, opt_states.critic_opt_state, traj_batch, targets
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
@@ -264,7 +249,6 @@ def get_learner_fn(
                 )
                 critic_new_params = optax.apply_updates(params.critic_params, critic_updates)
 
-                # PACK NEW PARAMS AND OPTIMISER STATE
                 new_params = Params(actor_new_params, critic_new_params)
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
 
@@ -326,7 +310,7 @@ def get_learner_fn(
         ----
             learner_state (NamedTuple):
                 - params (Params): The initial model parameters.
-                - opt_states (OptStates): The initial optimizer state.
+                - opt_states (OptStates): The initial optimizer states.
                 - key (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
                 - timesteps (TimeStep): The initial timestep in the initial trajectory.
@@ -367,7 +351,7 @@ def learner_setup(
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 
     actor_network = Actor(torso=actor_torso, action_head=actor_action_head)
-    critic_network = Critic(torso=critic_torso)
+    critic_network = Critic(torso=critic_torso, centralised_critic=True)
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
     critic_lr = make_learning_rate(config.system.critic_lr, config)
@@ -455,7 +439,7 @@ def run_experiment(_config: DictConfig) -> float:
     n_devices = len(jax.devices())
 
     # Create the enviroments for train and eval.
-    env, eval_env = environments.make(config)
+    env, eval_env = environments.make(config=config, add_global_state=True)
 
     # PRNG keys.
     key, key_e, actor_net_key, critic_net_key = jax.random.split(
@@ -510,7 +494,6 @@ def run_experiment(_config: DictConfig) -> float:
     for eval_step in range(config.arch.num_evaluation):
         # Train.
         start_time = time.time()
-
         learner_output = learn(learner_state)
         jax.block_until_ready(learner_output)
 
@@ -570,15 +553,20 @@ def run_experiment(_config: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(config_path="../../configs", config_name="default_ff_ippo.yaml", version_base="1.2")
+@hydra.main(
+    config_path="../../../configs/default",
+    config_name="ff_mappo.yaml",
+    version_base="1.2",
+)
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
+    cfg.logger.system_name = "ff_mappo"
 
     # Run experiment.
     eval_performance = run_experiment(cfg)
-    print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}MAPPO experiment completed{Style.RESET_ALL}")
     return eval_performance
 
 
