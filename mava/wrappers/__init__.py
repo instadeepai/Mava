@@ -16,6 +16,13 @@
 from mava.wrappers.auto_reset_wrapper import AutoResetWrapper
 from mava.wrappers.episode_metrics import RecordEpisodeMetrics
 from mava.wrappers.gigastep import GigastepWrapper
+from mava.wrappers.gym import (
+    GymAgentIDWrapper,
+    GymRecordEpisodeMetrics,
+    GymToJumanji,
+    GymWrapper,
+    async_multiagent_worker,
+)
 from mava.wrappers.jaxmarl import MabraxWrapper, SmaxWrapper
 from mava.wrappers.jumanji import (
     CleanerWrapper,
