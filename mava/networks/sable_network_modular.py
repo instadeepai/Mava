@@ -482,6 +482,24 @@ class SableNetwork(nn.Module):
 
         return action_log, v_loc, entropy
 
+    def init_net(
+        self,
+        obs_carry: Observation,
+        hstates: HiddenStates,
+        key: chex.PRNGKey,
+    ) -> Tuple[chex.Array]:
+        """Initializating the network."""
+
+        v_loc = self.executor.init_sable(
+            encoder=self.encoder,
+            decoder=self.decoder,
+            obs_carry=obs_carry,
+            hstates=hstates,
+            key=key,
+        )
+
+        return v_loc
+
     def get_actions(
         self,
         obs_carry: Observation,
@@ -507,8 +525,10 @@ class DiscreteSableTrainer:
         self.n_agents = n_agents
         # Set the train encoder and act functions based on the chunkwise setting
         # if self.net_config.use_chunkwise: TODO: Implement chunkwise
-        if False:
-            pass
+        if self.net_config.use_chunkwise:
+            self.chunksize = self.net_config.chunk_size
+            self.train_encoder_fn = self._train_encoder_chunkwise
+            self.act_fn = self._act_chunkwise
         else:
             self.train_encoder_fn = self._train_encoder_parallel
             self.act_fn = self._act_parallel
@@ -570,9 +590,32 @@ class DiscreteSableTrainer:
         timestep_id: chex.Array,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         """Chunkwise encoding for discrete action spaces."""
-        # Apply the encoder
-        v_loc, obs_rep, updated_hstate = encoder.chunkwise(obs, hstate, dones, timestep_id)
-        return v_loc, obs_rep, updated_hstate
+        # Get the batch and sequence dimensions
+        batch_dim, seq_dim = obs.shape[:2]
+        # Initialize the value location and observation representation
+        v_loc = jnp.zeros((batch_dim, seq_dim, 1))
+        obs_rep = jnp.zeros((batch_dim, seq_dim, encoder.embed_dim))
+
+        # Apply the encoder per chunk
+        num_chunks = seq_dim // self.chunksize
+        for chunk_id in range(0, num_chunks):
+            start_idx = chunk_id * self.chunksize
+            end_idx = (chunk_id + 1) * self.chunksize
+            chunk_obs = obs[:, start_idx:end_idx]
+            chunk_dones = dones[:, start_idx:end_idx]
+            chunk_timestep_id = timestep_id[:, start_idx:end_idx]
+            # Apply parallel encoding per chunk
+            chunk_v_loc, chunk_obs_rep, hstate = self._train_encoder_parallel(
+                encoder=encoder,
+                obs=chunk_obs,
+                hstate=hstate,
+                dones=chunk_dones,
+                timestep_id=chunk_timestep_id,
+            )
+            v_loc = v_loc.at[:, start_idx:end_idx].set(chunk_v_loc)
+            obs_rep = obs_rep.at[:, start_idx:end_idx].set(chunk_obs_rep)
+
+        return v_loc, obs_rep, hstate
 
     def train_decoder_fn(
         self,
@@ -592,13 +635,14 @@ class DiscreteSableTrainer:
         # Get the shifted actions for predicting the next action
         shifted_actions = self._get_shifted_actions(action, legal_actions)
 
-        logit = self.act_fn(
+        logit, _ = self.act_fn(
             decoder=decoder,
             obs_rep=obs_rep,
             shifted_actions=shifted_actions,
             hstates=hstates,
             dones=dones,
             timestep_id=timestep_id,
+            legal_actions=legal_actions,
         )
 
         # Mask the logits for illegal actions
@@ -628,16 +672,53 @@ class DiscreteSableTrainer:
         hstates: Tuple[chex.Array, chex.Array],
         dones: chex.Array,
         timestep_id: chex.Array,
-    ) -> chex.Array:
+        legal_actions: chex.Array,
+    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
+        del legal_actions
         # Apply the decoder
-        logit, _ = decoder.chunkwise(
+        logit, updated_hstates = decoder.chunkwise(
             action=shifted_actions,
             obs_rep=obs_rep,
             hstates=hstates,
             dones=dones,
             timestep_id=timestep_id,
         )
-        return logit
+        return logit, updated_hstates
+
+    def _act_chunkwise(
+        self,
+        decoder: Decoder,
+        obs_rep: chex.Array,
+        shifted_actions: chex.Array,
+        hstates: Tuple[chex.Array, chex.Array],
+        dones: chex.Array,
+        timestep_id: chex.Array,
+        legal_actions: chex.Array,
+    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
+        logit = jnp.zeros_like(legal_actions, dtype=jnp.float32)
+
+        # Apply the decoder per chunk
+        num_chunks = shifted_actions.shape[1] // self.chunksize
+        for chunk_id in range(0, num_chunks):
+            start_idx = chunk_id * self.chunksize
+            end_idx = (chunk_id + 1) * self.chunksize
+            chunked_obs_rep = obs_rep[:, start_idx:end_idx]
+            chunk_shifted_actions = shifted_actions[:, start_idx:end_idx]
+            chunk_dones = dones[:, start_idx:end_idx]
+            chunk_timestep_id = timestep_id[:, start_idx:end_idx]
+            # Apply parallel encoding per chunk
+            chunk_logit, hstates = self._act_parallel(
+                decoder=decoder,
+                obs_rep=chunked_obs_rep,
+                shifted_actions=chunk_shifted_actions,
+                hstates=hstates,
+                dones=chunk_dones,
+                timestep_id=chunk_timestep_id,
+                legal_actions=legal_actions,
+            )
+            logit = logit.at[:, start_idx:end_idx].set(chunk_logit)
+
+        return logit, hstates
 
     def _get_shifted_actions(self, action: chex.Array, legal_actions: chex.Array) -> chex.Array:
         """Get the shifted action sequence for predicting the next action."""
@@ -679,7 +760,7 @@ class DiscreteSableExecutor:
         if False:
             pass
         else:
-            self.execute_encoder_fn = self._train_encoder_parallel
+            self.execute_encoder_fn = self._execute_encoder_parallel
 
     def __call__(
         self,
@@ -720,7 +801,47 @@ class DiscreteSableExecutor:
 
         return output_actions, output_actions_log, v_loc, updated_hs
 
-    def _train_encoder_parallel(
+    def init_sable(
+        self,
+        encoder: Encoder,
+        decoder: Decoder,
+        obs_carry: chex.Array,
+        hstates: chex.Array,
+        key: chex.PRNGKey,
+    ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, HiddenStates]:
+        """Initializating the network: Applying non chunkwise encoding-decoding."""
+        # Get the observation, legal actions, and timestep id
+        obs, legal_actions, timestep_id = (
+            obs_carry.agents_view,
+            obs_carry.action_mask,
+            obs_carry.step_count,
+        )
+        # Decay the hidden states
+        decayed_hstates = jax.tree.map(
+            lambda x: x * self.decay_kappas[None, :, None, None, None], hstates
+        )
+
+        # Apply the encoder
+        v_loc, obs_rep, updated_enc_hs = self._execute_encoder_parallel(
+            encoder=encoder, obs=obs, decayed_hstate=decayed_hstates[0], timestep_id=timestep_id
+        )
+
+        # Apply the decoder
+        output_actions, output_actions_log, updated_dec_hs = self.autoregressive_act(
+            decoder=decoder,
+            obs_rep=obs_rep,
+            legal_actions=legal_actions,
+            hstates=decayed_hstates[1],
+            timestep_id=timestep_id,
+            key=key,
+        )
+
+        # Pack the hidden states
+        updated_hs = HiddenStates(encoder_hstate=updated_enc_hs, decoder_hstate=updated_dec_hs)
+
+        return output_actions, output_actions_log, v_loc, updated_hs
+
+    def _execute_encoder_parallel(
         self,
         encoder: Encoder,
         obs: chex.Array,
