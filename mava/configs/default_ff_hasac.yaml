@@ -1,7 +1,0 @@
-defaults:
-  - _self_
-  - logger: ff_hasac
-  - arch: anakin
-  - system: sac/ff_hasac
-  - network: continuous_mlp  # [continuous_mlp]
-  - env: mabrax  # [mabrax]
