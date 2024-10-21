@@ -28,6 +28,9 @@ from jumanji.environments.routing.connector.generator import (
 from jumanji.environments.routing.lbf.generator import (
     RandomGenerator as LbfRandomGenerator,
 )
+from jumanji.environments.routing.multi_cvrp.generator import (
+    UniformRandomGenerator as MultiCVRPRandomGenerator,
+)
 from jumanji.environments.routing.robot_warehouse.generator import (
     RandomGenerator as RwareRandomGenerator,
 )
@@ -43,6 +46,7 @@ from mava.wrappers import (
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
+    MultiCVRPWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
     SmaxWrapper,
@@ -58,6 +62,7 @@ _jumanji_registry = {
         "wrapper": ConnectorWrapper,
     },
     "Cleaner-v0": {"generator": CleanerRandomGenerator, "wrapper": CleanerWrapper},
+    "MultiCVRP-v0": {"generator": MultiCVRPRandomGenerator, "wrapper": MultiCVRPWrapper},
 }
 
 # Registry mapping environment names directly to the corresponding wrapper classes.
