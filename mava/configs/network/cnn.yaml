@@ -8,9 +8,6 @@ actor_network:
     use_layer_norm: False
     activation: relu
 
-action_head:
-  _target_: mava.networks.heads.DiscreteActionHead # [DiscreteActionHead, ContinuousActionHead]
-
 critic_network:
   pre_torso:
     _target_: mava.networks.torsos.CNNTorso
