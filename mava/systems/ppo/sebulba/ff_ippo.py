@@ -650,8 +650,11 @@ def run_experiment(_config: DictConfig) -> float:
                 ),
                 name=f"Actor-{actor_device}-{thread_id}",
             )
-            actor.start()
             actor_threads.append(actor)
+            
+    # Start the actors simultaneously 
+    for actor in actor_threads:
+        actor.start()
 
     eval_queue: Queue = Queue()
     threading.Thread(
