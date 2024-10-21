@@ -12,16 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict
+from typing import Dict, Tuple
 
 from jumanji.specs import DiscreteArray, MultiDiscreteArray
 
 from mava.types import MarlEnv
 
+_DISCRETE = "discrete"
+_CONTINUOUS = "continuous"
 
-def get_action_head(env: MarlEnv) -> Dict[str, str]:
+
+def get_action_head(env: MarlEnv) -> Tuple[Dict[str, str], str]:
     """Returns the appropriate action head config based on the environment action_spec."""
     if isinstance(env.action_spec(), (DiscreteArray, MultiDiscreteArray)):
-        return {"_target_": "mava.networks.heads.DiscreteActionHead"}
+        return {"_target_": "mava.networks.heads.DiscreteActionHead"}, _DISCRETE
 
-    return {"_target_": "mava.networks.heads.ContinuousActionHead"}
+    return {"_target_": "mava.networks.heads.ContinuousActionHead"}, _CONTINUOUS

@@ -111,7 +111,8 @@ def init(
 
     # Making actor network
     actor_torso = hydra.utils.instantiate(cfg.network.actor_network.pre_torso)
-    actor_action_head = hydra.utils.instantiate(get_action_head(env), action_dim=env.action_dim)
+    action_head, _ = get_action_head(env)
+    actor_action_head = hydra.utils.instantiate(action_head, action_dim=env.action_dim)
     actor_network = Actor(actor_torso, actor_action_head)
     actor_params = actor_network.init(actor_key, obs_single_batched)
 
