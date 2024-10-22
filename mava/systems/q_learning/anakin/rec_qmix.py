@@ -14,7 +14,7 @@
 
 import copy
 import time
-from typing import Any, Dict, NamedTuple, Tuple
+from typing import Any, Dict, Tuple
 
 import chex
 import flashbax as fbx
@@ -23,23 +23,29 @@ import jax
 import jax.lax as lax
 import jax.numpy as jnp
 import optax
-from chex import PRNGKey
 from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
-from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
 from flax.linen import FrozenDict
 from jax import Array, tree
-from jumanji.env import Environment, State
+from jumanji.env import Environment
 from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
-from typing_extensions import TypeAlias
 
 from mava.evaluator import ActorState, get_eval_fn, get_num_eval_envs
 from mava.networks import RecQNetwork, ScannedRNN
 from mava.networks.base import QMixNetwork
 from mava.networks.torsos import MLPTorso
+from mava.systems.q_learning.types import (
+    ActionSelectionState,
+    ActionState,
+    LearnerState,
+    Metrics,
+    QMIXParams,
+    TrainState,
+    Transition,
+)
 from mava.types import Observation, ObservationGlobalState
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
@@ -51,78 +57,6 @@ from mava.utils.jax_utils import (
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.wrappers import episode_metrics
-
-Metrics = Dict[str, Array]
-
-
-class Transition(NamedTuple):
-    """Transition for recurrent Q-learning."""
-
-    obs: Observation
-    action: Array
-    reward: Array
-    terminal: Array
-    term_or_trunc: Array
-    # Even though we use a trajectory buffer we need to store both obs and next_obs.
-    # This is because of how the `AutoResetWrapper` returns obs at the end of an episode.
-    next_obs: Observation
-
-
-BufferState: TypeAlias = TrajectoryBufferState[Transition]
-
-
-class QMIXParams(NamedTuple):
-    online: FrozenVariableDict
-    target: FrozenVariableDict
-    mixer_online: FrozenVariableDict
-    mixer_target: FrozenVariableDict
-
-
-class LearnerState(NamedTuple):
-    """State of the learner in an interaction-training loop."""
-
-    # Interaction vars
-    obs: Observation
-    terminal: Array
-    term_or_trunc: Array
-    hidden_state: Array
-    env_state: State
-    time_steps: Array
-
-    # Train vars
-    train_steps: Array
-    opt_state: optax.OptState
-
-    # Shared vars
-    buffer_state: TrajectoryBufferState
-    params: QMIXParams
-    key: PRNGKey
-
-
-class ActionSelectionState(NamedTuple):
-    online_params: FrozenVariableDict
-    hidden_state: chex.Array
-    time_steps: int
-    key: chex.PRNGKey
-
-
-class ActionState(NamedTuple):
-    """The carry in the interaction loop."""
-
-    action_selection_state: ActionSelectionState
-    env_state: State
-    buffer_state: BufferState
-    obs: Observation
-    terminal: Array
-    term_or_trunc: Array
-
-
-class TrainState(NamedTuple):  # 'carry' in training loop
-    buffer_state: BufferState
-    params: QMIXParams
-    opt_state: optax.OptState
-    train_steps: Array
-    key: chex.PRNGKey
 
 
 def init(

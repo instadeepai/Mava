@@ -98,3 +98,10 @@ class TrainState(NamedTuple):
     opt_state: optax.OptState
     train_steps: Array
     key: PRNGKey
+
+
+class QMIXParams(NamedTuple):
+    online: FrozenVariableDict
+    target: FrozenVariableDict
+    mixer_online: FrozenVariableDict
+    mixer_target: FrozenVariableDict
