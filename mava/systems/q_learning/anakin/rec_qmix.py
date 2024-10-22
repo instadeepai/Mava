@@ -14,11 +14,10 @@
 
 import copy
 import time
-from typing import Any, Callable, Dict, NamedTuple, Sequence, Tuple
+from typing import Any, Dict, NamedTuple, Tuple
 
 import chex
 import flashbax as fbx
-import flax.linen as nn
 import hydra
 import jax
 import jax.lax as lax
@@ -30,7 +29,6 @@ from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
 from flax.linen import FrozenDict
-from flax.linen.initializers import lecun_normal, orthogonal
 from jax import Array, tree
 from jumanji.env import Environment, State
 from jumanji.types import TimeStep
@@ -40,6 +38,8 @@ from typing_extensions import TypeAlias
 
 from mava.evaluator import ActorState, get_eval_fn, get_num_eval_envs
 from mava.networks import RecQNetwork, ScannedRNN
+from mava.networks.base import QMixNetwork
+from mava.networks.torsos import MLPTorso
 from mava.types import Observation, ObservationGlobalState
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
@@ -123,126 +123,6 @@ class TrainState(NamedTuple):  # 'carry' in training loop
     opt_state: optax.OptState
     train_steps: Array
     key: chex.PRNGKey
-
-
-def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
-    """Get the activation function."""
-    activation_fns: Dict[str, Callable[[chex.Array], chex.Array]] = {
-        "relu": nn.relu,
-        "tanh": nn.tanh,
-    }
-    return activation_fns[activation_fn_name]
-
-
-def _parse_kernel_init_fn(
-    kernel_init_fn_name: str,
-) -> Callable[[chex.Array], chex.Array]:
-    """Get kernel init function."""
-    init_fns: Dict[str, Callable[[chex.Array], chex.Array]] = {
-        "orthogonal": orthogonal(jnp.sqrt(2)),
-        "lecun_normal": lecun_normal(),
-    }
-    return init_fns[kernel_init_fn_name]
-
-
-class MLPTorso(nn.Module):
-    """MLP torso."""
-
-    layer_sizes: Sequence[int]
-    activation: str = "relu"
-    kernel_init: str = "orthogonal"  # orthogonal or lecun_normal
-    use_layer_norm: bool = False
-    activate_final: bool = True
-
-    def setup(self) -> None:
-        self.activation_fn = _parse_activation_fn(self.activation)
-        self.kernel_init_fn = _parse_kernel_init_fn(self.kernel_init)
-
-    @nn.compact
-    def __call__(self, observation: chex.Array) -> chex.Array:
-        """Forward pass."""
-        x = observation
-        for i, layer_size in enumerate(self.layer_sizes):
-            x = nn.Dense(layer_size, kernel_init=self.kernel_init_fn)(x)
-            if self.use_layer_norm:
-                x = nn.LayerNorm(use_scale=False)(x)
-
-            if i != len(self.layer_sizes) - 1:
-                x = self.activation_fn(x)
-            elif i == len(self.layer_sizes) - 1 and self.activate_final:
-                x = self.activation_fn(x)
-
-        return x
-
-
-class QMixNetwork(nn.Module):
-    num_actions: int
-    num_agents: int
-    hyper_hidden_dim: int = 64
-    embed_dim: int = 32
-    norm_env_states: bool = True
-
-    def setup(self) -> None:
-        self.hyper_w1: MLPTorso = MLPTorso(
-            (self.hyper_hidden_dim, self.embed_dim * self.num_agents),
-            activate_final=False,
-        )
-
-        self.hyper_b1: MLPTorso = MLPTorso(
-            (self.embed_dim,),
-            activate_final=False,
-        )
-
-        self.hyper_w2: MLPTorso = MLPTorso(
-            (self.hyper_hidden_dim, self.embed_dim),
-            activate_final=False,
-        )
-
-        self.hyper_b2: MLPTorso = MLPTorso(
-            (self.embed_dim, 1),
-            activate_final=False,
-        )
-
-        self.layer_norm: nn.Module = nn.LayerNorm()
-
-    @nn.compact
-    def __call__(
-        self,
-        agent_qs: Array,
-        env_global_state: Array,
-    ) -> Array:
-        B, T = agent_qs.shape[:2]  # batch size #noqa: N806
-
-        agent_qs = jnp.reshape(agent_qs, (B, T, 1, self.num_agents))
-
-        if self.norm_env_states:
-            states = self.layer_norm(env_global_state)
-        else:
-            states = env_global_state
-
-        # First layer
-        w1 = jnp.abs(self.hyper_w1(states))
-        b1 = self.hyper_b1(states)
-        w1 = jnp.reshape(w1, (B, T, self.num_agents, self.embed_dim))
-        b1 = jnp.reshape(b1, (B, T, 1, self.embed_dim))
-
-        # Matrix multiplication
-        hidden = nn.elu(jnp.matmul(agent_qs, w1) + b1)
-
-        # Second layer
-        w2 = jnp.abs(self.hyper_w2(states))
-        b2 = self.hyper_b2(states)
-
-        w2 = jnp.reshape(w2, (B, T, self.embed_dim, 1))
-        b2 = jnp.reshape(b2, (B, T, 1, 1))
-
-        # Compute final output
-        y = jnp.matmul(hidden, w2) + b2
-
-        # Reshape
-        q_tot = jnp.reshape(y, (B, T, 1))
-
-        return q_tot
 
 
 def init(
