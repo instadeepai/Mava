@@ -424,19 +424,21 @@ def make_update_fns(
             (params.online, params.mixer_online), q_updates
         )
 
-        # TODO (ruan): Implement soft target network update.
         # Target network update.
-        # next_target_params = jax.lax.select(
-        #     cfg.system.hard_update,
-        next_target_params = optax.periodic_update(
-            next_online_params, params.target, t_train, cfg.system.update_period
-        )
-        next_mixer_target_params = optax.periodic_update(
-            next_mixer_params, params.mixer_target, t_train, cfg.system.update_period
-        )
-        #     optax.incremental_update(next_online_params, params.target, cfg.system.tau)
-        # )
-
+        if cfg.system.hard_update:
+            next_target_params = optax.periodic_update(
+                next_online_params, params.target, t_train, cfg.system.update_period
+            )
+            next_mixer_target_params = optax.periodic_update(
+                next_mixer_params, params.mixer_target, t_train, cfg.system.update_period
+            )
+        else:
+            next_target_params = optax.incremental_update(
+                next_online_params, params.target, cfg.system.tau
+            )
+            next_mixer_target_params = optax.incremental_update(
+                next_mixer_params, params.mixer_target, cfg.system.tau
+            )
         # Repack params and opt_states.
         next_params = QMIXParams(
             next_online_params,
