@@ -56,27 +56,21 @@ class EncodeBlock(nn.Module):
         # Initialize SwiGLU feedforward network
         self.ffn = SwiGLU(self.embed_dim, self.embed_dim)
 
-    def __call__(self, x: chex.Array) -> chex.Array:
-        """Applies Parallel MultiScaleRetention."""
-        x = self.ln1(x + self.retn(key=x, query=x, value=x))
-        output = self.ln2(x + self.ffn(x))
-        return output
-
-    def recurrent(self, x: chex.Array, hstate: chex.Array, timestep_id: chex.Array) -> chex.Array:
-        """Applies Recurrent MultiScaleRetention."""
-        ret, updated_hstate = self.retn.recurrent(
-            key_n=x, query_n=x, value_n=x, hstate=hstate, timestep_id=timestep_id
+    def __call__(
+        self, x: chex.Array, hstate: chex.Array, dones: chex.Array, timestep_id: chex.Array
+    ) -> chex.Array:
+        """Applies Chunkwise MultiScaleRetention."""
+        ret, updated_hstate = self.retn(
+            key=x, query=x, value=x, hstate=hstate, dones=dones, timestep_id=timestep_id
         )
         x = self.ln1(x + ret)
         output = self.ln2(x + self.ffn(x))
         return output, updated_hstate
 
-    def chunkwise(
-        self, x: chex.Array, hstate: chex.Array, dones: chex.Array, timestep_id: chex.Array
-    ) -> chex.Array:
-        """Applies Chunkwise MultiScaleRetention."""
-        ret, updated_hstate = self.retn.chunkwise(
-            key=x, query=x, value=x, hstate=hstate, dones=dones, timestep_id=timestep_id
+    def recurrent(self, x: chex.Array, hstate: chex.Array, timestep_id: chex.Array) -> chex.Array:
+        """Applies Recurrent MultiScaleRetention."""
+        ret, updated_hstate = self.retn.recurrent(
+            key_n=x, query_n=x, value_n=x, hstate=hstate, timestep_id=timestep_id
         )
         x = self.ln1(x + ret)
         output = self.ln2(x + self.ffn(x))
@@ -127,19 +121,27 @@ class Encoder(nn.Module):
             for block_id in range(self.n_block)
         ]
 
-    def __call__(self, obs: chex.Array) -> Tuple[chex.Array, chex.Array]:
-        """Apply parallel encoding (default)."""
+    def __call__(
+        self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, timestep_id: chex.Array
+    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
+        """Apply chunkwise encoding."""
+        # Initialize the updated hidden state
+        updated_hstate = jnp.zeros_like(hstate)
         # Encode the observation
         obs_rep = self.obs_encoder(obs)
 
         # Apply the encoder blocks
-        for block in self.blocks:
-            obs_rep = block(self.ln(obs_rep))
+        for i, block in enumerate(self.blocks):
+            # Get the hidden state for the current block
+            hs = hstate[:, :, i]
+            # Apply the chunkwise encoder block
+            obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, timestep_id)
+            updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
         # Compute the value function
         v_loc = self.head(obs_rep)
 
-        return v_loc, obs_rep
+        return v_loc, obs_rep, updated_hstate
 
     def recurrent(
         self, obs: chex.Array, hstate: chex.Array, timestep_id: chex.Array
@@ -156,28 +158,6 @@ class Encoder(nn.Module):
             hs = hstate[:, :, i]
             # Apply the recurrent encoder block
             obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs, timestep_id)
-            updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
-
-        # Compute the value function
-        v_loc = self.head(obs_rep)
-
-        return v_loc, obs_rep, updated_hstate
-
-    def chunkwise(
-        self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, timestep_id: chex.Array
-    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        """Apply chunkwise encoding."""
-        # Initialize the updated hidden state
-        updated_hstate = jnp.zeros_like(hstate)
-        # Encode the observation
-        obs_rep = self.obs_encoder(obs)
-
-        # Apply the encoder blocks
-        for i, block in enumerate(self.blocks):
-            # Get the hidden state for the current block
-            hs = hstate[:, :, i]
-            # Apply the chunkwise encoder block
-            obs_rep, hs_new = block.chunkwise(self.ln(obs_rep), hs, dones, timestep_id)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
         # Compute the value function
@@ -220,12 +200,36 @@ class DecodeBlock(nn.Module):
         # Initialize SwiGLU feedforward network
         self.ffn = SwiGLU(self.embed_dim, self.embed_dim)
 
-    def __call__(self, x: chex.Array, obs_rep: chex.Array) -> chex.Array:
-        """Applies Parallel MultiScaleRetention."""
-        x = self.ln1(x + self.retn1(key=x, query=x, value=x))
-        x = self.ln2(obs_rep + self.retn2(key=x, query=obs_rep, value=x))
-        output = self.ln3(x + self.ffn(x))
-        return output
+    def __call__(
+        self,
+        x: chex.Array,
+        obs_rep: chex.Array,
+        hstates: Tuple[chex.Array, chex.Array],
+        dones: chex.Array,
+        timestep_id: chex.Array,
+    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
+        """Applies Chunkwise MultiScaleRetention."""
+        hs1, hs2 = hstates
+
+        # Apply the self-retention over actions
+        ret, hs1_new = self.retn1(
+            key=x, query=x, value=x, hstate=hs1, dones=dones, timestep_id=timestep_id
+        )
+        ret = self.ln1(x + ret)
+
+        # Apply the cross-retention over obs x action
+        ret2, hs2_new = self.retn2(
+            key=ret,
+            query=obs_rep,
+            value=ret,
+            hstate=hs2,
+            dones=dones,
+            timestep_id=timestep_id,
+        )
+        y = self.ln2(obs_rep + ret2)
+        output = self.ln3(y + self.ffn(y))
+
+        return output, (hs1_new, hs2_new)
 
     def recurrent(
         self,
@@ -246,37 +250,6 @@ class DecodeBlock(nn.Module):
         # Apply the cross-retention over obs x action
         ret2, hs2_new = self.retn2.recurrent(
             key_n=ret, query_n=obs_rep, value_n=ret, hstate=hs2, timestep_id=timestep_id
-        )
-        y = self.ln2(obs_rep + ret2)
-        output = self.ln3(y + self.ffn(y))
-
-        return output, (hs1_new, hs2_new)
-
-    def chunkwise(
-        self,
-        x: chex.Array,
-        obs_rep: chex.Array,
-        hstates: Tuple[chex.Array, chex.Array],
-        dones: chex.Array,
-        timestep_id: chex.Array,
-    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
-        """Applies Chunkwise MultiScaleRetention."""
-        hs1, hs2 = hstates
-
-        # Apply the self-retention over actions
-        ret, hs1_new = self.retn1.chunkwise(
-            key=x, query=x, value=x, hstate=hs1, dones=dones, timestep_id=timestep_id
-        )
-        ret = self.ln1(x + ret)
-
-        # Apply the cross-retention over obs x action
-        ret2, hs2_new = self.retn2.chunkwise(
-            key=ret,
-            query=obs_rep,
-            value=ret,
-            hstate=hs2,
-            dones=dones,
-            timestep_id=timestep_id,
         )
         y = self.ln2(obs_rep + ret2)
         output = self.ln3(y + self.ffn(y))
@@ -338,20 +311,35 @@ class Decoder(nn.Module):
             for block_id in range(self.n_block)
         ]
 
-    def __call__(self, action: chex.Array, obs_rep: chex.Array) -> chex.Array:
-        """Apply parallel decoding (default)."""
+    def __call__(
+        self,
+        action: chex.Array,
+        obs_rep: chex.Array,
+        hstates: Tuple[chex.Array, chex.Array],
+        dones: chex.Array,
+        timestep_id: chex.Array,
+    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
+        """Apply chunkwise decoding."""
+        # Initialize the updated hidden states
+        updated_hstates = (jnp.zeros_like(hstates[0]), jnp.zeros_like(hstates[1]))
         # Encode the action
         action_embeddings = self.action_encoder(action)
         x = self.ln(action_embeddings)
 
         # Apply the decoder blocks
-        for block in self.blocks:
-            x = block.parallel(x, obs_rep)
+        for i, block in enumerate(self.blocks):
+            hs = jax.tree.map(lambda x, i=i: x[:, :, i], hstates)
+            x, hs_new = block(
+                x=x, obs_rep=obs_rep, hstates=hs, dones=dones, timestep_id=timestep_id
+            )
+            updated_hstates = jax.tree.map(
+                lambda x, y: x.at[:, :, i].set(y), updated_hstates, hs_new
+            )
 
         # Compute the action logits
         logit = self.head(x)
 
-        return logit
+        return logit, updated_hstates
 
     def recurrent(
         self,
@@ -371,36 +359,6 @@ class Decoder(nn.Module):
         for i, block in enumerate(self.blocks):
             hs = jax.tree.map(lambda x, i=i: x[:, :, i], hstates)
             x, hs_new = block.recurrent(x=x, obs_rep=obs_rep, hstates=hs, timestep_id=timestep_id)
-            updated_hstates = jax.tree.map(
-                lambda x, y: x.at[:, :, i].set(y), updated_hstates, hs_new
-            )
-
-        # Compute the action logits
-        logit = self.head(x)
-
-        return logit, updated_hstates
-
-    def chunkwise(
-        self,
-        action: chex.Array,
-        obs_rep: chex.Array,
-        hstates: Tuple[chex.Array, chex.Array],
-        dones: chex.Array,
-        timestep_id: chex.Array,
-    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
-        """Apply chunkwise decoding."""
-        # Initialize the updated hidden states
-        updated_hstates = (jnp.zeros_like(hstates[0]), jnp.zeros_like(hstates[1]))
-        # Encode the action
-        action_embeddings = self.action_encoder(action)
-        x = self.ln(action_embeddings)
-
-        # Apply the decoder blocks
-        for i, block in enumerate(self.blocks):
-            hs = jax.tree.map(lambda x, i=i: x[:, :, i], hstates)
-            x, hs_new = block.chunkwise(
-                x=x, obs_rep=obs_rep, hstates=hs, dones=dones, timestep_id=timestep_id
-            )
             updated_hstates = jax.tree.map(
                 lambda x, y: x.at[:, :, i].set(y), updated_hstates, hs_new
             )
@@ -469,14 +427,14 @@ class SableNetwork(nn.Module):
         ) = self.setup_executor_trainer_fn()
 
         # Decay kappa for each head
+        assert (
+            self.decay_scaling_factor >= 0 and self.decay_scaling_factor <= 1,
+            "Decay scaling factor should be between 0 and 1",
+        )
         self.decay_kappas = 1 - jnp.exp(
             jnp.linspace(jnp.log(1 / 32), jnp.log(1 / 512), self.n_head)
         )
         self.decay_kappas = self.decay_kappas * self.decay_scaling_factor
-        if self.decay_scaling_factor <= 0:
-            self.decay_kappas = jnp.ones_like(
-                self.decay_kappas
-            )  # No decaying if decay_scaling_factor is 0
 
     def __call__(
         self,

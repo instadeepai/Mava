@@ -18,7 +18,6 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 from chex import Array
-from colorama import Fore, Style
 from omegaconf import DictConfig
 
 from mava.utils.sable_utils import PositionalEncoding
@@ -52,43 +51,10 @@ class SimpleRetention(nn.Module):
             (self.embed_dim, self.head_size),
         )
 
-    def __call__(self, key: Array, query: Array, value: Array) -> Array:
-        """Parallel (default) representation of the retention mechanism."""
-        # Apply projection to q_proj, k_proj, v_proj
-        q_proj = query @ self.W_Q
-        k_proj = key @ self.W_K
-        v_proj = value @ self.W_V
-
-        # Apply the retention mechanism
-        ret = q_proj @ jnp.transpose(k_proj, (0, 2, 1))
-
-        # Apply causal mask if not full self retention
-        if not self.full_self_retention:
-            decay_matrix = jnp.tril(jnp.ones((k_proj.shape[1], k_proj.shape[1])))
-            ret = ret * decay_matrix
-
-        ret = ret @ v_proj
-        return ret
-
-    def recurrent(
-        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array
-    ) -> Tuple[Array, Array]:
-        """Recurrent representation of the retention mechanism."""
-        # Apply projection to q_proj, k_proj, v_proj
-        q_proj = query_n @ self.W_Q
-        k_proj = key_n @ self.W_K
-        v_proj = value_n @ self.W_V
-
-        # Apply the retention mechanism and update the hidden state
-        updated_hstate = hstate + (k_proj.transpose(0, -1, -2) @ v_proj)
-        ret = q_proj @ updated_hstate
-
-        return ret, updated_hstate
-
-    def chunkwise(
+    def __call__(
         self, key: Array, query: Array, value: Array, hstate: Array, dones: Array
     ) -> Tuple[Array, Array]:
-        """Chunkwise representation of the retention mechanism."""
+        """Chunkwise (default) representation of the retention mechanism."""
         batch, chunk_size, _ = value.shape
 
         # Apply projection to q_proj, k_proj, v_proj
@@ -118,6 +84,21 @@ class SimpleRetention(nn.Module):
         # Compute the final retention
         ret = inner_chunk + cross_chunk
         return ret, next_hstate
+
+    def recurrent(
+        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array
+    ) -> Tuple[Array, Array]:
+        """Recurrent representation of the retention mechanism."""
+        # Apply projection to q_proj, k_proj, v_proj
+        q_proj = query_n @ self.W_Q
+        k_proj = key_n @ self.W_K
+        v_proj = value_n @ self.W_V
+
+        # Apply the retention mechanism and update the hidden state
+        updated_hstate = hstate + (k_proj.transpose(0, -1, -2) @ v_proj)
+        ret = q_proj @ updated_hstate
+
+        return ret, updated_hstate
 
     def get_masked_decay_matrix(self, dones: Array) -> Array:
         # get dones the timestep as we do full self attention over all agents within a timestep
@@ -220,13 +201,6 @@ class MultiScaleRetention(nn.Module):
             jnp.linspace(jnp.log(1 / 32), jnp.log(1 / 512), self.n_head)
         )
         self.decay_kappas = self.decay_kappas * self.decay_scaling_factor
-        if self.decay_scaling_factor <= 0:
-            self.decay_kappas = jnp.ones_like(
-                self.decay_kappas
-            )  # No decaying if decay_scaling_factor is 0
-            print(
-                f"{Fore.RED}{Style.BRIGHT} No decaying will be applied to the sequence because decay_scaling_factor is 0.{Style.RESET_ALL}"
-            )
 
         # Initialize the weights and group norm
         self.W_G = self.param(
@@ -257,20 +231,28 @@ class MultiScaleRetention(nn.Module):
         # Create an instance of the positional encoding
         self.pe = PositionalEncoding(self.net_config, self.embed_dim)
 
-    def __call__(self, key: Array, query: Array, value: Array) -> Array:
-        """Parallel (default) representation of the multi-scale retention mechanism."""
-        batch, seq_len, _ = value.shape
+    def __call__(
+        self,
+        key: Array,
+        query: Array,
+        value: Array,
+        hstate: Array,
+        dones: Array,
+        timestep_id: Array,
+    ) -> Tuple[Array, Array]:
+        """Chunkwise (default) representation of the multi-scale retention mechanism"""
+        batch, chunk_size, _ = value.shape
 
-        assert (
-            seq_len == self.n_agents
-        ), "Parallel retention expects a sequence equal to the number of agents."
+        # Set positional encoding
+        key, query, value = self.pe(key, query, value, timestep_id)
 
         # Per head retention
-        Y = jnp.zeros((batch, seq_len, self.head_size), dtype=value.dtype)
+        Y = jnp.zeros((batch, chunk_size, self.head_size), dtype=value.dtype)
+        h_ns = jnp.copy(hstate)
         for head in range(self.n_head):
-            Y = Y.at[:, :, head * self.v_dim_head_size : (head + 1)].set(
-                self.retentions[head](key, query, value)
-            )
+            y, h_n = self.retentions[head](key, query, value, hstate[:, head], dones)
+            Y = Y.at[:, :, self.head_size : (self.head_size + 1)].set(y)
+            h_ns = h_ns.at[:, head, :, :].set(h_n)
 
         # Gated Multi-scale retention
         # Apply the group norm
@@ -279,7 +261,7 @@ class MultiScaleRetention(nn.Module):
         # Swish gating
         X = key
         output = (jax.nn.swish(X @ self.W_G) * Y) @ self.W_O
-        return output
+        return output, h_ns
 
     def recurrent(
         self, key_n: Array, query_n: Array, value_n: Array, hstate: Array, timestep_id: Array
@@ -304,37 +286,5 @@ class MultiScaleRetention(nn.Module):
 
         # Swish gating
         X = key_n
-        output = (jax.nn.swish(X @ self.W_G) * Y) @ self.W_O
-        return output, h_ns
-
-    def chunkwise(
-        self,
-        key: Array,
-        query: Array,
-        value: Array,
-        hstate: Array,
-        dones: Array,
-        timestep_id: Array,
-    ) -> Tuple[Array, Array]:
-        """Chunkwise representation of the multi-scale retention mechanism"""
-        batch, chunk_size, _ = value.shape
-
-        # Set positional encoding
-        key, query, value = self.pe(key, query, value, timestep_id)
-
-        # Per head retention
-        Y = jnp.zeros((batch, chunk_size, self.head_size), dtype=value.dtype)
-        h_ns = jnp.copy(hstate)
-        for head in range(self.n_head):
-            y, h_n = self.retentions[head].chunkwise(key, query, value, hstate[:, head], dones)
-            Y = Y.at[:, :, self.head_size : (self.head_size + 1)].set(y)
-            h_ns = h_ns.at[:, head, :, :].set(h_n)
-
-        # Gated Multi-scale retention
-        # Apply the group norm
-        Y = self.group_norm(Y.reshape(-1, self.head_size)).reshape(Y.shape)
-
-        # Swish gating
-        X = key
         output = (jax.nn.swish(X @ self.W_G) * Y) @ self.W_O
         return output, h_ns

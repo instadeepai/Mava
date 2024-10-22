@@ -32,7 +32,7 @@ def train_encoder_parallel(
 ) -> Tuple[chex.Array, chex.Array, chex.Array]:
     """Parallel encoding for discrete action spaces."""
     # Apply the encoder
-    v_loc, obs_rep, updated_hstate = encoder.chunkwise(obs, hstate, dones, timestep_id)
+    v_loc, obs_rep, updated_hstate = encoder(obs, hstate, dones, timestep_id)
     return v_loc, obs_rep, updated_hstate
 
 
@@ -133,7 +133,7 @@ def act_parallel(
 ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
     del legal_actions
     # Apply the decoder
-    logit, updated_hstates = decoder.chunkwise(
+    logit, updated_hstates = decoder(
         action=shifted_actions,
         obs_rep=obs_rep,
         hstates=hstates,
