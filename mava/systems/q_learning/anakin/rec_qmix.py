@@ -35,7 +35,6 @@ from rich.pretty import pprint
 from mava.evaluator import ActorState, get_eval_fn, get_num_eval_envs
 from mava.networks import RecQNetwork, ScannedRNN
 from mava.networks.base import QMixNetwork
-from mava.networks.torsos import MLPTorso
 from mava.systems.q_learning.types import (
     ActionSelectionState,
     ActionState,
@@ -58,7 +57,6 @@ from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.wrappers import episode_metrics
 
 
-# (env, eval_env), learner_state, q_net, q_mixer, opt, rb, logger, key
 def init(
     cfg: DictConfig,
 ) -> Tuple[
@@ -71,6 +69,7 @@ def init(
     MavaLogger,
     chex.PRNGKey,
 ]:
+    """Initialize system by creating the envs, networks etc."""
     logger = MavaLogger(cfg)
 
     # init key, get devices available
@@ -106,9 +105,11 @@ def init(
     )
 
     # Making recurrent Q network
+    pre_torso = hydra.utils.instantiate(cfg.network.q_network.pre_torso)
+    post_torso = hydra.utils.instantiate(cfg.network.q_network.post_torso)
     q_net = RecQNetwork(
-        pre_torso=MLPTorso((256,)),
-        post_torso=MLPTorso((256,)),
+        pre_torso=pre_torso,
+        post_torso=post_torso,
         num_actions=action_dim,
         hidden_state_dim=cfg.network.hidden_state_dim,
     )
@@ -135,7 +136,12 @@ def init(
         ),
         "float32",
     )
-    q_mixer = QMixNetwork(action_dim, num_agents, 64, cfg.system.qmix_embed_dim)
+    q_mixer = hydra.utils.instantiate(
+        cfg.network.mixer_network,
+        num_actions=action_dim,
+        num_agents=num_agents,
+        embed_dim=cfg.system.qmix_embed_dim,
+    )
     mixer_online_params = q_mixer.init(q_key, dummy_agent_qs, dummy_global_env_state)
     mixer_target_params = q_mixer.init(q_key, dummy_agent_qs, dummy_global_env_state)
 

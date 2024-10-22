@@ -3,7 +3,7 @@ defaults:
   - logger: logger
   - arch: anakin
   - system: q_learning/rec_qmix
-  - network: rnn
+  - network: qmix_rnn
   - env: smax
 
 hydra:
