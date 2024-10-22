@@ -423,9 +423,9 @@ def learner_setup(
     params = sable_network.init(
         net_key,
         init_obs,
-        init_action,
         init_hs,
-        init_dones,
+        net_key,
+        method="init_net",
     )
     opt_state = optim.init(params)
 

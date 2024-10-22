@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import partial
 from typing import Optional, Tuple
 
 import chex
-import distrax
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
@@ -23,6 +23,7 @@ from flax.linen.initializers import orthogonal
 from omegaconf import DictConfig
 
 from mava.networks.retention import MultiScaleRetention
+from mava.networks.utils.sable.discrete_trainer_executor import *
 from mava.systems.sable.types import HiddenStates
 from mava.types import Observation
 from mava.utils.sable_utils import SwiGLU
@@ -429,11 +430,22 @@ class SableNetwork(nn.Module):
             "continuous",
         ], "Invalid action space type"
 
+        self.n_agents_per_chunk = self.n_agents
+        if self.net_config.use_chunkwise:
+            if self.net_config.type == "ff_sable":
+                self.net_config.chunk_size = self.net_config.agents_chunk_size
+                assert (
+                    self.n_agents % self.net_config.chunk_size == 0
+                ), "Number of agents should be divisible by chunk size"
+                self.n_agents_per_chunk = self.net_config.chunk_size
+            else:
+                self.net_config.chunk_size = self.net_config.timestep_chunk_size * self.n_agents
+
         self.encoder = Encoder(
             self.n_block,
             self.embed_dim,
             self.n_head,
-            self.n_agents,
+            self.n_agents_per_chunk,
             self.net_config,
             self.decay_scaling_factor,
         )
@@ -441,20 +453,20 @@ class SableNetwork(nn.Module):
             self.n_block,
             self.embed_dim,
             self.n_head,
-            self.n_agents,
+            self.n_agents_per_chunk,
             self.action_dim,
             self.net_config,
             self.decay_scaling_factor,
             self.action_space_type,
         )
-        if self.action_space_type == "discrete":
-            # TODO: add chunkwise
-            self.autoregressive_act = discrete_autoregressive_act
-            self.parallel_act = discrete_parallel_act
-        # TODO: Implement continuous executor and trainer
-        # else:
-        #    self.executor = ContinuousExecutor()
-        #    self.trainer = ContinuousTrainer()
+
+        # Set the executor and trainer functions
+        (
+            self.train_encoder_fn,
+            self.train_decoder_fn,
+            self.execute_encoder_fn,
+            self.autoregressive_act,
+        ) = self.setup_executor_trainer_fn()
 
         # Decay kappa for each head
         self.decay_kappas = 1 - jnp.exp(
@@ -482,13 +494,13 @@ class SableNetwork(nn.Module):
             obs_carry.step_count,
         )
         # Apply the encoder
-        v_loc, obs_rep, _ = self.encoder.chunkwise(
-            obs=obs, hstate=hstates[0], dones=dones, timestep_id=timestep_id
+        v_loc, obs_rep, _ = self.train_encoder_fn(
+            encoder=self.encoder, obs=obs, hstate=hstates[0], dones=dones, timestep_id=timestep_id
         )
+
         # Apply the decoder
-        action_log, entropy = self.parallel_act(
+        action_log, entropy = self.train_decoder_fn(
             decoder=self.decoder,
-            n_agents=self.n_agents,
             obs_rep=obs_rep,
             action=action,
             legal_actions=legal_actions,
@@ -498,7 +510,7 @@ class SableNetwork(nn.Module):
             rng_key=rng_key,
         )
 
-        return action_log, v_loc, entropy
+        return v_loc, action_log, entropy
 
     def get_actions(
         self,
@@ -519,8 +531,11 @@ class SableNetwork(nn.Module):
         )
 
         # Apply the encoder
-        v_loc, obs_rep, updated_enc_hs = self.encoder.recurrent(
-            obs, decayed_hstates[0], timestep_id
+        v_loc, obs_rep, updated_enc_hs = self.execute_encoder_fn(
+            encoder=self.encoder,
+            obs=obs,
+            decayed_hstate=decayed_hstates[0],
+            timestep_id=timestep_id,
         )
 
         # Apply the decoder
@@ -535,124 +550,49 @@ class SableNetwork(nn.Module):
 
         # Pack the hidden states
         updated_hs = HiddenStates(encoder_hstate=updated_enc_hs, decoder_hstate=updated_dec_hs)
-        return (output_actions, output_actions_log, v_loc, updated_hs)
+        return output_actions, output_actions_log, v_loc, updated_hs
 
+    def init_net(
+        self,
+        obs_carry: Observation,
+        hstates: HiddenStates,
+        key: chex.PRNGKey,
+    ) -> None:
+        """Initializating the network."""
 
-def discrete_parallel_act(
-    decoder: Decoder,
-    n_agents: int,
-    obs_rep: chex.Array,
-    action: chex.Array,
-    legal_actions: chex.Array,
-    hstates: chex.Array,
-    dones: chex.Array,
-    timestep_id: chex.Array,
-    rng_key: Optional[chex.PRNGKey] = None,
-) -> Tuple[chex.Array, chex.Array]:
-    """Parallel action sampling for discrete action spaces."""
-    # Delete `rng_key` since it is not used in discrete action space
-    del rng_key
-    # Get the batch size, sequence length, and action dimension
-    batch_size, sequence_size, action_dim = legal_actions.shape
-
-    # Create a shifted action sequence for predicting the next action
-    # Initialize the shifted action sequence.
-    shifted_actions = jnp.zeros((batch_size, sequence_size, action_dim + 1))
-
-    # Set the start-of-timestep token (first action as a "start" signal)
-    start_timestep_token = jnp.zeros(action_dim + 1).at[0].set(1)
-
-    # One hot encode the action
-    one_hot_action = jax.nn.one_hot(action, action_dim)
-
-    # Insert one-hot encoded actions into shifted array, shifting by 1 position
-    shifted_actions = shifted_actions.at[:, :, 1:].set(one_hot_action)
-    shifted_actions = jnp.roll(shifted_actions, shift=1, axis=1)
-
-    # Set the start token for the first agent in each timestep
-    shifted_actions = shifted_actions.at[:, ::n_agents, :].set(start_timestep_token)
-
-    # Apply the decoder
-    logit, _ = decoder.chunkwise(
-        action=shifted_actions,
-        obs_rep=obs_rep,
-        hstates=hstates,
-        dones=dones,
-        timestep_id=timestep_id,
-    )
-
-    # Mask the logits for illegal actions
-    masked_logits = jnp.where(
-        legal_actions,
-        logit,
-        jnp.finfo(jnp.float32).min,
-    )
-
-    # Create a categorical distribution over the masked logits
-    distribution = distrax.Categorical(logits=masked_logits)
-
-    # Compute the log probability of the actions
-    action_log_prob = distribution.log_prob(action)
-    action_log_prob = jnp.expand_dims(action_log_prob, axis=-1)
-
-    # Compute the entropy of the action distribution
-    entropy = jnp.expand_dims(distribution.entropy(), axis=-1)
-
-    return action_log_prob, entropy
-
-
-def discrete_autoregressive_act(
-    decoder: Decoder,
-    obs_rep: chex.Array,
-    hstates: chex.Array,
-    legal_actions: chex.Array,
-    timestep_id: chex.Array,
-    key: chex.PRNGKey,
-) -> Tuple[chex.Array, chex.Array, chex.Array]:
-    # Get the batch size, sequence length, and action dimension
-    batch_size, n_agents, action_dim = legal_actions.shape
-
-    # Create a shifted action sequence for predicting the next action
-    # Initialize the shifted action sequence.
-    shifted_actions = jnp.zeros((batch_size, n_agents, action_dim + 1))
-    # Set the start-of-timestep token (first action as a "start" signal)
-    shifted_actions = shifted_actions.at[:, 0, 0].set(1)
-
-    # Define the output action and output action log sizes
-    output_action = jnp.zeros((batch_size, n_agents, 1))
-    output_action_log = jnp.zeros_like(output_action)
-
-    # Apply the decoder autoregressively
-    for i in range(n_agents):
-        logit, updated_hstates = decoder.recurrent(
-            action=shifted_actions[:, i : i + 1, :],
-            obs_rep=obs_rep[:, i : i + 1, :],
+        _ = init_sable(
+            encoder=self.encoder,
+            decoder=self.decoder,
+            obs_carry=obs_carry,
             hstates=hstates,
-            timestep_id=timestep_id[:, i : i + 1],
-        )
-        # Mask the logits for illegal actions
-        masked_logits = jnp.where(
-            legal_actions[:, i : i + 1, :],
-            logit,
-            jnp.finfo(jnp.float32).min,
-        )
-        # Create a categorical distribution over the masked logits
-        distribution = distrax.Categorical(logits=masked_logits)
-        # Sample an action from the distribution
-        key, sample_key = jax.random.split(key)
-        action, action_log = distribution.sample_and_log_prob(seed=sample_key)
-        # Set the action and action log
-        output_action = output_action.at[:, i, :].set(action)
-        output_action_log = output_action_log.at[:, i, :].set(action_log)
-
-        # Update the shifted action
-        update_shifted_action = i + 1 < n_agents
-        shifted_actions = jax.lax.cond(
-            update_shifted_action,
-            lambda action=action, i=i, shifted_actions=shifted_actions: shifted_actions.at[
-                :, i + 1, 1:
-            ].set(jax.nn.one_hot(action[:, 0], action_dim)),
-            lambda shifted_actions=shifted_actions: shifted_actions,
+            key=key,
         )
 
-    return output_action.astype(jnp.int32), output_action_log, updated_hstates
+        return None
+
+    def setup_executor_trainer_fn(self):
+        """Setup the executor and trainer functions."""
+
+        # Set the executing encoder function based on the chunkwise setting.
+        if self.net_config.use_chunkwise:
+            # Define the trainer encoder in chunkwise setting.
+            train_enc_fn = partial(train_encoder_chunkwise, chunk_size=self.net_config.chunk_size)
+            # Define the trainer decoder in chunkwise setting.
+            act_fn = partial(act_chunkwise, chunk_size=self.net_config.chunk_size)
+            train_dec_fn = partial(train_decoder_fn, act_fn=act_fn, n_agents=self.n_agents)
+            # Define the executor encoder in chunkwise setting.
+            if self.net_config.type == "ff_sable":
+                execute_enc_fn = partial(
+                    execute_encoder_chunkwise, chunk_size=self.net_config.chunk_size
+                )
+            else:
+                execute_enc_fn = execute_encoder_parallel
+        else:
+            # Define the trainer encode when dealing with full sequence setting.
+            train_enc_fn = train_encoder_parallel
+            # Define the trainer decoder when dealing with full sequence setting.
+            train_dec_fn = partial(train_decoder_fn, act_fn=act_parallel, n_agents=self.n_agents)
+            # Define the executor encoder when dealing with full sequence setting.
+            execute_enc_fn = execute_encoder_parallel
+
+        return train_enc_fn, train_dec_fn, execute_enc_fn, autoregressive_act

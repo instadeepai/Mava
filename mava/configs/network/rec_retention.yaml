@@ -11,4 +11,4 @@ rec_config:
   timestep_positional_encoding: False # Timestamp positional encoding for Sable memory.
   # Chunking the sequence into smaller parts to fit into memory.
   use_chunkwise: False # Whether to chunk the sequence.
-  chunk_size: 32 # Size of the chunk: calculated over timesteps dim.
+  timestep_chunk_size: 32 # Size of the chunk: calculated over timesteps dim.

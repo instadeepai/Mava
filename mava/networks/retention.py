@@ -99,14 +99,19 @@ class SimpleRetention(nn.Module):
 
         # Compute next hidden state
         decay_matrix = self.get_masked_decay_matrix(dones)
-        chunk_decay = self.decay_kappa ** (chunk_size // self.n_agents)
-        delta = ~jnp.any(dones[:, :: self.n_agents], axis=1)[:, jnp.newaxis, jnp.newaxis]
-        next_hstate = (
-            k_proj @ (v_proj * decay_matrix[:, -1].reshape((batch, chunk_size, 1)))
-        ) + hstate * chunk_decay * delta
+        e = self.get_masked_e(dones)
+        if self.net_config.type == "ff_sable":
+            next_hstate = (k_proj @ v_proj) + hstate
+            decay_matrix = jnp.ones_like(decay_matrix)
+        else:
+            chunk_decay = self.decay_kappa ** (chunk_size // self.n_agents)
+            delta = ~jnp.any(dones[:, :: self.n_agents], axis=1)[:, jnp.newaxis, jnp.newaxis]
+            next_hstate = (
+                k_proj @ (v_proj * decay_matrix[:, -1].reshape((batch, chunk_size, 1)))
+            ) + hstate * chunk_decay * delta
+            e = jnp.ones_like(e)
 
         # Compute the inner chunk and cross chunk
-        e = self.get_masked_e(dones)
         cross_chunk = (q_proj @ hstate) * e
         inner_chunk = ((q_proj @ k_proj) * decay_matrix) @ v_proj
 
@@ -178,7 +183,7 @@ class SimpleRetention(nn.Module):
         B, S = dones.shape
 
         # If there is no done this sequence then the first done is after the
-        # sequence so must set it to chunksize, as argmax would return 0.
+        # sequence so must set it to chunk_size, as argmax would return 0.
         first_dones = jnp.where(
             ~jnp.any(dones, axis=1, keepdims=True),
             jnp.full((B, 1), S),
