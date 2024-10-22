@@ -13,160 +13,17 @@
 # limitations under the License.
 
 import functools
-from typing import Callable, Dict, Sequence, Tuple, Union
+from typing import Sequence, Tuple, Union
 
 import chex
 import jax
 import jax.numpy as jnp
-import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
-from mava.distributions import (
-    IdentityTransformation,
-    MaskedEpsGreedyDistribution,
-    TanhTransformedDistribution,
-)
-from mava.types import (
-    Observation,
-    ObservationGlobalState,
-    RNNGlobalObservation,
-    RNNObservation,
-)
-
-
-class MLPTorso(nn.Module):
-    """MLP torso."""
-
-    layer_sizes: Sequence[int]
-    activation: str = "relu"
-    use_layer_norm: bool = False
-
-    def setup(self) -> None:
-        self.activation_fn = _parse_activation_fn(self.activation)
-
-    @nn.compact
-    def __call__(self, observation: chex.Array) -> chex.Array:
-        """Forward pass."""
-        x = observation
-        for layer_size in self.layer_sizes:
-            x = nn.Dense(layer_size, kernel_init=orthogonal(np.sqrt(2)))(x)
-            if self.use_layer_norm:
-                x = nn.LayerNorm(use_scale=False)(x)
-            x = self.activation_fn(x)
-        return x
-
-
-class CNNTorso(nn.Module):
-    """CNN torso."""
-
-    channel_sizes: Sequence[int]
-    kernel_sizes: Sequence[int]
-    strides: Sequence[int]
-    activation: str = "relu"
-    use_layer_norm: bool = False
-
-    def setup(self) -> None:
-        self.activation_fn = _parse_activation_fn(self.activation)
-
-    @nn.compact
-    def __call__(self, observation: chex.Array) -> chex.Array:
-        """Forward pass."""
-        x = observation
-        for channel, kernel, stride in zip(self.channel_sizes, self.kernel_sizes, self.strides):
-            x = nn.Conv(channel, (kernel, kernel), (stride, stride))(x)
-            if self.use_layer_norm:
-                x = nn.LayerNorm(use_scale=False)(x)
-            x = self.activation_fn(x)
-
-        # Collapse (merge) the last three dimensions (width, height, channels)
-        # Leave the batch, agent and time (if recurrent) dims unchanged.
-        return jax.lax.collapse(x, -3)
-
-
-class DiscreteActionHead(nn.Module):
-    """Discrete Action Head"""
-
-    action_dim: int
-
-    @nn.compact
-    def __call__(
-        self, obs_embedding: chex.Array, observation: Observation
-    ) -> tfd.TransformedDistribution:
-        """Action selection for distrete action space environments.
-
-        Args:
-        ----
-            obs_embedding: Observation embedding from network torso.
-            observation: Observation object containing `agents_view`, `action_mask` and
-                `step_count`.
-
-        Returns:
-        -------
-            A transformed tfd.categorical distribution on the action space for action sampling.
-
-        NOTE: We pass both the observation embedding and the observation object to the action head
-        since the observation object contains the action mask and other potentially useful
-        information.
-
-        """
-        actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(obs_embedding)
-
-        masked_logits = jnp.where(
-            observation.action_mask,
-            actor_logits,
-            jnp.finfo(jnp.float32).min,
-        )
-
-        #  We transform this distribution with the `Identity()` transformation to
-        # keep the API identical to the ContinuousActionHead.
-        return IdentityTransformation(distribution=tfd.Categorical(logits=masked_logits))
-
-
-class ContinuousActionHead(nn.Module):
-    """ContinuousActionHead using a transformed Normal distribution.
-
-    Note: This network only handles the case where actions lie in the interval [-1, 1].
-    """
-
-    action_dim: int
-    min_scale: float = 1e-3
-    independent_std: bool = True  # whether or not the log_std is independent of the observation.
-
-    def setup(self) -> None:
-        self.mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))
-
-        if self.independent_std:
-            self.log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
-        else:
-            self.log_std = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))
-
-    @nn.compact
-    def __call__(self, obs_embedding: chex.Array, observation: Observation) -> tfd.Independent:
-        """Action selection for continuous action space environments.
-
-        Args:
-        ----
-            obs_embedding (chex.Array): Observation embedding.
-            observation (Observation): Observation object.
-
-        Returns:
-        -------
-            tfd.Independent: Independent transformed distribution.
-
-        """
-        loc = self.mean(obs_embedding)
-
-        scale = self.log_std if self.independent_std else self.log_std(obs_embedding)
-        scale = jax.nn.softplus(scale) + self.min_scale
-
-        distribution = tfd.Normal(loc=loc, scale=scale)
-
-        return tfd.Independent(
-            TanhTransformedDistribution(distribution),
-            reinterpreted_batch_ndims=1,
-        )
+from mava.networks.distributions import MaskedEpsGreedyDistribution
+from mava.types import Observation, ObservationGlobalState, RNNGlobalObservation, RNNObservation
 
 
 class FeedForwardActor(nn.Module):
@@ -180,7 +37,7 @@ class FeedForwardActor(nn.Module):
         """Forward pass."""
         obs_embedding = self.torso(observation.agents_view)
 
-        return self.action_head(obs_embedding, observation)
+        return self.action_head(obs_embedding, observation.action_mask)
 
 
 class FeedForwardValueNet(nn.Module):
@@ -217,7 +74,9 @@ class FeedForwardQNet(nn.Module):
         self.critic = nn.Dense(1, kernel_init=orthogonal(1.0))
 
     def __call__(
-        self, observation: Union[Observation, ObservationGlobalState], action: chex.Array
+        self,
+        observation: Union[Observation, ObservationGlobalState],
+        action: chex.Array,
     ) -> chex.Array:
         if self.centralised_critic:
             if not isinstance(observation, ObservationGlobalState):
@@ -289,7 +148,7 @@ class RecurrentActor(nn.Module):
             policy_hidden_state, policy_rnn_input
         )
         policy_embedding = self.post_torso(policy_embedding)
-        pi = self.action_head(policy_embedding, observation)
+        pi = self.action_head(policy_embedding, observation.action_mask)
 
         return policy_hidden_state, pi
 
@@ -329,15 +188,6 @@ class RecurrentValueNet(nn.Module):
         value = nn.Dense(1, kernel_init=orthogonal(1.0))(value)
 
         return value_net_hidden_state, jnp.squeeze(value, axis=-1)
-
-
-def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
-    """Get the activation function."""
-    activation_fns: Dict[str, Callable[[chex.Array], chex.Array]] = {
-        "relu": nn.relu,
-        "tanh": nn.tanh,
-    }
-    return activation_fns[activation_fn_name]
 
 
 class RecQNetwork(nn.Module):
