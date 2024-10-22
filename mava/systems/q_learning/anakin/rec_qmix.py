@@ -555,71 +555,61 @@ def make_update_fns(
         """Update the Q parameters."""
 
         # Get data aligned with current/next timestep
-        data_first: Dict[str, chex.Array] = jax.tree_map(lambda x: x[:, :-1, ...], data)
+        data_first: Dict[str, chex.Array] = jax.tree_map(
+            lambda x: x[:, :-1, ...], data
+        )  # (B, T, ...)
         data_next: Dict[str, chex.Array] = jax.tree_map(lambda x: x[:, 1:, ...], data)
 
-        obs = data_first.obs
-        term_or_trunc = data_first.term_or_trunc
-        reward = data_first.reward
-        action = data_first.action
-
-        # The three following variables all come from the same time step.
-        # They are stored and accessed in this way because of the `AutoResetWrapper`.
-        # At the end of an episode `data_first.next_obs` and `data_next.obs` will be
-        # different, which is why we need to store both. Thus `data_first.next_obs`
-        # aligns with the `terminal` from `data_next`.
-        next_obs = data_first.next_obs
-        next_term_or_trunc = data_next.term_or_trunc
-
-        # NOTE (Ruan): IQL uses terminal, but since qmix uses a shared reward, term_or_trunc makes
-        # more sense.
-        # next_terminal = data_next.terminal
-
-        # Scan over each sample
-        hidden_state, next_obs_term_or_trunc = prep_inputs_to_scannedrnn(
-            next_obs, next_term_or_trunc
-        )
+        first_reward = data_first.reward
+        next_done = data_next.term_or_trunc
 
         # Eps defaults to 0
-        _, next_online_greedy_dist = q_net.apply(
-            params.online, hidden_state, next_obs_term_or_trunc
-        )
+        # Get the greedy action
+        ###############################################################
+        # using the distribution instead.
+        hidden_state, next_obs_term_or_trunc = prep_inputs_to_scannedrnn(
+            data.obs,
+            data.term_or_trunc,
+        )  # (T, B, ...)
+        _, next_greedy_dist = q_net.apply(params.online, hidden_state, next_obs_term_or_trunc)
+        next_action = next_greedy_dist.mode()  # (T, B, ...)
+        next_action = switch_leading_axes(next_action)  # (T, B, ...) -> (B, T, ...)
+        next_action = next_action[:, 1:, ...]  # (B, T, ...)
+        ###############################################################
 
         hidden_state, next_obs_term_or_trunc = prep_inputs_to_scannedrnn(
-            next_obs, next_term_or_trunc
-        )
+            data.obs, data.term_or_trunc
+        )  # (T, B, ...)
 
         _, next_q_vals_target = q_net.apply(
             params.target, hidden_state, next_obs_term_or_trunc, method="get_q_values"
         )
-
-        # Get the greedy action
-        next_action = next_online_greedy_dist.mode()  # (T, B, ...)
+        next_q_vals_target = switch_leading_axes(next_q_vals_target)  # (T, B, ...) -> (B, T, ...)
+        next_q_vals_target = next_q_vals_target[:, 1:, ...]  # (B, T, ...)
 
         # Double q-value selection
         next_q_val = jnp.squeeze(
             jnp.take_along_axis(next_q_vals_target, next_action[..., jnp.newaxis], axis=-1), axis=-1
         )
 
-        next_q_val = switch_leading_axes(next_q_val)  # (T, B, ...) -> (B, T, ...)
-
         next_q_val = mixer.apply(
             params.mixer_target, next_q_val, data_next.obs.global_state[:, :, 0, ...]
         )  # B,T,A,... -> B,T,1,...
 
         # TD Target
-        target_q_val = reward + (1.0 - next_term_or_trunc) * cfg.system.gamma * next_q_val
+        target_q_val = first_reward + (1.0 - next_done) * cfg.system.gamma * next_q_val
 
         # Update Q function.
+
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
         q_grads, q_loss_info = q_grad_fn(
             (params.online, params.mixer_online),
-            obs,
-            term_or_trunc,
-            action,
+            data_first.obs,
+            data_first.term_or_trunc,
+            data_first.action,
             target_q_val,
         )
-        q_loss_info["mean_first_reward"] = jnp.mean(reward)
+        q_loss_info["mean_first_reward"] = jnp.mean(first_reward)
         q_loss_info["mean_next_qval"] = jnp.mean(next_q_val)
         q_loss_info["done"] = jnp.mean(data.term_or_trunc)
 
