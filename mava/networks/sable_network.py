@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from functools import partial
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 import chex
 import jax
@@ -23,7 +23,7 @@ from flax.linen.initializers import orthogonal
 from omegaconf import DictConfig
 
 from mava.networks.retention import MultiScaleRetention
-from mava.networks.utils.sable.discrete_trainer_executor import *
+from mava.networks.utils.sable.discrete_trainer_executor import *  # noqa
 from mava.systems.sable.types import HiddenStates
 from mava.types import Observation
 from mava.utils.sable_utils import SwiGLU
@@ -328,12 +328,12 @@ class Decoder(nn.Module):
 
         # Apply the decoder blocks
         for i, block in enumerate(self.blocks):
-            hs = jax.tree.map(lambda x, i=i: x[:, :, i], hstates)
+            hs = jax.tree.map(lambda x, j=i: x[:, :, j], hstates)
             x, hs_new = block(
                 x=x, obs_rep=obs_rep, hstates=hs, dones=dones, timestep_id=timestep_id
             )
             updated_hstates = jax.tree.map(
-                lambda x, y: x.at[:, :, i].set(y), updated_hstates, hs_new
+                lambda x, y, j=i: x.at[:, :, j].set(y), updated_hstates, hs_new
             )
 
         # Compute the action logits
@@ -360,7 +360,7 @@ class Decoder(nn.Module):
             hs = jax.tree.map(lambda x, i=i: x[:, :, i], hstates)
             x, hs_new = block.recurrent(x=x, obs_rep=obs_rep, hstates=hs, timestep_id=timestep_id)
             updated_hstates = jax.tree.map(
-                lambda x, y: x.at[:, :, i].set(y), updated_hstates, hs_new
+                lambda x, y, j=i: x.at[:, :, j].set(y), updated_hstates, hs_new
             )
 
         # Compute the action logits
@@ -428,9 +428,8 @@ class SableNetwork(nn.Module):
 
         # Decay kappa for each head
         assert (
-            self.decay_scaling_factor >= 0 and self.decay_scaling_factor <= 1,
-            "Decay scaling factor should be between 0 and 1",
-        )
+            self.decay_scaling_factor >= 0 and self.decay_scaling_factor <= 1
+        ), "Decay scaling factor should be between 0 and 1"
         self.decay_kappas = 1 - jnp.exp(
             jnp.linspace(jnp.log(1 / 32), jnp.log(1 / 512), self.n_head)
         )
@@ -515,10 +514,10 @@ class SableNetwork(nn.Module):
         obs_carry: Observation,
         hstates: HiddenStates,
         key: chex.PRNGKey,
-    ) -> None:
+    ) -> Any:
         """Initializating the network."""
 
-        _ = init_sable(
+        return init_sable(  # noqa
             encoder=self.encoder,
             decoder=self.decoder,
             obs_carry=obs_carry,
@@ -526,31 +525,30 @@ class SableNetwork(nn.Module):
             key=key,
         )
 
-        return None
-
-    def setup_executor_trainer_fn(self):
+    def setup_executor_trainer_fn(self) -> Tuple:
         """Setup the executor and trainer functions."""
 
         # Set the executing encoder function based on the chunkwise setting.
         if self.net_config.use_chunkwise:
             # Define the trainer encoder in chunkwise setting.
-            train_enc_fn = partial(train_encoder_chunkwise, chunk_size=self.net_config.chunk_size)
+            train_enc_fn = partial(train_encoder_chunkwise, chunk_size=self.net_config.chunk_size)  # noqa
             # Define the trainer decoder in chunkwise setting.
-            act_fn = partial(act_chunkwise, chunk_size=self.net_config.chunk_size)
-            train_dec_fn = partial(train_decoder_fn, act_fn=act_fn, n_agents=self.n_agents)
+            act_fn = partial(act_chunkwise, chunk_size=self.net_config.chunk_size)  # noqa
+            train_dec_fn = partial(train_decoder_fn, act_fn=act_fn, n_agents=self.n_agents)  # noqa
             # Define the executor encoder in chunkwise setting.
             if self.net_config.type == "ff_sable":
                 execute_enc_fn = partial(
-                    execute_encoder_chunkwise, chunk_size=self.net_config.chunk_size
+                    execute_encoder_chunkwise,  # noqa
+                    chunk_size=self.net_config.chunk_size,
                 )
             else:
-                execute_enc_fn = execute_encoder_parallel
+                execute_enc_fn = partial(execute_encoder_parallel)  # noqa
         else:
             # Define the trainer encode when dealing with full sequence setting.
-            train_enc_fn = train_encoder_parallel
+            train_enc_fn = partial(train_encoder_parallel)  # noqa
             # Define the trainer decoder when dealing with full sequence setting.
-            train_dec_fn = partial(train_decoder_fn, act_fn=act_parallel, n_agents=self.n_agents)
+            train_dec_fn = partial(train_decoder_fn, act_fn=act_parallel, n_agents=self.n_agents)  # noqa
             # Define the executor encoder when dealing with full sequence setting.
-            execute_enc_fn = execute_encoder_parallel
+            execute_enc_fn = partial(execute_encoder_parallel)  # noqa
 
-        return train_enc_fn, train_dec_fn, execute_enc_fn, autoregressive_act
+        return train_enc_fn, train_dec_fn, execute_enc_fn, autoregressive_act  # noqa

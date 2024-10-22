@@ -414,10 +414,8 @@ def learner_setup(
     # Get mock inputs to initialise network.
     init_obs = env.observation_spec().generate_value()
     init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs)  # Add batch dim
-    init_action = jnp.zeros((1, n_agents), dtype=jnp.int32)
     init_hs = get_init_hidden_state(config.network, config.arch.num_envs)
     init_hs = tree.map(lambda x: x[0, jnp.newaxis], init_hs)
-    init_dones = jnp.zeros((1, n_agents), dtype=bool)
 
     # Initialise params and optimiser state.
     params = sable_network.init(
@@ -523,7 +521,8 @@ def run_experiment(_config: DictConfig) -> float:
     # Create a fake hstate: will not be updated during steps
     eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
     eval_hs = get_init_hidden_state(config.network, eval_batch_size)
-    eval_act_fn = make_ff_sable_act_fn(sable_execution_fn, eval_hs)
+    sable_execution_fn = partial(sable_execution_fn, hstates=eval_hs)
+    eval_act_fn = make_ff_sable_act_fn(sable_execution_fn)
     # Create evaluator
     evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
 
@@ -612,7 +611,8 @@ def run_experiment(_config: DictConfig) -> float:
     if config.arch.absolute_metric:
         eval_batch_size = get_num_eval_envs(config, absolute_metric=True)
         abs_hs = get_init_hidden_state(config.network, eval_batch_size)
-        eval_act_fn = make_ff_sable_act_fn(sable_execution_fn, abs_hs)
+        sable_execution_fn = partial(sable_execution_fn, hstates=abs_hs)
+        eval_act_fn = make_ff_sable_act_fn(sable_execution_fn)
         abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=True)
         eval_keys = jax.random.split(key, n_devices)
 

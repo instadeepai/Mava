@@ -26,7 +26,7 @@ from jumanji.types import TimeStep
 from omegaconf import DictConfig
 from typing_extensions import TypeAlias
 
-from mava.systems.sable.types import ExecutionApply, HiddenStates
+from mava.systems.sable.types import ExecutionApply
 from mava.types import (
     Action,
     ActorApply,
@@ -229,29 +229,26 @@ def make_rec_sable_act_fn(actor_apply_fn: ExecutionApply) -> EvalActFn:
         # Sequenze the output actions
         actions = jnp.squeeze(output_action, axis=(-1))
 
-        # TODO: deal with continuous action squeezing
         return actions, {_hidden_state: hidden_state}
 
     return eval_act_fn
 
 
-def make_ff_sable_act_fn(actor_apply_fn: ExecutionApply, dummy_hstates: HiddenStates) -> EvalActFn:
+def make_ff_sable_act_fn(actor_apply_fn: ExecutionApply) -> EvalActFn:
     """Makes an act function that conforms to the evaluator API given FF Sable network."""
 
     def eval_act_fn(
-        params: FrozenDict, timestep: TimeStep, key: PRNGKey, _: ActorState
+        params: FrozenDict, timestep: TimeStep, key: PRNGKey, actor_state: ActorState
     ) -> Tuple[Action, Dict]:
         output_action, _, _, _ = actor_apply_fn(  # type: ignore
             params,
-            timestep.observation,
-            dummy_hstates,
-            key,
+            obs_carry=timestep.observation,
+            key=key,
         )
 
         # Sequenze the output actions
         actions = jnp.squeeze(output_action, axis=(-1))
 
-        # TODO: deal with continuous action squeezing
         return actions, {}
 
     return eval_act_fn

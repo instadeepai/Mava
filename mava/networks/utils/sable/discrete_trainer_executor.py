@@ -210,7 +210,7 @@ def init_sable(
     obs_carry: chex.Array,
     hstates: chex.Array,
     key: chex.PRNGKey,
-) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array, HiddenStates]:
+) -> chex.Array:
     """Initializating the network: Applying non chunkwise encoding-decoding."""
     # Get the observation, legal actions, and timestep id
     obs, legal_actions, timestep_id = (
