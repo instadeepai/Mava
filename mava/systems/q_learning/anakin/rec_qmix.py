@@ -78,7 +78,7 @@ def init(
 
     def replicate(x: Any) -> Any:
         """First replicate the update batch dim then put on devices."""
-        x = jax.tree_map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
+        x = tree.map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
         return jax.device_put_replicated(x, devices)
 
     # make envs
@@ -375,8 +375,8 @@ def make_update_fns(
         """Update the Q parameters."""
 
         # Get data aligned with current/next timestep
-        data_first = jax.tree_map(lambda x: x[:, :-1, ...], data)  # (B, T, ...)
-        data_next = jax.tree_map(lambda x: x[:, 1:, ...], data)  # (B, T, ...)
+        data_first = tree.map(lambda x: x[:, :-1, ...], data)  # (B, T, ...)
+        data_next = tree.map(lambda x: x[:, 1:, ...], data)  # (B, T, ...)
 
         first_reward = data_first.reward
         next_done = data_next.term_or_trunc
