@@ -154,6 +154,10 @@ def init(
     init_hidden_state = replicate(init_hidden_state)
 
     init_acts = env.action_spec().generate_value()
+
+    # NOTE: Term_or_trunc refers to the the joint done, ie. when all agents are done or when the
+    # episode has terminated. We use this exclusively in QMIX. Terminal refers to individual agent
+    # dones. We keep this in this file for consistency with IQL.
     init_transition = Transition(
         obs=init_obs,  # (A, ...)
         action=init_acts,  # (A,)
