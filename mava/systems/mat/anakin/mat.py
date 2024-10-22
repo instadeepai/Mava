@@ -101,35 +101,18 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # LOG EPISODE METRICS
+            # Repeat along the agent dimension. This is needed to handle the
+            # shuffling along the agent dimension during training.
+            info = tree.map(
+                lambda x: jnp.repeat(x[..., jnp.newaxis], config.system.num_agents, axis=-1),
+                timestep.extras["episode_metrics"],
+            )
+
+            # SET TRANSITION
             done = tree.map(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
                 timestep.last(),
             )
-
-            # Repeat along the agent dimension. This is needed to handle the
-            # shuffling along the agent dimension during training. Otherwise
-            # it breaks.
-            info = {
-                "episode_return": tree.map(
-                    lambda x: jnp.repeat(x, config.system.num_agents).reshape(
-                        config.arch.num_envs, -1
-                    ),
-                    timestep.extras["episode_metrics"]["episode_return"],
-                ),
-                "episode_length": tree.map(
-                    lambda x: jnp.repeat(x, config.system.num_agents).reshape(
-                        config.arch.num_envs, -1
-                    ),
-                    timestep.extras["episode_metrics"]["episode_length"],
-                ),
-                "is_terminal_step": tree.map(
-                    lambda x: jnp.repeat(x, config.system.num_agents).reshape(
-                        config.arch.num_envs, -1
-                    ),
-                    timestep.extras["episode_metrics"]["is_terminal_step"],
-                ),
-            }
-
             transition = PPOTransition(
                 done,
                 action,
@@ -321,7 +304,7 @@ def get_learner_fn(
             shuffled_batch = tree.map(lambda x: jnp.take(x, permutation, axis=1), shuffled_batch)
 
             minibatches = tree.map(
-                lambda x: jnp.reshape(x, [config.system.num_minibatches, -1] + list(x.shape[1:])),
+                lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 shuffled_batch,
             )
 
@@ -409,14 +392,14 @@ def learner_setup(
     init_x = tree.map(lambda x: x[None, ...], init_x)
 
     _, action_space_type = get_action_head(env)
-    
+
     if action_space_type == "discrete":
         init_action = jnp.zeros((1, config.system.num_agents), dtype=jnp.int32)
     elif action_space_type == "continuous":
         init_action = jnp.zeros((1, config.system.num_agents, env.action_dim), dtype=jnp.float32)
     else:
         raise ValueError("Invalid action space type")
-    
+
     # Define network and optimiser.
     actor_network = MultiAgentTransformer(
         obs_dim=init_x.agents_view.shape[-1],
@@ -485,7 +468,7 @@ def learner_setup(
     replicate_learner = (params, opt_state, step_keys)
 
     # Duplicate learner for update_batch_size.
-    broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size,) + x.shape)
+    broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
     replicate_learner = tree.map(broadcast, replicate_learner)
 
     # Duplicate learner across devices.

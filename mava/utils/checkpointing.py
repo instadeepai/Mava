@@ -24,7 +24,7 @@ from flax.core.frozen_dict import FrozenDict
 from jax import tree
 from omegaconf import DictConfig, OmegaConf
 
-from mava.systems.ppo.types import HiddenStates, Params
+from mava.systems.ppo.types import HiddenStates
 from mava.types import MavaState
 
 # Keep track of the version of the checkpointer
@@ -152,7 +152,7 @@ class Checkpointer:
         timestep: Optional[int] = None,
         restore_hstates: bool = False,
         THiddenState: Optional[Type] = None,  # noqa: N803
-    ) -> Tuple[Params, Union[HiddenStates, None]]:
+    ) -> Tuple[Any, Union[HiddenStates, None]]:
         """Restore the params and the hidden state (in case of RNNs)
 
         Args:
