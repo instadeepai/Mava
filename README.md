@@ -29,10 +29,10 @@
 <div align="center">
 <h3>
 
-[**Installation**](#installation-) | [**Quickstart**](#quickstart-)
+[**Installation**](#installation-) | [**Getting started**](#getting-started-)
 
 </div>
-Mava allows researchers to experiment with multi-agent reinforcement learning (MARL) at lightning speed. The single-file JAX implementations are built for rapid research iteration - hack, modify, and test new ideas fast. Our [state-of-the-art algorithms](sable) scale seamlessly across devices. Created for researchers, by The Research Team at [InstaDeep](https://www.instadeep.com/).
+Mava allows researchers to experiment with multi-agent reinforcement learning (MARL) at lightning speed. The single-file JAX implementations are built for rapid research iteration - hack, modify, and test new ideas fast. Our [state-of-the-art algorithms][sable] scale seamlessly across devices. Created for researchers, by The Research Team at [InstaDeep](https://www.instadeep.com).
 
 ## Highlights 🦜
 
@@ -43,26 +43,26 @@ Mava allows researchers to experiment with multi-agent reinforcement learning (M
 - ⚡ **Blazingly fast experiments**: All of the above allow for very quick runtime for our experiments, especially when compared to other non-JAX based MARL libraries.
 
 <details>
-    <summary<h3>Algorithms</h3></summary
+    <summary><h3>Algorithms</h3></summary>
 
 | Algorithm  | Variants       | Continuous | Discrete | Anakin | Sebulba |
 |------------|----------------|------------|----------|--------|---------|
-| PPO        | `ff_ippo.py`   | ✅         | ✅       | ✅     | ✅      |
-|            | `ff_mappo.py`  | ✅         | ✅       | ✅     |         |
-|            | `rec_ippo.py`  | ✅         | ✅       | ✅     |         |
-|            | `rec_mappo.py` | ✅         | ✅       | ✅     |         |
-| Q Learning | `rec_iql.py`   |            | ✅       | ✅     |         |
-|            | `rec_qmix.py`  |            | ✅       | ✅     |         |
-| SAC        | `ff_isac.py`   | ✅         |          | ✅     |         |
-|            | `ff_masac.py`  | ✅         |          | ✅     |         |
-|            | `ff_hasac.py`  | ✅         |          | ✅     |         |
-| MAT        | `mat.py`       | ✅         | ✅       | ✅     |         |
-| Sable      | `ff_sable.py`  | ✅         | ✅       | ✅     |         |
-|            | `rec_sable.py` | ✅         | ✅       | ✅     |         |
+| PPO        | [`ff_ippo.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/ppo/anakin/ff_ippo.py)   | ✅         | ✅       | ✅     | ✅      |
+|            | [`ff_mappo.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/ppo/anakin/ff_mappo.py)  | ✅         | ✅       | ✅     |         |
+|            | [`rec_ippo.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/ppo/anakin/rec_ippo.py)  | ✅         | ✅       | ✅     |         |
+|            | [`rec_mappo.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/ppo/anakin/rec_mappo.py) | ✅         | ✅       | ✅     |         |
+| Q Learning | [`rec_iql.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/q_learning/anakin/rec_iql.py)   |            | ✅       | ✅     |         |
+|            | [`rec_qmix.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/q_learning/anakin/rec_qmix.py)  |            | ✅       | ✅     |         |
+| SAC        | [`ff_isac.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/sac/anakin/ff_isac.py)   | ✅         |          | ✅     |         |
+|            | [`ff_masac.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/sac/anakin/ff_masac.py)  | ✅         |          | ✅     |         |
+|            | [`ff_hasac.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/sac/anakin/ff_hasac.py)  | ✅         |          | ✅     |         |
+| MAT        | [`mat.py`]()       | ✅         | ✅       | ✅     |         |
+| Sable      | [`ff_sable.py`]()  | ✅         | ✅       | ✅     |         |
+|            | [`rec_sable.py`]() | ✅         | ✅       | ✅     |         |
 </details>
 <details>
-    <summary<h3>Environments</h3></summary
-        The environment's action space determines which algorithms will work with it. Additionally, the framework indicates compatible agorithms, where Anakin algorithms work with JAX environments and Sebulba algorithms work with Numpy environments.
+    <summary><h3>Environments</h3></summary>
+        These are the environments which Mava supports _out of the box_, to add your own environments use the existing wrappers as an example. The framework indicates compatible agorithms, where Anakin algorithms work with JAX environments and Sebulba algorithms work with Numpy environments.
 
 | Environment                     | Action space        | JAX | Numpy |
 |---------------------------------|---------------------|-----|-------|
@@ -103,7 +103,7 @@ todo: speed plot - 1 bar plot: torch based vs anakin vs sebulba
 
 ## Code Philosophy 🧘
 
-The current code in Mava is adapted from [PureJaxRL][purejaxrl] which provides high-quality single-file implementations with research-friendly features. In turn, PureJaxRL is inspired by the code philosophy from [CleanRL][cleanrl]. Along this vein of easy-to-use and understandable RL codebases, Mava is not designed to be a modular library and is not meant to be imported. Our repository focuses on simplicity and clarity in its implementations while utilising the advantages offered by JAX such as `pmap` and `vmap`, making it an excellent resource for researchers and practitioners to build upon.
+The current code in Mava is adapted from [PureJaxRL][purejaxrl] which provides high-quality single-file implementations with research-friendly features. In turn, PureJaxRL is inspired by the code philosophy from [CleanRL][cleanrl]. Along this vein of easy-to-use and understandable RL codebases, Mava is not designed to be a modular library and is not meant to be imported. Our repository focuses on simplicity and clarity in its implementations while utilising the advantages offered by JAX such as `pmap` and `vmap`, making it an excellent resource for researchers and practitioners to build upon. A noteable difference between Mava and CleanRL is that Mava creates small utilities for heavily re-used elements, such as networks and logging, we've found that this, in addition to hydra configs greatly improves the readability of the algorithms.
 
 ## Installation 🎬
 
@@ -148,12 +148,7 @@ Please read our [contributing docs](docs/CONTRIBUTING.md) for details on how to 
 
 We plan to iteratively expand Mava in the following increments:
 
-- 🌴 Support for more environments.
-- 🔁 More robust recurrent systems.
-- 🌳 Support for non JAX-based environments.
-- 🦾 Support for off-policy algorithms.
-- 🎛 Continuous action space environments and algorithms.
-- Add sebulba to more algorithms
+- Add sebulba versions of more algorithms
 
 Please do follow along as we develop this next phase!
 
@@ -210,3 +205,4 @@ The development of Mava was supported with Cloud TPUs from Google's [TPU Researc
 [toward_standard_eval]: https://arxiv.org/pdf/2209.10485.pdf
 [marl_eval]: https://github.com/instadeepai/marl-eval
 [smax]: https://github.com/FLAIROx/JaxMARL/tree/main/jaxmarl/environments/smax
+[sable]: https://arxiv.org/pdf/2410.01706
