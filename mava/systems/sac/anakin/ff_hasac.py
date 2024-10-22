@@ -694,6 +694,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
+    cfg.logger.system_name = "ff_hasac"
 
     # Run experiment.
     final_return = run_experiment(cfg)
