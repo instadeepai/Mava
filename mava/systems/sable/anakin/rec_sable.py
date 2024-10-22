@@ -305,14 +305,15 @@ def get_learner_fn(
             batch_perm = jax.random.permutation(batch_shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
             batch = jax.tree_util.tree_map(lambda x: jnp.take(x, batch_perm, axis=1), batch)
-            # Shuffle agents
-            agent_perm = jax.random.permutation(agent_shuffle_key, config.system.num_agents)
-            batch = jax.tree_util.tree_map(lambda x: jnp.take(x, agent_perm, axis=2), batch)
 
             # Shuffle hidden states
             prev_hstates = jax.tree_util.tree_map(
                 lambda x: jnp.take(x, batch_perm, axis=0), prev_hstates
             )
+
+            # Shuffle agents
+            agent_perm = jax.random.permutation(agent_shuffle_key, config.system.num_agents)
+            batch = jax.tree_util.tree_map(lambda x: jnp.take(x, agent_perm, axis=2), batch)
 
             # CONCATENATE TIME AND AGENTS
             batch = jax.tree_util.tree_map(concat_time_and_agents, batch)
@@ -445,10 +446,8 @@ def learner_setup(
     # Get mock inputs to initialise network.
     init_obs = env.observation_spec().generate_value()
     init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs)  # Add batch dim
-    init_action = jnp.zeros((1, n_agents), dtype=jnp.int32)
     init_hs = get_init_hidden_state(config.network, config.arch.num_envs)
     init_hs = tree.map(lambda x: x[0, jnp.newaxis], init_hs)
-    init_dones = jnp.zeros((1, n_agents), dtype=bool)
 
     # Initialise params and optimiser state.
     params = sable_network.init(
@@ -495,9 +494,12 @@ def learner_setup(
             **config.logger.checkpointing.load_args,  # Other checkpoint args
         )
         # Restore the learner state from the checkpoint
-        restored_params, _ = loaded_checkpoint.restore_params(input_params=params)
-        # Update the params
+        restored_params, restored_hstates = loaded_checkpoint.restore_params(
+            input_params=params, restore_hstates=True, THiddenState=HiddenStates
+        )
+        # Update the params and hidden states
         params = restored_params
+        init_hstates = restored_hstates if restored_hstates else init_hstates  # type: ignore
 
     # Define params to be replicated across devices and batches.
     key, step_keys = jax.random.split(key)

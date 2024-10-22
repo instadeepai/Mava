@@ -534,7 +534,7 @@ def learner_setup(
         )
         # Update the params and hstates
         params = restored_params
-        hstates = restored_hstates if restored_hstates else hstates
+        hstates = restored_hstates if restored_hstates else hstates  # type: ignore
 
     # Initialise environment states and timesteps: across devices and batches.
     key, *env_keys = jax.random.split(

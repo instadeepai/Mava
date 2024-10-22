@@ -25,6 +25,7 @@ from jax import tree
 from omegaconf import DictConfig, OmegaConf
 
 from mava.systems.ppo.types import HiddenStates, Params
+from mava.systems.sable.types import HiddenStates as SableHiddenStates
 from mava.types import MavaState
 
 # Keep track of the version of the checkpointer
@@ -152,7 +153,7 @@ class Checkpointer:
         timestep: Optional[int] = None,
         restore_hstates: bool = False,
         THiddenState: Optional[Type] = None,  # noqa: N803
-    ) -> Tuple[Params, Union[HiddenStates, None]]:
+    ) -> Tuple[Params, Union[HiddenStates, SableHiddenStates, None]]:
         """Restore the params and the hidden state (in case of RNNs)
 
         Args:
@@ -191,7 +192,9 @@ class Checkpointer:
         # This is a sanity check to ensure correct handling of parameter types.
         # In Flax 0.6.11, parameters were typically of the `FrozenDict` type,
         # but in later versions, a regular dictionary is used.
-        if isinstance(input_params.actor_params, FrozenDict):
+        if hasattr(input_params, "actor_params") and isinstance(
+            input_params.actor_params, FrozenDict
+        ):
             restored_params = TParams(**FrozenDict(restored_learner_state_raw["params"]))
         else:
             restored_params = TParams(**restored_learner_state_raw["params"])
@@ -199,8 +202,18 @@ class Checkpointer:
         # Restore hidden states if required
         restored_hstates = None
         if restore_hstates and THiddenState is not None:
-            if isinstance(input_params.actor_params, FrozenDict):
+            if hasattr(input_params, "actor_params") and isinstance(
+                input_params.actor_params, FrozenDict
+            ):
                 restored_hstates = THiddenState(**FrozenDict(restored_learner_state_raw["hstates"]))
+            elif "hidden_state" in restored_learner_state_raw.keys():
+                restored_hstates = THiddenState(
+                    encoder_hstate=restored_learner_state_raw["hidden_state"]["encoder_hstate"],
+                    decoder_hstate=(
+                        restored_learner_state_raw["hidden_state"]["decoder_hstate"][0],
+                        restored_learner_state_raw["hidden_state"]["decoder_hstate"][1],
+                    ),
+                )
             else:
                 restored_hstates = THiddenState(**restored_learner_state_raw["hstates"])
 
