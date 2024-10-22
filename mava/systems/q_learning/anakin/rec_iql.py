@@ -443,7 +443,9 @@ def make_update_fns(
 
         return next_params, next_opt_state, q_loss_info
 
-    def train(train_state: TrainState, _: Any) -> Tuple[TrainState, Metrics]:
+    def train(
+        train_state: TrainState[QNetParams], _: Any
+    ) -> Tuple[TrainState[QNetParams], Metrics]:
         """Sample, train and repack."""
         # unpack and get keys
         buffer_state, params, opt_states, t_train, key = train_state

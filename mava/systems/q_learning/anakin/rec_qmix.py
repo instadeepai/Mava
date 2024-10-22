@@ -28,7 +28,6 @@ from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flax.core.scope import FrozenVariableDict
 from flax.linen import FrozenDict
 from jax import Array, tree
-from jumanji.env import Environment
 from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
@@ -46,7 +45,7 @@ from mava.systems.q_learning.types import (
     TrainState,
     Transition,
 )
-from mava.types import Observation, ObservationGlobalState
+from mava.types import MarlEnv, Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import (
@@ -59,12 +58,14 @@ from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.wrappers import episode_metrics
 
 
+# (env, eval_env), learner_state, q_net, q_mixer, opt, rb, logger, key
 def init(
     cfg: DictConfig,
 ) -> Tuple[
-    Tuple[Environment, Environment],
+    Tuple[MarlEnv, MarlEnv],
     LearnerState,
     RecQNetwork,
+    QMixNetwork,
     optax.GradientTransformation,
     TrajectoryBuffer,
     MavaLogger,
@@ -222,7 +223,7 @@ def init(
 
 def make_update_fns(
     cfg: DictConfig,
-    env: Environment,
+    env: MarlEnv,
     q_net: RecQNetwork,
     mixer: QMixNetwork,
     opt: optax.GradientTransformation,
@@ -230,7 +231,7 @@ def make_update_fns(
 ) -> Any:
     def select_eps_greedy_action(
         action_selection_state: ActionSelectionState,
-        obs: ObservationGlobalState,
+        obs: Observation,
         term_or_trunc: Array,
     ) -> Tuple[ActionSelectionState, Array]:
         """Select action to take in eps-greedy way. Batch and agent dims are included."""
@@ -364,12 +365,8 @@ def make_update_fns(
         """Update the Q parameters."""
 
         # Get data aligned with current/next timestep
-        data_first: Dict[str, chex.Array] = jax.tree_map(
-            lambda x: x[:, :-1, ...], data
-        )  # (B, T, ...)
-        data_next: Dict[str, chex.Array] = jax.tree_map(
-            lambda x: x[:, 1:, ...], data
-        )  # (B, T, ...)
+        data_first = jax.tree_map(lambda x: x[:, :-1, ...], data)  # (B, T, ...)
+        data_next = jax.tree_map(lambda x: x[:, 1:, ...], data)  # (B, T, ...)
 
         first_reward = data_first.reward
         next_done = data_next.term_or_trunc
@@ -450,7 +447,9 @@ def make_update_fns(
 
         return next_params, next_opt_state, q_loss_info
 
-    def train(train_state: TrainState, _: Any) -> TrainState:
+    def train(
+        train_state: TrainState[QMIXParams], _: Any
+    ) -> Tuple[TrainState[QMIXParams], Metrics]:
         """Sample, train and repack."""
 
         buffer_state, params, opt_states, t_train, key = train_state
