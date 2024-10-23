@@ -49,27 +49,6 @@ class QNetParams(NamedTuple):
     target: FrozenVariableDict
 
 
-class LearnerState(NamedTuple):
-    """State of the learner in an interaction-training loop."""
-
-    # Interaction vars
-    obs: Observation
-    terminal: Array
-    term_or_trunc: Array
-    hidden_state: Array
-    env_state: State
-    time_steps: Array
-
-    # Train vars
-    train_steps: Array
-    opt_state: optax.OptState
-
-    # Shared vars
-    buffer_state: TrajectoryBufferState
-    params: QNetParams
-    key: PRNGKey
-
-
 class ActionSelectionState(NamedTuple):
     """Everything used for action selection apart from the observation."""
 
@@ -98,6 +77,27 @@ class QMIXParams(NamedTuple):
 
 
 QLearningParams = TypeVar("QLearningParams", QNetParams, QMIXParams)
+
+
+class LearnerState(NamedTuple, Generic[QLearningParams]):
+    """State of the learner in an interaction-training loop."""
+
+    # Interaction vars
+    obs: Observation
+    terminal: Array
+    term_or_trunc: Array
+    hidden_state: Array
+    env_state: State
+    time_steps: Array
+
+    # Train vars
+    train_steps: Array
+    opt_state: optax.OptState
+
+    # Shared vars
+    buffer_state: TrajectoryBufferState
+    params: QLearningParams
+    key: PRNGKey
 
 
 class TrainState(NamedTuple, Generic[QLearningParams]):

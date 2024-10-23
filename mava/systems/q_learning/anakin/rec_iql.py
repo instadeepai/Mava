@@ -202,7 +202,7 @@ def make_update_fns(
     q_net: RecQNetwork,
     opt: optax.GradientTransformation,
     rb: TrajectoryBuffer,
-) -> Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]]:
+) -> Callable[[LearnerState[QNetParams]], Tuple[LearnerState[QNetParams], Tuple[Metrics, Metrics]]]:
     """Create the update function for the Q-learner.
 
     Args:
@@ -439,8 +439,8 @@ def make_update_fns(
     scanned_train = lambda state: lax.scan(train, state, None, length=cfg.system.epochs)
 
     def update_step(
-        learner_state: LearnerState, _: Any
-    ) -> Tuple[LearnerState, Tuple[Metrics, Metrics]]:
+        learner_state: LearnerState[QNetParams], _: Any
+    ) -> Tuple[LearnerState[QNetParams], Tuple[Metrics, Metrics]]:
         """Interact, then learn."""
         # unpack and get random keys
         (

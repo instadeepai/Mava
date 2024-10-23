@@ -237,7 +237,7 @@ def make_update_fns(
     mixer: QMixingNetwork,
     opt: optax.GradientTransformation,
     rb: TrajectoryBuffer,
-) -> Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]]:
+) -> Callable[[LearnerState[QMIXParams]], Tuple[LearnerState[QMIXParams], Tuple[Metrics, Metrics]]]:
     def select_eps_greedy_action(
         action_selection_state: ActionSelectionState,
         obs: Observation,
@@ -481,8 +481,8 @@ def make_update_fns(
 
     # Act and train
     def update_step(
-        learner_state: LearnerState, _: Any
-    ) -> Tuple[LearnerState, Tuple[Metrics, Metrics]]:
+        learner_state: LearnerState[QMIXParams], _: Any
+    ) -> Tuple[LearnerState[QMIXParams], Tuple[Metrics, Metrics]]:
         """Act, then learn."""
 
         (
@@ -531,15 +531,15 @@ def make_update_fns(
 
         return next_learner_state, (metrics, losses)
 
-    pmaped_update_step: Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]] = (
-        jax.pmap(
-            jax.vmap(
-                lambda state: lax.scan(update_step, state, None, length=cfg.system.scan_steps),
-                axis_name="batch",
-            ),
-            axis_name="device",
-            donate_argnums=0,
-        )
+    pmaped_update_step: Callable[
+        [LearnerState[QMIXParams]], Tuple[LearnerState[QMIXParams], Tuple[Metrics, Metrics]]
+    ] = jax.pmap(
+        jax.vmap(
+            lambda state: lax.scan(update_step, state, None, length=cfg.system.scan_steps),
+            axis_name="batch",
+        ),
+        axis_name="device",
+        donate_argnums=0,
     )
 
     return pmaped_update_step
