@@ -76,7 +76,7 @@ Mava allows researchers to experiment with multi-agent reinforcement learning (M
 </details>
 
 ## Performance and Speed 🚀
-We have performed a rigorus benchmark over 45 different scenarios and 6 different environment suites to determine the performance of Mava's implementation. For more results please see the [Sable paper][sable]
+We have performed a rigorus benchmark over 45 different scenarios and 6 different environment suites to determine the performance of Mava's implementation. For more results please see the [Sable paper][sable].
 
 <p align="center">
     <a href="docs/images/benchmark_results/rware.png">
@@ -98,6 +98,9 @@ We have performed a rigorus benchmark over 45 different scenarios and 6 differen
         <img src="docs/images/benchmark_results/mpe.png" alt="Mava performance across 3 Multi-Particle environments" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
+    <a href="docs/images/benchmark_results/legend.jpg">
+        <img src="docs/images/benchmark_results/legend.jpg" alt="Legend" width="60%" style="display:inline-block; margin-right: 10px;"/>
+    </a>
     <div style="text-align:center; margin-top: 10px;"> Mava's algorithm performance, each algorithm was tuned for 40 trials with the TPE optimizer and benchmarked over 10 seeds for each scenario. Environments from top left Robot Warehouse (aggregated over 15 scenarios) Level Based Foraging (aggregated over 7 scenarios) SMAX (aggregated over 11 environments) Connector (aggregated over 4 environments) MaBrax (aggregated over 5 environments) Multi-Particle Env (aggregated over 3 environments)</div>
 </p>
 
