@@ -203,21 +203,7 @@ def make_update_fns(
     opt: optax.GradientTransformation,
     rb: TrajectoryBuffer,
 ) -> Callable[[LearnerState[QNetParams]], Tuple[LearnerState[QNetParams], Tuple[Metrics, Metrics]]]:
-    """Create the update function for the Q-learner.
-
-    Args:
-    ----
-        cfg: System configuration.
-        env: Learning environment.
-        q_net: Recurrent q network.
-        opt: Optimiser for the recurrent Q network.
-        rb: The replay buffer.
-
-    Returns:
-    -------
-        The update function.
-
-    """
+    """Create the update function for the Q-learner."""
     # ---- Acting functions ----
 
     def select_eps_greedy_action(
