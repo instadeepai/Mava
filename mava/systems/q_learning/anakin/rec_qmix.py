@@ -122,7 +122,7 @@ def init(
             cfg.system.sample_sequence_length - 1,
             num_agents,
         ),
-        "float32",
+        dtype=float,
     )
     global_env_state_shape = (
         env.observation_spec().generate_value().global_state[0, :].shape
