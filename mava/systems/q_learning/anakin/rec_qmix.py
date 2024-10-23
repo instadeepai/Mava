@@ -258,7 +258,6 @@ def make_update_fns(
             params, hidden_state, (obs, term_or_trunc), eps
         )
 
-        # Random key splitting
         new_key, explore_key = jax.random.split(key, 2)
 
         action = eps_greedy_dist.sample(seed=explore_key)
