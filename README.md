@@ -98,7 +98,7 @@ We have performed a rigorus benchmark over 45 different scenarios and 6 differen
         <img src="docs/images/benchmark_results/mpe.png" alt="Mava performance across 3 Multi-Particle environments" width="30%" style="display:inline-block; margin-right: 10px;"/>
     </a>
     <br>
-    <div style="text-align:center; margin-top: 10px;"> Mava's algorithm performance, each algorithm was tuned for 40 trials with the TPE optimizer for each scenario and benchmarked over 10 seeds. Environments from top left Robot Warehouse (aggregated over 15 scenarios) Level Based Foraging (aggregated over 7 scenarios) SMAX (aggregated over 11 environments) Connector (aggregated over 4 environments) MaBrax (aggregated over 5 environments) Multi-Particle Env (aggregated over 3 environments)</div>
+    <div style="text-align:center; margin-top: 10px;"> Mava's algorithm performance, each algorithm was tuned for 40 trials with the TPE optimizer and benchmarked over 10 seeds for each scenario. Environments from top left Robot Warehouse (aggregated over 15 scenarios) Level Based Foraging (aggregated over 7 scenarios) SMAX (aggregated over 11 environments) Connector (aggregated over 4 environments) MaBrax (aggregated over 5 environments) Multi-Particle Env (aggregated over 3 environments)</div>
 </p>
 
 todo: speed plot - 1 bar plot: torch based vs anakin vs sebulba
