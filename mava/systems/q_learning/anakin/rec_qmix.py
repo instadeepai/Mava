@@ -133,7 +133,7 @@ def init(
             cfg.system.sample_sequence_length - 1,
             *global_env_state_shape,
         ),
-        "float32",
+        dtype=float,
     )
     q_mixer = hydra.utils.instantiate(
         cfg.network.mixer_network,
