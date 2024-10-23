@@ -70,15 +70,16 @@ def get_actions(
     actor_params: FrozenVariableDict,
     actor_net: Actor,
     keys: chex.PRNGKey,
-    env: MarlEnv,
+    num_agents: int,
+    action_dim: int,
     obs: Union[Observation, ObservationGlobalState],
 ) -> Tuple[chex.Array, chex.Array]:
     batch_size = obs.agents_view.shape[0]
 
-    actions = jnp.zeros((batch_size, env.num_agents, env.action_dim))
-    log_std = jnp.zeros((batch_size, env.num_agents))
+    actions = jnp.zeros((batch_size, num_agents, action_dim))
+    log_std = jnp.zeros((batch_size, num_agents))
 
-    for agent in range(env.num_agents):
+    for agent in range(num_agents):
         actor_params_per_agent = tree.map(lambda x, agent=agent: x[agent], actor_params)
         obs_per_agent = tree.map(lambda x, agent=agent: x[:, agent], obs)
 
@@ -284,7 +285,8 @@ def make_update_fns(
         q_params: QVals, obs: Array, action: Array, target: Array
     ) -> Tuple[Array, Metrics]:
         q1_params, q2_params = q_params
-        joint_action = get_joint_action(action)
+        # Concat all actions and tile them for num agents to create joint actions for all agents
+        joint_action = get_joint_action(action)  # (B, A, Act) -> (B, A, A * Act)
 
         q1_a_values = q_net.apply(q1_params, obs, joint_action)
         q2_a_values = q_net.apply(q2_params, obs, joint_action)
@@ -336,16 +338,17 @@ def make_update_fns(
         # Calculate Q target values.
         act_keys = jax.random.split(key, env.num_agents)
         next_action, next_log_prob = get_actions(
-            params.actor, actor_net, act_keys, env, data.next_obs
+            params.actor, actor_net, act_keys, env.num_agents, env.action_dim, data.next_obs
         )
 
-        joint_next_actions = get_joint_action(next_action)
+        # Concat all actions and tile them for num agents to create joint actions for all agents
+        joint_next_actions = get_joint_action(next_action)  # (B, A, Act) -> (B, A, A * Act)
         next_q1_val = q_net.apply(params.q.targets.q1, data.next_obs, joint_next_actions)
         next_q2_val = q_net.apply(params.q.targets.q2, data.next_obs, joint_next_actions)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
         next_q_val = next_q_val - jnp.exp(params.log_alpha) * next_log_prob
 
-        target_q_val = data.reward + (1.0 - data.done) * cfg.system.gamma * next_q_val
+        target_q_val = data.reward + (1.0 - data.done) * cfg.system.gamma * next_q_val  # (B, A, 1)
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
@@ -385,7 +388,9 @@ def make_update_fns(
             else:
                 agent_ids = jnp.arange(env.num_agents)
 
-            joint_actions, log_probs = get_actions(params.actor, actor_net, act_keys, env, data.obs)
+            joint_actions, log_probs = get_actions(
+                params.actor, actor_net, act_keys, env.num_agents, env.action_dim, data.obs
+            )
 
             # HASAC sequential update: run the normal actor update one at a time instead of batched.
             # Update the joint actions after updating the actor and use the new joint actions.
@@ -507,7 +512,9 @@ def make_update_fns(
         key, act_key = jax.random.split(key)
         act_keys = jax.random.split(act_key, env.num_agents)
 
-        actions, _ = get_actions(actor_params, actor_net, act_keys, env, obs)
+        actions, _ = get_actions(
+            actor_params, actor_net, act_keys, env.num_agents, env.action_dim, obs
+        )
 
         next_obs, env_state, buffer_state, metrics = step(actions, obs, env_state, buffer_state)
         return (actor_params, next_obs, env_state, buffer_state, key), metrics
@@ -600,7 +607,9 @@ def run_experiment(cfg: DictConfig) -> float:
         params: FrozenDict, timestep: TimeStep, key: chex.PRNGKey, actor_state: ActorState
     ) -> Tuple[Action, Dict]:
         keys = jax.random.split(key, eval_env.num_agents)
-        action, _ = get_actions(params, actor, keys, eval_env, timestep.observation)
+        action, _ = get_actions(
+            params, actor, keys, eval_env.num_agents, eval_env.action_dim, timestep.observation
+        )
         return action, {}
 
     evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, absolute_metric=False)
