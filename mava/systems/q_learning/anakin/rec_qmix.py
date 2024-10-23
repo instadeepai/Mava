@@ -14,7 +14,7 @@
 
 import copy
 import time
-from typing import Any, Dict, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import chex
 import flashbax as fbx
@@ -34,7 +34,7 @@ from rich.pretty import pprint
 
 from mava.evaluator import ActorState, get_eval_fn, get_num_eval_envs
 from mava.networks import RecQNetwork, ScannedRNN
-from mava.networks.base import QMixNetwork
+from mava.networks.base import QMixingNetwork
 from mava.systems.q_learning.types import (
     ActionSelectionState,
     ActionState,
@@ -62,7 +62,7 @@ def init(
 ) -> Tuple[
     Tuple[MarlEnv, MarlEnv],
     RecQNetwork,
-    QMixNetwork,
+    QMixingNetwork,
     optax.GradientTransformation,
     TrajectoryBuffer,
     LearnerState,
@@ -234,10 +234,10 @@ def make_update_fns(
     cfg: DictConfig,
     env: MarlEnv,
     q_net: RecQNetwork,
-    mixer: QMixNetwork,
+    mixer: QMixingNetwork,
     opt: optax.GradientTransformation,
     rb: TrajectoryBuffer,
-) -> Any:
+) -> Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]]:
     def select_eps_greedy_action(
         action_selection_state: ActionSelectionState,
         obs: Observation,
@@ -530,13 +530,15 @@ def make_update_fns(
 
         return next_learner_state, (metrics, losses)
 
-    pmaped_update_step = jax.pmap(
-        jax.vmap(
-            lambda state: lax.scan(update_step, state, None, length=cfg.system.scan_steps),
-            axis_name="batch",
-        ),
-        axis_name="device",
-        donate_argnums=0,
+    pmaped_update_step: Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]] = (
+        jax.pmap(
+            jax.vmap(
+                lambda state: lax.scan(update_step, state, None, length=cfg.system.scan_steps),
+                axis_name="batch",
+            ),
+            axis_name="device",
+            donate_argnums=0,
+        )
     )
 
     return pmaped_update_step
@@ -645,6 +647,8 @@ def run_experiment(cfg: DictConfig) -> float:
                 episode_return=episode_return,
             )
 
+    eval_performance = float(jnp.mean(eval_metrics[cfg.env.eval_metric]))
+
     # Measure absolute metric.
     if cfg.arch.absolute_metric:
         eval_keys = jax.random.split(key, cfg.arch.n_devices)
@@ -660,7 +664,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     logger.stop()
 
-    return float(episode_return)
+    return float(eval_performance)
 
 
 @hydra.main(

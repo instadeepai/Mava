@@ -235,7 +235,7 @@ class RecQNetwork(nn.Module):
         return hidden_state, eps_greedy_dist
 
 
-class QMixNetwork(nn.Module):
+class QMixingNetwork(nn.Module):
     num_actions: int
     num_agents: int
     hyper_hidden_dim: int = 64

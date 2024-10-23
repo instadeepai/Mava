@@ -14,6 +14,6 @@ q_network:
     activation: relu
 
 mixer_network:
-  _target_ : mava.networks.base.QMixNetwork
+  _target_ : mava.networks.base.QMixingNetwork
   hyper_hidden_dim: 64
   norm_env_states: True

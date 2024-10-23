@@ -29,7 +29,6 @@ from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flax.core.scope import FrozenVariableDict
 from flax.linen import FrozenDict
 from jax import Array, tree
-from jumanji.env import Environment
 from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
@@ -45,7 +44,7 @@ from mava.systems.q_learning.types import (
     TrainState,
     Transition,
 )
-from mava.types import Observation
+from mava.types import MarlEnv, Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import (
@@ -61,7 +60,7 @@ from mava.wrappers import episode_metrics
 def init(
     cfg: DictConfig,
 ) -> Tuple[
-    Tuple[Environment, Environment],
+    Tuple[MarlEnv, MarlEnv],
     RecQNetwork,
     optax.GradientTransformation,
     TrajectoryBuffer,
@@ -69,24 +68,7 @@ def init(
     MavaLogger,
     PRNGKey,
 ]:
-    """Initialize system by creating the envs, networks etc.
-
-    Args:
-    ----
-        cfg: System configuration.
-
-    Returns:
-    -------
-        Tuple containing:
-            Tuple[Environment, Environment]: The environment and evaluation environment.
-            RecQNetwork: Recurrent Q network.
-            optax.GradientTransformation: Optimiser for RecQNetwork.
-            TrajectoryBuffer: The replay buffer.
-            LearnerState: The initial learner state.
-            MavaLogger: The logger.
-            PRNGKey: The random key.
-
-    """
+    """Initialize system by creating the envs, networks etc."""
     logger = MavaLogger(cfg)
 
     key = jax.random.PRNGKey(cfg.system.seed)
@@ -216,7 +198,7 @@ def init(
 
 def make_update_fns(
     cfg: DictConfig,
-    env: Environment,
+    env: MarlEnv,
     q_net: RecQNetwork,
     opt: optax.GradientTransformation,
     rb: TrajectoryBuffer,
@@ -241,20 +223,7 @@ def make_update_fns(
     def select_eps_greedy_action(
         action_selection_state: ActionSelectionState, obs: Observation, term_or_trunc: Array
     ) -> Tuple[ActionSelectionState, Array]:
-        """Select action to take in epsilon-greedy way. Batch and agent dims are included.
-
-        Args:
-        ----
-            action_selection_state: Tuple of online parameters, previous hidden state,
-                environment timestep (used to calculate epsilon) and a random key.
-            obs: The observation from the previous timestep.
-            term_or_trunc: The flag timestep.last() from the previous timestep.
-
-        Returns:
-        -------
-            A tuple of the updated action selection state and the chosen action.
-
-        """
+        """Select action to take in epsilon-greedy way. Batch and agent dims are included."""
         params, hidden_state, t, key = action_selection_state
 
         eps = jnp.maximum(
@@ -567,8 +536,7 @@ def run_experiment(cfg: DictConfig) -> float:
         term_or_trunc = timestep.last()
         net_input = (timestep.observation, term_or_trunc[..., jnp.newaxis])
         net_input = tree.map(lambda x: x[jnp.newaxis], net_input)  # add batch dim to obs
-
-        next_hidden_state, eps_greedy_dist = q_net.apply(params, hidden_state, net_input, 0.0)
+        next_hidden_state, eps_greedy_dist = q_net.apply(params, hidden_state, net_input)
         action = eps_greedy_dist.sample(seed=key).squeeze(0)
         return action, {"hidden_state": next_hidden_state}
 
@@ -589,6 +557,7 @@ def run_experiment(cfg: DictConfig) -> float:
     )
 
     max_episode_return = -jnp.inf
+    best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.online))
 
     # Main loop:
     for eval_idx, t in enumerate(
@@ -621,6 +590,7 @@ def run_experiment(cfg: DictConfig) -> float:
         eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
         eval_params = unreplicate_batch_dim(learner_state.params.online)
         eval_metrics = evaluator(eval_params, eval_keys, {"hidden_state": eval_hs})
+        jax.block_until_ready(eval_metrics)
         logger.log(eval_metrics, t, eval_idx, LogEvent.EVAL)
         episode_return = jnp.mean(eval_metrics["episode_return"])
 
