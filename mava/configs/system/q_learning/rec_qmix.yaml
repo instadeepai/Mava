@@ -11,11 +11,11 @@ add_agent_id: True
 min_buffer_size: 32
 update_batch_size: 1 # Number of vectorised gradient updates per device.
 
-rollout_length: 2 # Number of environment steps per vectorised environment.
-epochs: 2 # Number of learn epochs per training data batch.
+rollout_length: 8 # Number of environment steps per vectorised environment.
+epochs: 32 # Number of learn epochs per training data batch.
 
 # sizes
-buffer_size: 1000 # size of the replay buffer. Note: total size is this * num_devices
+buffer_size: 10000 # size of the replay buffer. Note: total size is this * num_devices
 sample_batch_size: 128  # size of training data batch sampled from the buffer
 sample_sequence_length: 20 # 21 transitions are sampled, giving 20 complete data points
 
