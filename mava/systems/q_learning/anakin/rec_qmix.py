@@ -356,11 +356,12 @@ def make_update_fns(
 
         q_loss = jnp.mean((q_online - target) ** 2)
 
+        q_error = q_online - target
         loss_info = {
             "q_loss": q_loss,
             "mean_q": jnp.mean(q_online),
-            "max_q_error": jnp.max(jnp.abs(q_online - target) ** 2),
-            "min_q_error": jnp.min(jnp.abs(q_online - target) ** 2),
+            "max_q_error": jnp.max(jnp.abs(q_error) ** 2),
+            "min_q_error": jnp.min(jnp.abs(q_error) ** 2),
             "mean_target": jnp.mean(target),
         }
 
