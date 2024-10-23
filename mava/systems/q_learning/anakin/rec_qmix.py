@@ -61,11 +61,11 @@ def init(
     cfg: DictConfig,
 ) -> Tuple[
     Tuple[MarlEnv, MarlEnv],
-    LearnerState,
     RecQNetwork,
     QMixNetwork,
     optax.GradientTransformation,
     TrajectoryBuffer,
+    LearnerState,
     MavaLogger,
     chex.PRNGKey,
 ]:
@@ -81,7 +81,6 @@ def init(
         x = tree.map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
         return jax.device_put_replicated(x, devices)
 
-    # make envs
     env, eval_env = environments.make(cfg, add_global_state=True)
 
     action_dim = env.action_dim
@@ -116,7 +115,7 @@ def init(
     q_params = q_net.init(q_key, init_hidden_state, init_x)
     q_target_params = q_net.init(q_key, init_hidden_state, init_x)
 
-    # Make QMixer
+    # Make Mixer Network
     dummy_agent_qs = jnp.zeros(
         (
             cfg.system.sample_batch_size,
@@ -154,7 +153,7 @@ def init(
     )
     opt_state = opt.init((params.online, params.mixer_online))
 
-    # Distribute params and opt states across all devices
+    # Distribute params, opt states and hidden states across all devices
     params = replicate(params)
     opt_state = replicate(opt_state)
     init_hidden_state = replicate(init_hidden_state)
@@ -228,7 +227,7 @@ def init(
         first_keys,
     )
 
-    return (env, eval_env), learner_state, q_net, q_mixer, opt, rb, logger, key
+    return (env, eval_env), q_net, q_mixer, opt, rb, learner_state, logger, key
 
 
 def make_update_fns(
@@ -486,7 +485,7 @@ def make_update_fns(
     def update_step(
         learner_state: LearnerState, _: Any
     ) -> Tuple[LearnerState, Tuple[Metrics, Metrics]]:
-        """Interact, then learn. The _ at the end of a var means updated."""
+        """Act, then learn."""
 
         (
             obs,
@@ -501,11 +500,11 @@ def make_update_fns(
             params,
             key,
         ) = learner_state
-        new_key, interact_key, train_key = jax.random.split(key, 3)
+        new_key, act_key, train_key = jax.random.split(key, 3)
 
         # Select actions, step env and store transitions
         action_selection_state = ActionSelectionState(
-            params.online, hidden_state, time_steps, interact_key
+            params.online, hidden_state, time_steps, act_key
         )
         action_state = ActionState(
             action_selection_state, env_state, buffer_state, obs, terminal, term_or_trunc
@@ -538,7 +537,7 @@ def make_update_fns(
 
         return next_learner_state, (metrics, losses)
 
-    pmaped_updated_step = jax.pmap(
+    pmaped_update_step = jax.pmap(
         jax.vmap(
             lambda state: lax.scan(update_step, state, None, length=cfg.system.scan_steps),
             axis_name="batch",
@@ -547,7 +546,7 @@ def make_update_fns(
         donate_argnums=0,
     )
 
-    return pmaped_updated_step
+    return pmaped_update_step
 
 
 def run_experiment(cfg: DictConfig) -> float:
@@ -566,8 +565,8 @@ def run_experiment(cfg: DictConfig) -> float:
     pprint(OmegaConf.to_container(cfg, resolve=True))
 
     # Initialise system and make learning/evaluation functions
-    (env, eval_env), learner_state, q_net, mixer, opts, rb, logger, key = init(cfg)
-    update = make_update_fns(cfg, env, q_net, mixer, opts, rb)
+    (env, eval_env), q_net, q_mixer, opts, rb, learner_state, logger, key = init(cfg)
+    update = make_update_fns(cfg, env, q_net, q_mixer, opts, rb)
 
     cfg.system.num_agents = env.num_agents
 
