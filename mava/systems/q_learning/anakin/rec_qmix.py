@@ -350,10 +350,10 @@ def make_update_fns(
             jnp.take_along_axis(q_online, action[..., jnp.newaxis], axis=-1), axis=-1
         )
 
+        # NOTE: States are replicated over agents so we take only take first one
         q_online = mixer.apply(
             online_mixer_params, q_online, obs.global_state[:, :, 0, ...]
         )  # B,T,A,... -> B,T,1,...
-        # NOTE: States are replicated over agents so we take only take first one
 
         q_loss = jnp.mean((q_online - target) ** 2)
 
