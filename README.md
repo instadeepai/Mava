@@ -43,8 +43,43 @@ Mava allows researchers to experiment with multi-agent reinforcement learning (M
 - 🖥️ **Multi-agent Sebulba**: We maintain a sebulba versions of some of our algorithms allowing for speed ups even with non-Jax environments.
 - ⚡ **Blazingly fast experiments**: All of the above allow for very quick runtime for our experiments, especially when compared to other non-JAX based MARL libraries.
 
+## Installation 🎬
+
+At the moment Mava is not meant to be installed as a library, but rather to be used as a research tool. We recommend cloning the Mava repo and pip installing as follows:
+
+```bash
+git clone https://github.com/instadeepai/mava.git
+cd mava
+pip install -e .
+```
+
+We have tested `Mava` on Python 3.11 and 3.12, but earlier versions may also work. Note that because the installation of JAX differs depending on your hardware accelerator,
+we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth installation guides including Docker builds and virtual environments, please see our [detailed installation guide](docs/DETAILED_INSTALL.md).
+
+## Getting started ⚡
+
+To get started with training your first Mava system, simply run one of the system files:
+
+```bash
+python mava/systems/ppo/anakin/ff_ippo.py
+```
+
+Mava makes use of Hydra for config management. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the LBF environment, the above code can simply be adapted as follows:
+
+```bash
+python mava/systems/ppo/anakin/ff_ippo.py env=lbf
+```
+
+Different scenarios can also be run by making the following config updates from the terminal:
+
+```bash
+python mava/systems/ff_ippo.py env=rware env/scenario=tiny-4ag
+```
+
+Additionally, we also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-agent system.
+
 <details>
-    <summary><h3>Algorithms</h3></summary>
+    <summary><h2>Algorithms</h2></summary>
 
 | Algorithm  | Variants       | Continuous | Discrete | Anakin | Sebulba |
 |------------|----------------|------------|----------|--------|---------|
@@ -62,7 +97,7 @@ Mava allows researchers to experiment with multi-agent reinforcement learning (M
 |            | [`rec_sable.py`]() | ✅         | ✅       | ✅     |         |
 </details>
 <details>
-    <summary><h3>Environments</h3></summary>
+    <summary><h2>Environments</h2></summary>
         These are the environments which Mava supports _out of the box_, to add your own environments use the existing wrappers as an example. The framework indicates compatible agorithms, where Anakin algorithms work with JAX environments and Sebulba algorithms work with Numpy environments.
 
 | Environment                     | Action space        | JAX | Numpy |
@@ -109,41 +144,6 @@ todo: speed plot - 1 bar plot: torch based vs anakin vs sebulba
 ## Code Philosophy 🧘
 
 The current code in Mava is adapted from [PureJaxRL][purejaxrl] which provides high-quality single-file implementations with research-friendly features. In turn, PureJaxRL is inspired by the code philosophy from [CleanRL][cleanrl]. Along this vein of easy-to-use and understandable RL codebases, Mava is not designed to be a modular library and is not meant to be imported. Our repository focuses on simplicity and clarity in its implementations while utilising the advantages offered by JAX such as `pmap` and `vmap`, making it an excellent resource for researchers and practitioners to build upon. A noteable difference between Mava and CleanRL is that Mava creates small utilities for heavily re-used elements, such as networks and logging, we've found that this, in addition to hydra configs greatly improves the readability of the algorithms.
-
-## Installation 🎬
-
-At the moment Mava is not meant to be installed as a library, but rather to be used as a research tool. We recommend cloning the Mava repo and pip installing as follows:
-
-```bash
-git clone https://github.com/instadeepai/mava.git
-cd mava
-pip install -e .
-```
-
-We have tested `Mava` on Python 3.11 and 3.12, but earlier versions may also work. Note that because the installation of JAX differs depending on your hardware accelerator,
-we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth installation guides including Docker builds and virtual environments, please see our [detailed installation guide](docs/DETAILED_INSTALL.md).
-
-## Getting started ⚡
-
-To get started with training your first Mava system, simply run one of the system files:
-
-```bash
-python mava/systems/ppo/anakin/ff_ippo.py
-```
-
-Mava makes use of Hydra for config management. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the LBF environment, the above code can simply be adapted as follows:
-
-```bash
-python mava/systems/ppo/anakin/ff_ippo.py env=lbf
-```
-
-Different scenarios can also be run by making the following config updates from the terminal:
-
-```bash
-python mava/systems/ff_ippo.py env=rware env/scenario=tiny-4ag
-```
-
-Additionally, we also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-agent system.
 
 ## Contributing 🤝
 
