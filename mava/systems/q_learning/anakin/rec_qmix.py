@@ -510,11 +510,7 @@ def make_update_fns(
 
         # Sample and learn
         train_state = TrainState(
-            final_action_state.buffer_state,
-            params,
-            opt_state,
-            train_steps,
-            train_key,
+            final_action_state.buffer_state, params, opt_state, train_steps, train_key
         )
         final_train_state, losses = scanned_train(train_state)
 
