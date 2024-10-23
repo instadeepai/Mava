@@ -19,7 +19,7 @@ from dataclasses import field
 from enum import IntEnum
 from multiprocessing import Queue
 from multiprocessing.connection import Connection
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 import gymnasium
 import gymnasium.vector.async_vector_env
@@ -29,7 +29,7 @@ from gymnasium.spaces.utils import is_space_dtype_shape_equiv
 from gymnasium.vector.utils import write_to_shared_memory
 from numpy.typing import NDArray
 
-from mava.types import MarlEnv, Observation, ObservationGlobalState
+from mava.types import Observation, ObservationGlobalState
 
 if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
     from dataclasses import dataclass
@@ -106,7 +106,7 @@ class GymWrapper(gymnasium.Wrapper):
 
         return np.array(agents_view), info
 
-    def step(self, actions: Tuple) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
+    def step(self, actions: List) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
         agents_view, reward, terminated, truncated, info = self._env.step(actions)
 
         info = {"actions_mask": self.get_actions_mask(info)}
@@ -128,20 +128,22 @@ class GymWrapper(gymnasium.Wrapper):
     def get_global_obs(self, obs: NDArray) -> NDArray:
         global_obs = np.concatenate(obs, axis=0)
         return np.tile(global_obs, (self.num_agents, 1))
-    
+
+
 class SmacWrapper(GymWrapper):
     """A wrapper that converts actions step to integers."""
 
-    def step(self, actions: Tuple) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
+    def step(self, actions: List) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
         # Convert actions to integers before passing them to the environment
         actions = [int(action) for action in actions]
 
         agents_view, reward, terminated, truncated, info = super().step(actions)
 
         return agents_view, reward, terminated, truncated, info
-    
+
     def get_actions_mask(self, info: Dict) -> NDArray:
         return np.array(self._env.unwrapped.get_avail_actions())
+
 
 class GymRecordEpisodeMetrics(gymnasium.Wrapper):
     """Record the episode returns and lengths."""

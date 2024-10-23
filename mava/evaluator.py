@@ -239,7 +239,9 @@ def get_sebulba_eval_fn(
     episode_loops = math.ceil(eval_episodes / n_parallel_envs)
     env = env_maker(config, n_parallel_envs)
 
-    act_fn = jax.jit(act_fn, device=jax.devices('cpu')[0])  # cpu so that we don't block actors/learners
+    act_fn = jax.jit(
+        act_fn, device=jax.devices("cpu")[0]
+    )  # cpu so that we don't block actors/learners
 
     # Warnings if num eval episodes is not divisible by num parallel envs.
     if eval_episodes % n_parallel_envs != 0:

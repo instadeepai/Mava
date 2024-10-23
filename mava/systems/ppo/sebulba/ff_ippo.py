@@ -26,15 +26,14 @@ import jax
 import jax.debug
 import jax.numpy as jnp
 import numpy as np
-from numpy.typing import NDArray
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from jax import tree
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
-from jax.sharding import Mesh, NamedSharding, Sharding
-from jax.sharding import PartitionSpec as P
+from jax.sharding import Mesh, NamedSharding, PartitionSpec, Sharding
+from numpy.typing import NDArray
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
@@ -165,7 +164,7 @@ def get_learner_step_fn(
 ) -> SebulbaLearnerFn[LearnerState, PPOTransition]:
     """Get the learner function."""
 
-    num_agents, num_envs = config.system.num_agents, config.arch.num_envs
+    num_envs = config.arch.num_envs
     num_learner_envs = int(num_envs // len(config.arch.learner_device_ids))
 
     # Get apply and update functions for actor and critic networks.
@@ -469,8 +468,8 @@ def learner_setup(
 
     devices = mesh_utils.create_device_mesh((len(learner_devices),), devices=learner_devices)
     mesh = Mesh(devices, axis_names=("learner_devices",))
-    model_spec = P()
-    data_spec = P("learner_devices")
+    model_spec = PartitionSpec()
+    data_spec = PartitionSpec("learner_devices")
     learner_sharding = NamedSharding(mesh, model_spec)
 
     # PRNG keys.
@@ -651,8 +650,8 @@ def run_experiment(_config: DictConfig) -> float:
                 name=f"Actor-{actor_device}-{thread_id}",
             )
             actor_threads.append(actor)
-            
-    # Start the actors simultaneously 
+
+    # Start the actors simultaneously
     for actor in actor_threads:
         actor.start()
 
@@ -704,7 +703,7 @@ def run_experiment(_config: DictConfig) -> float:
 
         if config.arch.absolute_metric and max_episode_return <= episode_return:
             best_params_cpu = copy.deepcopy(learner_state_cpu.params.actor_params)
-            max_episode_return = episode_return
+            max_episode_return = float(episode_return)
 
     evaluator_envs.close()
     eval_performance = float(np.mean(eval_metrics[config.env.eval_metric]))

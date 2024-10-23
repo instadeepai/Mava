@@ -53,8 +53,8 @@ from mava.wrappers import (
     MatraxWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
-    SmaxWrapper,
     SmacWrapper,
+    SmaxWrapper,
     async_multiagent_worker,
 )
 from mava.wrappers.jaxmarl import JaxMarlWrapper
