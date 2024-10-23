@@ -1,0 +1,40 @@
+# --- Defaults FF-HASAC ---
+seed: 581744
+
+# --- Agent observations ---
+add_agent_id: False
+
+# --- RL hyperparameters ---
+# step related
+total_timesteps: ~ # Set the total environment steps.
+# If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
+num_updates: 8000 # Number of updates
+explore_steps: 5000  # number of steps to take with random actions at the start of training
+update_batch_size: 1 # number of vectorised gradient updates per device.
+
+rollout_length: 8 # number of environment steps per vectorised environment.
+epochs: 32 # number of learn epochs per training data batch.
+policy_update_delay: 2  # the delay before training the policy -
+# Every `policy_update_delay` q network learning steps the policy network is trained.
+# It is trained `policy_update_delay` times to compensate, this is a TD3 trick.
+
+# sizes
+buffer_size: 100000  # size of the replay buffer. Note: total size is this * num_devices
+batch_size: 64
+
+# learning rates
+policy_lr: 3e-4  # the learning rate of the policy network optimizer
+q_lr: 5e-4  # the learning rate of the Q network network optimizer
+alpha_lr: 1e-3  # the learning rate of the alpha optimizer
+max_grad_norm: 10
+
+# SAC specific
+tau: 0.005  # smoothing coefficient for target networks
+gamma: 0.95  # discount factor
+
+autotune: False  # whether to autotune alpha
+target_entropy_scale: 5.0  # scale factor for target entropy (when auto-tuning)
+init_alpha: 0.005  # initial entropy value when not using autotune
+
+# HASAC specific
+shuffle_agents: False  # whether to shuffle agents during train time

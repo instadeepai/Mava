@@ -1,0 +1,11 @@
+defaults:
+  - _self_
+  - logger: logger
+  - arch: anakin
+  - system: sac/ff_hasac
+  - network: mlp  # [mlp, cnn]
+  - env: mabrax  # [mabrax]
+
+hydra:
+  searchpath:
+    - file://mava/configs

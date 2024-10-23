@@ -14,7 +14,7 @@
 
 import copy
 import time
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, Tuple, Union
 
 import chex
 import flashbax as fbx
@@ -25,13 +25,15 @@ import jax.numpy as jnp
 import optax
 from colorama import Fore, Style
 from flashbax.buffers.flat_buffer import TrajectoryBuffer
+from flax.core import FrozenDict
 from flax.core.scope import FrozenVariableDict
 from jax import Array, tree
 from jumanji.env import State
+from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
+from mava.evaluator import ActorState, get_eval_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardQNet as QNetwork
 from mava.systems.sac.types import (
@@ -46,15 +48,47 @@ from mava.systems.sac.types import (
     SacParams,
     Transition,
 )
-from mava.types import MarlEnv, ObservationGlobalState
+from mava.types import Action, MarlEnv, Observation, ObservationGlobalState
 from mava.utils import make_env as environments
-from mava.utils.centralised_training import get_joint_action, get_updated_joint_actions
+from mava.utils.centralised_training import get_joint_action
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
+from mava.utils.jax_utils import (
+    tree_at_set,
+    tree_slice,
+    unreplicate_batch_dim,
+    unreplicate_n_dims,
+)
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.network_utils import get_action_head
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.wrappers import episode_metrics
+
+
+# It is faster to do this with a vmap, but unfortunately that requires switching to numpyro.
+# This requires a lot of testing so there is currently an issue for it: #1098
+def get_actions(
+    actor_params: FrozenVariableDict,
+    actor_net: Actor,
+    keys: chex.PRNGKey,
+    num_agents: int,
+    action_dim: int,
+    obs: Union[Observation, ObservationGlobalState],
+) -> Tuple[chex.Array, chex.Array]:
+    batch_size = obs.agents_view.shape[0]
+
+    actions = jnp.zeros((batch_size, num_agents, action_dim))
+    log_std = jnp.zeros((batch_size, num_agents))
+
+    for agent in range(num_agents):
+        actor_params_per_agent = tree.map(lambda x, agent=agent: x[agent], actor_params)
+        obs_per_agent = tree.map(lambda x, agent=agent: x[:, agent], obs)
+
+        pi = actor_net.apply(actor_params_per_agent, obs_per_agent)
+        action = pi.sample(seed=keys[agent])
+        actions = actions.at[:, agent].set(action)
+        log_std = log_std.at[:, agent].set(pi.log_prob(action))
+
+    return actions, log_std
 
 
 def init(
@@ -78,7 +112,7 @@ def init(
     Returns:
     -------
         Tuple containing:
-            Tuple[Environment, Environment]: The environment and evaluation environment.
+            Tuple[MarlEnv, MarlEnv]: The environment and evaluation environment.
             Networks: Tuple of actor and critic networks.
             Optimisers: Tuple of actor, critic and alpha optimisers.
             TrajectoryBuffer: The replay buffer.
@@ -86,7 +120,6 @@ def init(
             Array: The target entropy.
             MavaLogger: The logger.
             PRNGKey: The random key.
-
     """
     logger = MavaLogger(cfg)
 
@@ -104,11 +137,12 @@ def init(
     action_dim = env.action_dim
 
     key, actor_key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 6)
+    actor_keys = jax.random.split(actor_key, n_agents)
 
     acts = env.action_spec().generate_value()  # all agents actions
     act_single = acts[0]  # single agents action
-    joint_acts = jnp.concatenate([act_single for _ in range(n_agents)], axis=0)
-    joint_acts_batched = joint_acts[jnp.newaxis, ...]  # joint actions with a batch dim
+    concat_acts = jnp.concatenate([act_single for _ in range(n_agents)], axis=0)
+    concat_acts_batched = concat_acts[jnp.newaxis, ...]  # batch + concat of all agents actions
     obs = env.observation_spec().generate_value()
     obs_single_batched = tree.map(lambda x: x[0][jnp.newaxis, ...], obs)
 
@@ -119,15 +153,15 @@ def init(
         action_head, action_dim=env.action_dim, independent_std=False
     )
     actor_network = Actor(actor_torso, actor_action_head)
-    actor_params = actor_network.init(actor_key, obs_single_batched)
+    actor_params = jax.vmap(actor_network.init, in_axes=(0, None))(actor_keys, obs_single_batched)
 
     # Making Q networks
     critic_torso = hydra.utils.instantiate(cfg.network.critic_network.pre_torso)
     q_network = QNetwork(critic_torso, centralised_critic=True)
-    q1_params = q_network.init(q1_key, obs_single_batched, joint_acts_batched)
-    q2_params = q_network.init(q2_key, obs_single_batched, joint_acts_batched)
-    q1_target_params = q_network.init(q1_target_key, obs_single_batched, joint_acts_batched)
-    q2_target_params = q_network.init(q2_target_key, obs_single_batched, joint_acts_batched)
+    q1_params = q_network.init(q1_key, obs_single_batched, concat_acts_batched)
+    q2_params = q_network.init(q2_key, obs_single_batched, concat_acts_batched)
+    q1_target_params = q_network.init(q1_target_key, obs_single_batched, concat_acts_batched)
+    q2_target_params = q_network.init(q2_target_key, obs_single_batched, concat_acts_batched)
 
     # Automatic entropy tuning
     target_entropy = -cfg.system.target_entropy_scale * action_dim
@@ -149,13 +183,13 @@ def init(
     grad_clip = optax.clip_by_global_norm(cfg.system.max_grad_norm)
 
     actor_opt = optax.chain(grad_clip, optax.adam(cfg.system.policy_lr))
-    actor_opt_state = actor_opt.init(params.actor)
+    actor_opt_state = jax.vmap(actor_opt.init)(params.actor)
 
     q_opt = optax.chain(grad_clip, optax.adam(cfg.system.q_lr))
     q_opt_state = q_opt.init(params.q.online)
 
     alpha_opt = optax.chain(grad_clip, optax.adam(cfg.system.alpha_lr))
-    alpha_opt_state = alpha_opt.init(params.log_alpha)
+    alpha_opt_state = jax.vmap(alpha_opt.init)(params.log_alpha)
 
     # Pack opt states
     opt_states = OptStates(actor_opt_state, q_opt_state, alpha_opt_state)
@@ -240,7 +274,6 @@ def make_update_fns(
         Tuple of (explore_fn, update_fn).
         Explore function is used for initial exploration with random actions.
         Update function is the main learning function, it both acts and learns.
-
     """
     actor_net, q_net = networks
     actor_opt, q_opt, alpha_opt = optims
@@ -252,7 +285,8 @@ def make_update_fns(
         q_params: QVals, obs: Array, action: Array, target: Array
     ) -> Tuple[Array, Metrics]:
         q1_params, q2_params = q_params
-        joint_action = get_joint_action(action)
+        # Concat all actions and tile them for num agents to create joint actions for all agents
+        joint_action = get_joint_action(action)  # (B, A, Act) -> (B, A, A * Act)
 
         q1_a_values = q_net.apply(q1_params, obs, joint_action)
         q2_a_values = q_net.apply(q2_params, obs, joint_action)
@@ -278,21 +312,20 @@ def make_update_fns(
         alpha: Array,
         q_params: QVals,
         key: chex.PRNGKey,
+        agent_id: int,
     ) -> Array:
+        batch_size = actions.shape[0]
         pi = actor_net.apply(actor_params, obs)
         new_actions = pi.sample(seed=key)
         log_prob = pi.log_prob(new_actions)
 
-        # Updated joint actions are done so that each agent's central critic sees what all
-        # other agents did in the past, but it sees how its agent's policy is currently acting.
-        # This is done by placing new_action[i] in joint_actions[i].
-        joint_actions = get_updated_joint_actions(actions, new_actions)
+        joint_actions = actions.at[:, agent_id, :].set(new_actions).reshape(batch_size, -1)
 
         qval_1 = q_net.apply(q_params.q1, obs, joint_actions)
         qval_2 = q_net.apply(q_params.q2, obs, joint_actions)
         min_q_val = jnp.minimum(qval_1, qval_2)
 
-        return ((alpha * log_prob) - min_q_val).mean()
+        return ((alpha[:, agent_id] * log_prob) - min_q_val).mean()
 
     def alpha_loss_fn(log_alpha: Array, log_pi: Array, target_entropy: Array) -> Array:
         return jnp.mean(-jnp.exp(log_alpha) * (log_pi + target_entropy))
@@ -303,17 +336,19 @@ def make_update_fns(
     ) -> Tuple[SacParams, OptStates, Metrics]:
         """Update the Q parameters."""
         # Calculate Q target values.
-        pi = actor_net.apply(params.actor, data.next_obs)
-        next_action = pi.sample(seed=key)
-        next_log_prob = pi.log_prob(next_action)
+        act_keys = jax.random.split(key, env.num_agents)
+        next_action, next_log_prob = get_actions(
+            params.actor, actor_net, act_keys, env.num_agents, env.action_dim, data.next_obs
+        )
 
-        joint_next_actions = get_joint_action(next_action)
+        # Concat all actions and tile them for num agents to create joint actions for all agents
+        joint_next_actions = get_joint_action(next_action)  # (B, A, Act) -> (B, A, A * Act)
         next_q1_val = q_net.apply(params.q.targets.q1, data.next_obs, joint_next_actions)
         next_q2_val = q_net.apply(params.q.targets.q2, data.next_obs, joint_next_actions)
         next_q_val = jnp.minimum(next_q1_val, next_q2_val)
         next_q_val = next_q_val - jnp.exp(params.log_alpha) * next_log_prob
 
-        target_q_val = data.reward + (1.0 - data.done) * cfg.system.gamma * next_q_val
+        target_q_val = data.reward + (1.0 - data.done) * cfg.system.gamma * next_q_val  # (B, A, 1)
 
         # Update Q function.
         q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
@@ -340,49 +375,83 @@ def make_update_fns(
         params: SacParams, opt_states: OptStates, data: Transition, key: chex.PRNGKey
     ) -> Tuple[SacParams, OptStates, Metrics]:
         """Update the actor and alpha parameters. Compensated for the delay in policy updates."""
+        alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
+        actor_grad_fn = jax.value_and_grad(actor_loss_fn)
+
         # compensate for the delay by doing `policy_frequency` updates instead of 1.
         assert cfg.system.policy_update_delay > 0, "Need to have a policy update delay > 0."
         for _ in range(cfg.system.policy_update_delay):
-            actor_key, alpha_key = jax.random.split(key)
+            key, act_key, agent_order_key = jax.random.split(key, 3)
+            act_keys = jax.random.split(act_key, env.num_agents)
+            if cfg.system.shuffle_agents:
+                agent_ids = jax.random.permutation(agent_order_key, env.num_agents)
+            else:
+                agent_ids = jnp.arange(env.num_agents)
 
-            # Update actor.
-            actor_grad_fn = jax.value_and_grad(actor_loss_fn)
-            actor_loss, act_grads = actor_grad_fn(
-                params.actor,
-                data.obs,
-                data.action,
-                jnp.exp(params.log_alpha),
-                params.q.online,
-                actor_key,
+            joint_actions, log_probs = get_actions(
+                params.actor, actor_net, act_keys, env.num_agents, env.action_dim, data.obs
             )
-            # Mean over the device and batch dimensions.
-            actor_loss, act_grads = lax.pmean((actor_loss, act_grads), axis_name="device")
-            actor_loss, act_grads = lax.pmean((actor_loss, act_grads), axis_name="batch")
-            actor_updates, new_actor_opt_state = actor_opt.update(act_grads, opt_states.actor)
-            new_actor_params = optax.apply_updates(params.actor, actor_updates)
 
-            params = params._replace(actor=new_actor_params)
-            opt_states = opt_states._replace(actor=new_actor_opt_state)
+            # HASAC sequential update: run the normal actor update one at a time instead of batched.
+            # Update the joint actions after updating the actor and use the new joint actions.
+            for agent_id in agent_ids:
+                key, actor_key = jax.random.split(key)
 
-            # Update alpha if autotuning
-            alpha_loss = 0.0  # loss is 0 if autotune is off
-            if cfg.system.autotune:
-                # Get log prob for alpha loss
-                pi = actor_net.apply(params.actor, data.obs)
-                action = pi.sample(seed=key)
-                log_prob = pi.log_prob(action)
+                agent_params = tree_slice(params.actor, agent_id)
+                agent_opt_state = tree_slice(opt_states.actor, agent_id)
+                agent_obs = tree_slice(data.obs, jnp.s_[:, agent_id])
 
-                alpha_grad_fn = jax.value_and_grad(alpha_loss_fn)
-                alpha_loss, alpha_grads = alpha_grad_fn(params.log_alpha, log_prob, target_entropy)
-                alpha_loss, alpha_grads = lax.pmean((alpha_loss, alpha_grads), axis_name="device")
-                alpha_loss, alpha_grads = lax.pmean((alpha_loss, alpha_grads), axis_name="batch")
-                alpha_updates, new_alpha_opt_state = alpha_opt.update(alpha_grads, opt_states.alpha)
-                new_log_alpha = optax.apply_updates(params.log_alpha, alpha_updates)
+                # Update actor.
+                act_loss, grads = actor_grad_fn(
+                    agent_params,
+                    agent_obs,
+                    joint_actions,
+                    jnp.exp(params.log_alpha),
+                    params.q.online,
+                    actor_key,
+                    agent_id,
+                )
+                # Mean over the device and batch dimensions.
+                act_loss, grads = lax.pmean((act_loss, grads), axis_name="device")
+                act_loss, grads = lax.pmean((act_loss, grads), axis_name="batch")
+                updates, new_agent_opt_state = actor_opt.update(grads, agent_opt_state)
+                new_agent_params = optax.apply_updates(agent_params, updates)
 
-                params = params._replace(log_alpha=new_log_alpha)
-                opt_states = opt_states._replace(alpha=new_alpha_opt_state)
+                # update actions list with new action from updated actor
+                pi = actor_net.apply(new_agent_params, agent_obs)
+                new_action = pi.sample(seed=key)
 
-        loss_info = {"actor_loss": actor_loss, "alpha_loss": alpha_loss}
+                # Add new action to list of actions
+                joint_actions = joint_actions.at[:, agent_id].set(new_action)
+
+                all_actor_params = tree_at_set(params.actor, agent_id, new_agent_params)
+                all_opt_states = tree_at_set(opt_states.actor, agent_id, new_agent_opt_state)
+                params = params._replace(actor=all_actor_params)
+                opt_states = opt_states._replace(actor=all_opt_states)
+
+                # Update alpha if autotuning
+                alpha_loss = 0.0  # loss is 0 if autotune is off
+                if cfg.system.autotune:
+                    alpha_opt_state = tree_slice(opt_states.alpha, agent_id)
+
+                    alpha_loss, grads = alpha_grad_fn(
+                        params.log_alpha[:, agent_id],
+                        log_probs[:, agent_id],
+                        target_entropy[:, agent_id],
+                    )
+                    alpha_loss, grads = lax.pmean((alpha_loss, grads), axis_name="device")
+                    alpha_loss, grads = lax.pmean((alpha_loss, grads), axis_name="batch")
+                    updates, new_alpha_opt_state = alpha_opt.update(grads, alpha_opt_state)
+                    new_log_alpha = optax.apply_updates(params.log_alpha[:, agent_id], updates)
+
+                    new_log_alphas = tree_at_set(params.log_alpha, agent_id, new_log_alpha)
+                    new_alpha_opt_states = tree_at_set(
+                        opt_states.alpha, agent_id, new_alpha_opt_state
+                    )
+                    params = params._replace(log_alpha=new_log_alphas)
+                    opt_states = opt_states._replace(alpha=new_alpha_opt_states)
+
+        loss_info = {"actor_loss": act_loss, "alpha_loss": alpha_loss}
         return params, opt_states, loss_info
 
     # Act/learn loops:
@@ -441,11 +510,13 @@ def make_update_fns(
         """Acting loop: select action, step env, add to buffer."""
         actor_params, obs, env_state, buffer_state, key = carry
         key, act_key = jax.random.split(key)
+        act_keys = jax.random.split(act_key, env.num_agents)
 
-        pi = actor_net.apply(actor_params, obs)
-        action = pi.sample(seed=act_key)
+        actions, _ = get_actions(
+            actor_params, actor_net, act_keys, env.num_agents, env.action_dim, obs
+        )
 
-        next_obs, env_state, buffer_state, metrics = step(action, obs, env_state, buffer_state)
+        next_obs, env_state, buffer_state, metrics = step(actions, obs, env_state, buffer_state)
         return (actor_params, next_obs, env_state, buffer_state, key), metrics
 
     def explore(carry: LearnerState, _: Any) -> Tuple[LearnerState, Metrics]:
@@ -531,7 +602,16 @@ def run_experiment(cfg: DictConfig) -> float:
 
     actor, _ = networks
     key, eval_key = jax.random.split(key)
-    eval_act_fn = make_ff_eval_act_fn(actor.apply, cfg)
+
+    def eval_act_fn(
+        params: FrozenDict, timestep: TimeStep, key: chex.PRNGKey, actor_state: ActorState
+    ) -> Tuple[Action, Dict]:
+        keys = jax.random.split(key, eval_env.num_agents)
+        action, _ = get_actions(
+            params, actor, keys, eval_env.num_agents, eval_env.action_dim, timestep.observation
+        )
+        return action, {}
+
     evaluator = get_eval_fn(eval_env, eval_act_fn, cfg, absolute_metric=False)
 
     if cfg.logger.checkpointing.save_model:
@@ -618,16 +698,12 @@ def run_experiment(cfg: DictConfig) -> float:
     return eval_performance
 
 
-@hydra.main(
-    config_path="../../../configs/default",
-    config_name="ff_masac.yaml",
-    version_base="1.2",
-)
+@hydra.main(config_path="../../../configs/default", config_name="ff_hasac.yaml", version_base="1.2")
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-    cfg.logger.system_name = "ff_masac"
+    cfg.logger.system_name = "ff_hasac"
 
     # Run experiment.
     final_return = run_experiment(cfg)
