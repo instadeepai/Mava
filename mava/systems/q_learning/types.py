@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, NamedTuple
+from typing import Dict, Generic, TypeVar
 
 import optax
 from chex import PRNGKey
@@ -19,7 +19,7 @@ from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
 from jax import Array
 from jumanji.env import State
-from typing_extensions import TypeAlias
+from typing_extensions import NamedTuple, TypeAlias
 
 from mava.types import Observation
 
@@ -49,27 +49,6 @@ class QNetParams(NamedTuple):
     target: FrozenVariableDict
 
 
-class LearnerState(NamedTuple):
-    """State of the learner in an interaction-training loop."""
-
-    # Interaction vars
-    obs: Observation
-    terminal: Array
-    term_or_trunc: Array
-    hidden_state: Array
-    env_state: State
-    time_steps: Array
-
-    # Train vars
-    train_steps: Array
-    opt_state: optax.OptState
-
-    # Shared vars
-    buffer_state: TrajectoryBufferState
-    params: QNetParams
-    key: PRNGKey
-
-
 class ActionSelectionState(NamedTuple):
     """Everything used for action selection apart from the observation."""
 
@@ -90,11 +69,42 @@ class ActionState(NamedTuple):
     term_or_trunc: Array
 
 
-class TrainState(NamedTuple):
+class QMIXParams(NamedTuple):
+    online: FrozenVariableDict
+    target: FrozenVariableDict
+    mixer_online: FrozenVariableDict
+    mixer_target: FrozenVariableDict
+
+
+QLearningParams = TypeVar("QLearningParams", QNetParams, QMIXParams)
+
+
+class LearnerState(NamedTuple, Generic[QLearningParams]):
+    """State of the learner in an interaction-training loop."""
+
+    # Interaction vars
+    obs: Observation
+    terminal: Array
+    term_or_trunc: Array
+    hidden_state: Array
+    env_state: State
+    time_steps: Array
+
+    # Train vars
+    train_steps: Array
+    opt_state: optax.OptState
+
+    # Shared vars
+    buffer_state: TrajectoryBufferState
+    params: QLearningParams
+    key: PRNGKey
+
+
+class TrainState(NamedTuple, Generic[QLearningParams]):
     """The carry in the training loop."""
 
     buffer_state: BufferState
-    params: QNetParams
+    params: QLearningParams
     opt_state: optax.OptState
     train_steps: Array
     key: PRNGKey

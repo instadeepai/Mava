@@ -1,0 +1,11 @@
+defaults:
+  - _self_
+  - logger: logger
+  - arch: anakin
+  - system: q_learning/rec_qmix
+  - network: qmix_rnn
+  - env: smax
+
+hydra:
+  searchpath:
+    - file://mava/configs
