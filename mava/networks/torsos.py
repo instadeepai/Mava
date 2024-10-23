@@ -41,10 +41,8 @@ class MLPTorso(nn.Module):
             if self.use_layer_norm:
                 x = nn.LayerNorm(use_scale=False)(x)
 
-            if i != len(self.layer_sizes) - 1:
-                x = self.activation_fn(x)
-            elif i == len(self.layer_sizes) - 1 and self.activate_final:
-                x = self.activation_fn(x)
+            should_activate = (i < len(self.layer_sizes) - 1) or self.activate_final
+            x = self.activation_fn(x) if should_activate else x
 
         return x
 
