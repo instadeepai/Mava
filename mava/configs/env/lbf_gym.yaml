@@ -20,3 +20,6 @@ log_win_rate: False
 
 # Weather or not to sum the returned rewards over all of the agents.
 use_shared_rewards: True
+
+kwargs:
+  max_episode_steps: 100

@@ -21,6 +21,7 @@ from mava.wrappers.gym import (
     GymRecordEpisodeMetrics,
     GymToJumanji,
     GymWrapper,
+    SmacWrapper,
     async_multiagent_worker,
 )
 from mava.wrappers.jaxmarl import MabraxWrapper, SmaxWrapper

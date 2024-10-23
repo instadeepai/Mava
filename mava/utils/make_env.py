@@ -54,6 +54,7 @@ from mava.wrappers import (
     RecordEpisodeMetrics,
     RwareWrapper,
     SmaxWrapper,
+    SmacWrapper,
     async_multiagent_worker,
 )
 from mava.wrappers.jaxmarl import JaxMarlWrapper
@@ -77,6 +78,7 @@ _gigastep_registry = {"Gigastep": GigastepWrapper}
 _gym_registry = {
     "RobotWarehouse": GymWrapper,
     "LevelBasedForaging": GymWrapper,
+    "Starcraft": SmacWrapper,
 }
 
 
@@ -247,7 +249,7 @@ def make_gym_env(
 
     def create_gym_env(config: DictConfig, add_global_state: bool = False) -> gymnasium.Env:
         registered_name = f"{config.env.scenario.name}:{config.env.scenario.task_name}"
-        env = gym.make(registered_name, disable_env_checker=False)
+        env = gym.make(registered_name, disable_env_checker=False, **config.env.kwargs)
         wrapped_env = wrapper(env, config.env.use_shared_rewards, add_global_state)
         if config.system.add_agent_id:
             wrapped_env = GymAgentIDWrapper(wrapped_env)

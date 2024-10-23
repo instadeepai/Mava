@@ -99,7 +99,7 @@ class Pipeline(threading.Thread):
 
         # [Transition(num_envs)] * rollout_len -> Transition[done=(num_envs, rollout_len, ...)]
         traj = _stack_trajectory(traj)
-        traj, timestep = jax.device_put((traj, timestep), device=self.sharding, donate=True)
+        traj, timestep = jax.device_put((traj, timestep), device=self.sharding)
 
         # We block on the `put` to ensure that actors wait for the learners to catch up.
         # This ensures two things:

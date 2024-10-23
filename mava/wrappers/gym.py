@@ -106,7 +106,7 @@ class GymWrapper(gymnasium.Wrapper):
 
         return np.array(agents_view), info
 
-    def step(self, actions: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
+    def step(self, actions: Tuple) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
         agents_view, reward, terminated, truncated, info = self._env.step(actions)
 
         info = {"actions_mask": self.get_actions_mask(info)}
@@ -128,7 +128,20 @@ class GymWrapper(gymnasium.Wrapper):
     def get_global_obs(self, obs: NDArray) -> NDArray:
         global_obs = np.concatenate(obs, axis=0)
         return np.tile(global_obs, (self.num_agents, 1))
+    
+class SmacWrapper(GymWrapper):
+    """A wrapper that converts actions step to integers."""
 
+    def step(self, actions: Tuple) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
+        # Convert actions to integers before passing them to the environment
+        actions = [int(action) for action in actions]
+
+        agents_view, reward, terminated, truncated, info = super().step(actions)
+
+        return agents_view, reward, terminated, truncated, info
+    
+    def get_actions_mask(self, info: Dict) -> NDArray:
+        return np.array(self._env.unwrapped.get_avail_actions())
 
 class GymRecordEpisodeMetrics(gymnasium.Wrapper):
     """Record the episode returns and lengths."""
