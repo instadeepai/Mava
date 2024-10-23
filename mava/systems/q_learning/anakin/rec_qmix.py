@@ -283,9 +283,8 @@ def make_update_fns(
         next_env_state, next_timestep = jax.vmap(env.step)(env_state, action)
 
         # Get reward
-        reward = jnp.mean(
-            next_timestep.reward, axis=-1, keepdims=True
-        )  # NOTE: Combine agent rewards, since QMIX is cooperative.
+        # NOTE: Combine agent rewards, since QMIX is cooperative.
+        reward = jnp.mean(next_timestep.reward, axis=-1, keepdims=True)
 
         transition = Transition(
             obs, action, reward, terminal, term_or_trunc, next_timestep.extras["real_next_obs"]
