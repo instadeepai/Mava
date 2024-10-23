@@ -381,8 +381,7 @@ def make_update_fns(
         # Get the greedy action using the distribution.
         # Epsilon defaults to 0.
         hidden_state, next_obs_term_or_trunc = prep_inputs_to_scannedrnn(
-            data.obs,
-            data.term_or_trunc,
+            data.obs, data.term_or_trunc
         )  # (T, B, ...)
         _, next_greedy_dist = q_net.apply(params.online, hidden_state, next_obs_term_or_trunc)
         next_action = next_greedy_dist.mode()  # (T, B, ...)
