@@ -3,8 +3,8 @@ defaults:
   - logger: logger
   - arch: anakin
   - system: sac/ff_isac
-  - network: continuous_mlp  # [continuous_mlp]
-  - env: mabrax  # [mabrax, mpe]
+  - network: mlp
+  - env: mabrax  # [mabrax]
 
 hydra:
   searchpath:

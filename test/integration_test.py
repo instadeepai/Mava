@@ -136,8 +136,7 @@ def test_continuous_env(fast_config: dict, env_name: str) -> None:
     """Test all continuous envs on random systems."""
     system_path = random.choice(ppo_systems + sac_systems)
     _, _, system_name = system_path.split(".")
-    action_head = "mava.networks.heads.ContinuousActionHead "
-    overrides = [f"env={env_name}", f"network.action_head._target_={action_head}"]
+    overrides = [f"env={env_name}"]
 
     with initialize(version_base=None, config_path=config_path):
         cfg = compose(config_name=f"{system_name}", overrides=overrides)
