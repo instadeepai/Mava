@@ -23,7 +23,7 @@ sample_sequence_length: 20 # 21 transitions are sampled, giving 20 complete data
 q_lr: 3e-5  # the learning rate of the Q network network optimizer
 max_grad_norm: 10 # value used to clip optimiser - set big for no clipping
 
-# other
+# Q Learning related
 hard_update: True
 update_period: 200
 tau: 0.01  # smoothing coefficient for target networks
