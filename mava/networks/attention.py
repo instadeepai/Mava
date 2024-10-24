@@ -47,26 +47,14 @@ class SelfAttention(nn.Module):
         # hs: head size
         # nh: number of heads
 
-        batch, seq_len, embed_dim = key.shape
+        B, L, D = key.shape
 
         # calculate query, key, values for all heads in batch and move
         # head forward to be the batch dim
         # [B, L, D] -> [B, L, H, D//H]
-        k = (
-            self.key(key)
-            .reshape(batch, seq_len, self.n_head, embed_dim // self.n_head)
-            .transpose((0, 2, 1, 3))
-        )
-        q = (
-            self.query(query)
-            .reshape(batch, seq_len, self.n_head, embed_dim // self.n_head)
-            .transpose((0, 2, 1, 3))
-        )
-        v = (
-            self.value(value)
-            .reshape(batch, seq_len, self.n_head, embed_dim // self.n_head)
-            .transpose((0, 2, 1, 3))
-        )
+        k = self.key(key).reshape(B, L, self.n_head, D // self.n_head).transpose((0, 2, 1, 3))
+        q = self.query(query).reshape(B, L, self.n_head, D // self.n_head).transpose((0, 2, 1, 3))
+        v = self.value(value).reshape(B, L, self.n_head, D // self.n_head).transpose((0, 2, 1, 3))
 
         # causal attention: (B, nh, L, hs) x (B, nh, hs, L) -> (B, nh, L, L)
         att = jnp.matmul(q, k.transpose((0, 1, 3, 2))) * (1.0 / jnp.sqrt(k.shape[-1]))
@@ -74,7 +62,7 @@ class SelfAttention(nn.Module):
         # mask out attention for all agents
         if self.masked:
             att = jnp.where(
-                self.mask[:, :, :seq_len, :seq_len] == 0,
+                self.mask[:, :, :L, :L] == 0,
                 jnp.finfo(jnp.float32).min,
                 att,
             )
@@ -84,7 +72,7 @@ class SelfAttention(nn.Module):
         y = jnp.matmul(att, v)  # (B, nh, L, L) x (B, nh, L, hs) -> (B, nh, L, hs)
         # re-assemble all head outputs side by side
         y = y.transpose((0, 2, 1, 3))
-        y = y.reshape(batch, seq_len, embed_dim)
+        y = y.reshape(B, L, D)
 
         # output projection
         y = self.proj(y)
