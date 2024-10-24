@@ -25,8 +25,6 @@ class SelfAttention(nn.Module):
     masked: bool = False
 
     def setup(self) -> None:
-        # flax defualt is to only be defined using features out.
-        # bias init is zero in MAT.
         assert self.n_embd % self.n_head == 0
         self.key = nn.Dense(self.n_embd, kernel_init=orthogonal(0.01))
         self.query = nn.Dense(self.n_embd, kernel_init=orthogonal(0.01))
