@@ -140,8 +140,7 @@ def get_learner_fn(
         )
 
         def _calculate_gae(
-            traj_batch: PPOTransition,
-            last_val: chex.Array,
+            traj_batch: PPOTransition, last_val: chex.Array
         ) -> Tuple[chex.Array, chex.Array]:
             """Calculate the GAE."""
 
@@ -165,10 +164,7 @@ def get_learner_fn(
                 reverse=True,
                 unroll=16,
             )
-            return (
-                advantages,
-                advantages + traj_batch.value,
-            )
+            return advantages, advantages + traj_batch.value
 
         advantages, targets = _calculate_gae(traj_batch, last_val)
 
