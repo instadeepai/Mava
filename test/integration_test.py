@@ -19,6 +19,8 @@ import pytest
 from hydra import compose, initialize
 from omegaconf import DictConfig, OmegaConf
 
+from test.conftest import find_replace
+
 # This integration test is not exhaustive, that would be too expensive. This means that not all
 # system run all envs, but each env and each system is run at least once.
 # For each system we select a random environment to run.
@@ -53,70 +55,68 @@ def _run_system(system_name: str, cfg: DictConfig) -> float:
     return float(eval_perf)
 
 
-def _get_fast_config(cfg: DictConfig, fast_config: dict) -> DictConfig:
+def _get_fast_config(cfg: DictConfig, config_modifications: dict) -> DictConfig:
     """Makes the configs use a minimum number of timesteps and evaluations."""
-    dconf: dict = OmegaConf.to_container(cfg, resolve=True)
-    dconf["system"] |= fast_config["system"]
-    dconf["arch"] |= fast_config["arch"]
-    cfg = OmegaConf.create(dconf)
 
-    return cfg
+    return OmegaConf.create(
+        find_replace(OmegaConf.to_container(cfg, resolve=True), config_modifications)
+    )
 
 
 @pytest.mark.parametrize("system_path", ppo_systems)
-def test_ppo_system(fast_config: dict, system_path: str) -> None:
+def test_ppo_system(fast_config_modifications: dict, system_path: str) -> None:
     """Test all ppo systems on random envs."""
     _, _, system_name = system_path.split(".")
     env = random.choice(discrete_envs)
 
     with initialize(version_base=None, config_path=config_path):
         cfg = compose(config_name=f"{system_name}", overrides=[f"env={env}"])
-        cfg = _get_fast_config(cfg, fast_config)
+        cfg = _get_fast_config(cfg, fast_config_modifications)
 
     _run_system(system_path, cfg)
 
 
 @pytest.mark.parametrize("system_path", q_learning_systems)
-def test_q_learning_system(fast_config: dict, system_path: str) -> None:
+def test_q_learning_system(fast_config_modifications: dict, system_path: str) -> None:
     """Test all Q-Learning systems on random envs."""
     _, _, system_name = system_path.split(".")
     env = random.choice(discrete_envs)
 
     with initialize(version_base=None, config_path=config_path):
         cfg = compose(config_name=f"{system_name}", overrides=[f"env={env}"])
-        cfg = _get_fast_config(cfg, fast_config)
+        cfg = _get_fast_config(cfg, fast_config_modifications)
 
     _run_system(system_path, cfg)
 
 
 @pytest.mark.parametrize("system_path", sac_systems)
-def test_sac_system(fast_config: dict, system_path: str) -> None:
+def test_sac_system(fast_config_modifications: dict, system_path: str) -> None:
     """Test all SAC systems on random envs."""
     _, _, system_name = system_path.split(".")
     env = random.choice(continuous_envs)
 
     with initialize(version_base=None, config_path=config_path):
         cfg = compose(config_name=f"{system_name}", overrides=[f"env={env}"])
-        cfg = _get_fast_config(cfg, fast_config)
+        cfg = _get_fast_config(cfg, fast_config_modifications)
 
     _run_system(system_path, cfg)
 
 
 @pytest.mark.parametrize("env_name", discrete_envs)
-def test_discrete_env(fast_config: dict, env_name: str) -> None:
+def test_discrete_env(fast_config_modifications: dict, env_name: str) -> None:
     """Test all discrete envs on random systems."""
     system_path = random.choice(ppo_systems + q_learning_systems)
     _, _, system_name = system_path.split(".")
 
     with initialize(version_base=None, config_path=config_path):
         cfg = compose(config_name=f"{system_name}", overrides=[f"env={env_name}"])
-        cfg = _get_fast_config(cfg, fast_config)
+        cfg = _get_fast_config(cfg, fast_config_modifications)
 
     _run_system(system_path, cfg)
 
 
 @pytest.mark.parametrize("env_name", cnn_envs)
-def test_discrete_cnn_env(fast_config: dict, env_name: str) -> None:
+def test_discrete_cnn_env(fast_config_modifications: dict, env_name: str) -> None:
     """Test all 2D envs on random systems."""
     system_path = random.choice(ppo_systems)
     _, _, system_name = system_path.split(".")
@@ -126,7 +126,7 @@ def test_discrete_cnn_env(fast_config: dict, env_name: str) -> None:
     overrides = [f"env={env_name}", f"network={network}"]
     with initialize(version_base=None, config_path=config_path):
         cfg = compose(config_name=f"{system_name}", overrides=overrides)
-        cfg = _get_fast_config(cfg, fast_config)
+        cfg = _get_fast_config(cfg, fast_config_modifications)
 
     _run_system(system_path, cfg)
 
@@ -134,7 +134,7 @@ def test_discrete_cnn_env(fast_config: dict, env_name: str) -> None:
 # leaving this here for the future if we have some new continuous envs
 @pytest.mark.skip(reason="MaBrax is the only continuous env and already tested in test_mava_system")
 @pytest.mark.parametrize("env_name", continuous_envs)
-def test_continuous_env(fast_config: dict, env_name: str) -> None:
+def test_continuous_env(fast_config_modifications: dict, env_name: str) -> None:
     """Test all continuous envs on random systems."""
     system_path = random.choice(ppo_systems + sac_systems)
     _, _, system_name = system_path.split(".")
@@ -142,6 +142,6 @@ def test_continuous_env(fast_config: dict, env_name: str) -> None:
     overrides = [f"env={env_name}"]
     with initialize(version_base=None, config_path=config_path):
         cfg = compose(config_name=f"{system_name}", overrides=overrides)
-        cfg = _get_fast_config(cfg, fast_config)
+        cfg = _get_fast_config(cfg, fast_config_modifications)
 
     _run_system(system_path, cfg)

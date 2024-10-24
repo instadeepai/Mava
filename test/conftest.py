@@ -12,37 +12,67 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict
+from typing import Any, Dict, List, TypeAlias
 
 import pytest
 
+_ConfSingleValue: TypeAlias = bool | int | float
+ConfigValue: TypeAlias = _ConfSingleValue | List[_ConfSingleValue] | Dict[str, _ConfSingleValue]
+
 
 @pytest.fixture
-def fast_config() -> Dict[str, Dict[str, bool | int | float]]:
+def fast_config_modifications() -> Dict[str, ConfigValue]:
     return {
-        "system": {
-            # common
-            "num_updates": 2,
-            "rollout_length": 1,
-            "num_minibatches": 1,
-            "update_batch_size": 1,
-            # ppo:
-            "ppo_epochs": 1,
-            # sac:
-            "explore_steps": 1,
-            "epochs": 1,  # also for iql
-            "policy_update_delay": 1,
-            "buffer_size": 8,  # also for iql
-            "batch_size": 1,
-            # iql
-            "min_buffer_size": 4,
-            "sample_batch_size": 1,
-            "sample_sequence_length": 1,
-        },
-        "arch": {
-            "num_envs": 1,
-            "num_eval_episodes": 1,
-            "num_evaluation": 1,
-            "absolute_metric": False,
-        },
+        # ---------- system config ---------
+        # common
+        "num_updates": 2,
+        "rollout_length": 1,
+        "num_minibatches": 1,
+        "update_batch_size": 1,
+        # ppo
+        "ppo_epochs": 1,
+        # sac
+        "explore_steps": 1,
+        "epochs": 1,  # also for iql
+        "policy_update_delay": 1,
+        "buffer_size": 8,  # also for iql
+        "batch_size": 1,
+        # iql
+        "min_buffer_size": 4,
+        "sample_batch_size": 1,
+        "sample_sequence_length": 1,
+        # ---------- arch config ----------
+        "num_envs": 1,
+        "num_eval_episodes": 1,
+        "num_evaluation": 1,
+        "absolute_metric": False,
+        # ---------- network config ----------
+        "hidden_state_dim": 2,
+        "layer_sizes": [4],
+        "channel_sizes": [1, 1],
+        "use_layer_norm": False,
     }
+
+
+def find_replace(d: Dict[str, Any], replacements: Dict[str, ConfigValue]) -> Dict[str, ConfigValue]:
+    """Recursively searches through a dictionary and replaces values for specified keys.
+
+    Args:
+        d: Dictionary to search through
+        replacements: The keys and values to replace
+    """
+
+    def _find_replace_recursive(current_dict: Dict[str, ConfigValue]) -> Dict[str, ConfigValue]:
+        """Helper function that recursively searches and replaces values."""
+        x = {}
+        for k, v in list(current_dict.items()):
+            if isinstance(v, dict):
+                v = _find_replace_recursive(v)
+            elif k in replacements:
+                v = replacements[k]
+
+            x[k] = v
+
+        return x
+
+    return _find_replace_recursive(d)
