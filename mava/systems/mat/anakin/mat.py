@@ -26,7 +26,6 @@ import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from jax import tree
-from jumanji.env import Environment
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
@@ -39,6 +38,7 @@ from mava.types import (
     CriticApply,
     ExperimentOutput,
     LearnerFn,
+    MarlEnv,
     TimeStep,
 )
 from mava.utils import make_env as environments
@@ -56,7 +56,7 @@ from mava.wrappers.episode_metrics import get_final_step_metrics
 
 
 def get_learner_fn(
-    env: Environment,
+    env: MarlEnv,
     apply_fns: Tuple[ActorApply, CriticApply],
     update_fn: optax.TransformUpdateFn,
     config: DictConfig,
@@ -375,7 +375,7 @@ def get_learner_fn(
 
 
 def learner_setup(
-    env: Environment, keys: chex.Array, config: DictConfig
+    env: MarlEnv, keys: chex.Array, config: DictConfig
 ) -> Tuple[LearnerFn[LearnerState], Any, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
