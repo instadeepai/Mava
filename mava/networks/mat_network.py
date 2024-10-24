@@ -27,6 +27,7 @@ from mava.networks.utils.mat.decode import (
     discrete_autoregressive_act,
     discrete_parallel_act,
 )
+from mava.types import MavaObservation
 from mava.utils.network_utils import _CONTINUOUS, _DISCRETE
 
 
@@ -270,19 +271,18 @@ class MultiAgentTransformer(nn.Module):
 
     def __call__(
         self,
-        obs: chex.Array,  # (B, N, O)
+        observation: MavaObservation,  # (B, N, ...)
         action: chex.Array,  # (B, N, A)
-        legal_actions: chex.Array,  # (B, N, A)
         key: chex.PRNGKey,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        value, obs_rep = self.encoder(obs)
+        value, obs_rep = self.encoder(observation.agents_view)
 
         action_log, entropy = self.train_function(
             decoder=self.decoder,
             obs_rep=obs_rep,
             action=action,
             action_dim=self.action_dim,
-            legal_actions=legal_actions,
+            legal_actions=observation.action_mask,
             key=key,
         )
 
@@ -290,16 +290,15 @@ class MultiAgentTransformer(nn.Module):
 
     def get_actions(
         self,
-        obs: chex.Array,  # (B, N, O)
-        legal_actions: chex.Array,  # (B, N, A)
+        observation: MavaObservation,  # (B, N, ...)
         key: chex.PRNGKey,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        value, obs_rep = self.encoder(obs)
+        value, obs_rep = self.encoder(observation.agents_view)
         output_action, output_action_log = self.act_function(
             decoder=self.decoder,
             obs_rep=obs_rep,
             action_dim=self.action_dim,
-            legal_actions=legal_actions,
+            legal_actions=observation.action_mask,
             key=key,
         )
         return output_action, output_action_log, value

@@ -93,8 +93,7 @@ def get_learner_fn(
             key, policy_key = jax.random.split(key)
             action, log_prob, value = actor_action_select_fn(  # type: ignore
                 params.actor_params,
-                last_timestep.observation.agents_view,
-                last_timestep.observation.action_mask,
+                last_timestep.observation,
                 policy_key,
             )
             # STEP ENVIRONMENT
@@ -136,8 +135,7 @@ def get_learner_fn(
         key, last_val_key = jax.random.split(key)
         _, _, last_val = actor_action_select_fn(  # type: ignore
             params.actor_params,
-            last_timestep.observation.agents_view,
-            last_timestep.observation.action_mask,
+            last_timestep.observation,
             last_val_key,
         )
 
@@ -196,9 +194,8 @@ def get_learner_fn(
 
                     log_prob, value, entropy = actor_apply_fn(  # type: ignore
                         actor_params,
-                        traj_batch.obs.agents_view,
+                        traj_batch.obs,
                         traj_batch.action,
-                        traj_batch.obs.action_mask,
                         entropy_key,
                     )
 
@@ -420,9 +417,7 @@ def learner_setup(
     )
 
     # Initialise actor params and optimiser state.
-    actor_params = actor_network.init(
-        actor_net_key, init_x.agents_view, init_action, init_x.action_mask, jax.random.PRNGKey(0)
-    )
+    actor_params = actor_network.init(actor_net_key, init_x, init_action, jax.random.PRNGKey(0))
     actor_opt_state = actor_optim.init(actor_params)
 
     # Pack params.
@@ -515,8 +510,7 @@ def run_experiment(_config: DictConfig) -> float:
         del actor_state  # Unused since the system doesn't have memory over time.
         output_action, _, _ = actor_network.apply(  # type: ignore
             params,
-            timestep.observation.agents_view,
-            timestep.observation.action_mask,
+            timestep.observation,
             key,
             method="get_actions",
         )
