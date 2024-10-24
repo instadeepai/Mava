@@ -40,3 +40,6 @@ ignore = [
     "ANN204",  # no need for return type for special methods
     "ANN401",  # can use Any type
 ]
+
+[tool.ruff.lint.pep8-naming]
+ignore-names = ["?"]

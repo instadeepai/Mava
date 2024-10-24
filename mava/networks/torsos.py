@@ -70,6 +70,19 @@ class CNNTorso(nn.Module):
         return jax.lax.collapse(x, -3)
 
 
+class SwiGLU(nn.Module):
+    ffn_dim: int
+    embed_dim: int
+
+    def setup(self) -> None:
+        self.W_1 = self.param("W_1", nn.initializers.zeros, (self.embed_dim, self.ffn_dim))
+        self.W_G = self.param("W_G", nn.initializers.zeros, (self.embed_dim, self.ffn_dim))
+        self.W_2 = self.param("W_2", nn.initializers.zeros, (self.ffn_dim, self.embed_dim))
+
+    def __call__(self, x: chex.Array) -> chex.Array:
+        return (jax.nn.swish(x @ self.W_G) * (x @ self.W_1)) @ self.W_2
+
+
 def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
     """Get the activation function."""
     activation_fns: Dict[str, Callable[[chex.Array], chex.Array]] = {

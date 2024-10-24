@@ -1,0 +1,25 @@
+# --- Defaults MAT ---
+
+total_timesteps: ~ # Set the total environment steps.
+# If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
+num_updates: 1220 # Number of updates
+seed: 42
+
+# --- Agent observations ---
+add_agent_id: True
+
+# --- RL hyperparameters ---
+actor_lr: 0.0005 # Learning rate for actor network
+update_batch_size: 2 # Number of vectorised gradient updates per device.
+rollout_length: 128 # Number of environment steps per vectorised environment.
+ppo_epochs: 5 # Number of ppo epochs per training data batch.
+num_minibatches: 1 # Number of minibatches per ppo epoch.
+gamma: 0.99 # Discounting factor.
+gae_lambda: 0.95 # Lambda value for GAE computation.
+clip_eps: 0.1 # Clipping value for PPO updates and value function.
+ent_coef: 0.01 # Entropy regularisation term for loss function.
+vf_coef: 0.5 # Critic weight in
+max_grad_norm: 5 # Maximum norm of the gradients for a weight update.
+decay_learning_rates: False # Whether learning rates should be linearly decayed during training.
+
+normalise_value_targets: False
