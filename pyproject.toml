@@ -1,39 +1,54 @@
-[tool.mypy]
-python_version = 3.9
-namespace_packages = true
-incremental = false
-cache_dir = ""
-warn_redundant_casts = true
-warn_return_any = true
-warn_unused_configs = true
-warn_unused_ignores = false
-allow_redefinition = true
-disallow_untyped_calls = false
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = false
-strict_optional = true
-strict_equality = true
-explicit_package_bases = true
-follow_imports = "skip"
-ignore_missing_imports = true
+[build-system]
+requires=["setuptools>=62.6"]
+build-backend="setuptools.build_meta"
 
-[[tool.mypy.overrides]]
-module = [
-    "numpy.*",
-    "optax.*",
-    "neptune.*",
-    "hydra.*",
-    "omegaconf.*",
+[tool.setuptools.packages.find]
+include=['mava*']
+
+[project]
+name="id-mava"
+authors=[{name="InstaDeep Ltd"}]
+dynamic=["version", "dependencies", "optional-dependencies"]
+license={file="LISCENSE"}
+description="Distributed Multi-Agent Reinforcement Learning in JAX."
+readme ="README.md"
+requires-python=">=3.9"  # would be nice to upgrade this and jumanji at some point
+keywords=["multi-agent", "reinforcement learning", "python", "jax", "anakin", "sebulba"]
+classifiers=[
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: Apache Software License",
 ]
+[tool.setuptools.dynamic]
+version={attr="mava.__version__"}
+dependencies={file="requirements/requirements.txt"}
+optional-dependencies={dev={file=["requirements/requirements-dev.txt"]}}
+
+[project.urls]
+"Homepage"="https://github.com/instadeep/Mava"
+"Bug Tracker"="https://github.com/instadeep/Mava/issues"
+
+[tool.mypy]
+python_version="3.10"
+warn_redundant_casts=true
+disallow_untyped_defs=true
+strict_equality=true
+follow_imports="skip"
+ignore_missing_imports=true
 
 [tool.ruff]
-line-length = 100
+line-length=100
 
 [tool.ruff.lint]
-select = ["A", "B", "E", "F",  "I", "N", "W", "RUF", "ANN"]
-ignore = [
+select=["A", "B", "E", "F",  "I", "N", "W", "RUF", "ANN"]
+ignore=[
     "E731",  # Allow lambdas to be assigned to variables.
     "ANN101",  # no need to type self
     "ANN102",  # no need to type cls

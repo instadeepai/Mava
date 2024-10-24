@@ -147,7 +147,7 @@ def make_jaxmarl_env(
         add_global_state,
     )
 
-    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)  # type: ignore
 
     return train_env, eval_env
 
@@ -208,7 +208,7 @@ def make_gigastep_env(
     train_env = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
     eval_env = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
 
-    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)  # type: ignore
     return train_env, eval_env
 
 

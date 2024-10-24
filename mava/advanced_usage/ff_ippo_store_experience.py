@@ -548,11 +548,9 @@ def run_experiment(_config: DictConfig) -> None:
     def _reshape_experience(experience: Dict[str, chex.Array]) -> Dict[str, chex.Array]:
         """Reshape experience to match buffer."""
         # Swap the T and NE axes (D, NU, UB, T, NE, ...) -> (D, NU, UB, NE, T, ...)
-        experience: Dict[str, chex.Array] = tree.map(lambda x: x.swapaxes(3, 4), experience)
+        experience = tree.map(lambda x: x.swapaxes(3, 4), experience)
         # Merge 4 leading dimensions into 1. (D, NU, UB, NE, T ...) -> (D * NU * UB * NE, T, ...)
-        experience: Dict[str, chex.Array] = tree.map(
-            lambda x: x.reshape(-1, *x.shape[4:]), experience
-        )
+        experience = tree.map(lambda x: x.reshape(-1, *x.shape[4:]), experience)
         return experience
 
     # Use vault to record experience
