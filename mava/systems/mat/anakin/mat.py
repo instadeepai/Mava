@@ -176,7 +176,7 @@ def get_learner_fn(
 
                 # UNPACK TRAIN STATE AND BATCH INFO
                 params, opt_state, key = train_state
-                (traj_batch, advantages, targets) = batch_info
+                traj_batch, advantages, targets = batch_info
 
                 def _actor_loss_fn(
                     actor_params: FrozenDict,
@@ -274,14 +274,7 @@ def get_learner_fn(
 
                 return (new_params, new_opt_state, key), loss_info
 
-            (
-                params,
-                opt_state,
-                traj_batch,
-                advantages,
-                targets,
-                key,
-            ) = update_state
+            params, opt_state, traj_batch, advantages, targets, key = update_state
             key, batch_shuffle_key, agent_shuffle_key, entropy_key = jax.random.split(key, 4)
 
             # SHUFFLE MINIBATCHES
@@ -378,7 +371,7 @@ def learner_setup(
     config.system.num_agents = env.num_agents
 
     # PRNG keys.
-    key, actor_net_key, _ = keys
+    key, actor_net_key = keys
 
     # Initialise observation: Obs for all agents.
     init_x = env.observation_spec().generate_value()
@@ -481,14 +474,10 @@ def run_experiment(_config: DictConfig) -> float:
     env, eval_env = environments.make(config)
 
     # PRNG keys.
-    key, key_e, actor_net_key, critic_net_key = jax.random.split(
-        jax.random.PRNGKey(config.system.seed), num=4
-    )
+    key, key_e, actor_net_key = jax.random.split(jax.random.PRNGKey(config.system.seed), num=3)
 
     # Setup learner.
-    learn, actor_network, learner_state = learner_setup(
-        env, (key, actor_net_key, critic_net_key), config
-    )
+    learn, actor_network, learner_state = learner_setup(env, (key, actor_net_key), config)
 
     eval_keys = jax.random.split(key_e, n_devices)
 
