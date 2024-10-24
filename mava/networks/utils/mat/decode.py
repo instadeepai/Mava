@@ -38,9 +38,9 @@ def discrete_parallel_act(
     legal_actions: chex.Array,  # (B, N, A)
     key: chex.PRNGKey,
 ) -> Tuple[chex.Array, chex.Array]:
-    batch_size, n_agent, _ = obs_rep.shape
+    B, N, _ = obs_rep.shape
     one_hot_action = jax.nn.one_hot(action, action_dim)  # (B, A)
-    shifted_action = jnp.zeros((batch_size, n_agent, action_dim + 1))  # (B, N, A +1)
+    shifted_action = jnp.zeros((B, N, action_dim + 1))  # (B, N, A +1)
     shifted_action = shifted_action.at[:, 0, 0].set(1)
     shifted_action = shifted_action.at[:, 1:, 1:].set(one_hot_action[:, :-1, :])
     logit = decoder(shifted_action, obs_rep)  # (B, N, A)
@@ -68,8 +68,8 @@ def continuous_parallel_act(
 ) -> Tuple[chex.Array, chex.Array]:
     # We don't need legal_actions for continuous actions but keep it to keep the APIs consistent.
     del legal_actions
-    batch_size, n_agent, _ = obs_rep.shape
-    shifted_action = jnp.zeros((batch_size, n_agent, action_dim))
+    B, N, _ = obs_rep.shape
+    shifted_action = jnp.zeros((B, N, action_dim))
 
     shifted_action = shifted_action.at[:, 1:, :].set(action[:, :-1, :])
 
@@ -94,13 +94,13 @@ def discrete_autoregressive_act(
     legal_actions: chex.Array,  # (B, N, A)
     key: chex.PRNGKey,
 ) -> Tuple[chex.Array, chex.Array]:
-    batch_size, n_agent, _ = obs_rep.shape
-    shifted_action = jnp.zeros((batch_size, n_agent, action_dim + 1))
+    B, N, _ = obs_rep.shape
+    shifted_action = jnp.zeros((B, N, action_dim + 1))
     shifted_action = shifted_action.at[:, 0, 0].set(1)
-    output_action = jnp.zeros((batch_size, n_agent))
+    output_action = jnp.zeros((B, N))
     output_action_log = jnp.zeros_like(output_action)
 
-    for i in range(n_agent):
+    for i in range(N):
         logit = decoder(shifted_action, obs_rep)[:, i, :]  # (B, A)
         masked_logits = jnp.where(
             legal_actions[:, i, :],
@@ -116,7 +116,7 @@ def discrete_autoregressive_act(
         output_action = output_action.at[:, i].set(action)
         output_action_log = output_action_log.at[:, i].set(action_log)
 
-        update_shifted_action = i + 1 < n_agent
+        update_shifted_action = i + 1 < N
         shifted_action = jax.lax.cond(
             update_shifted_action,
             lambda action=action, i=i, shifted_action=shifted_action: shifted_action.at[
@@ -137,12 +137,12 @@ def continuous_autoregressive_act(
 ) -> Tuple[chex.Array, chex.Array]:
     # We don't need legal_actions for continuous actions but keep it to keep the APIs consistent.
     del legal_actions
-    batch_size, n_agent, _ = obs_rep.shape
-    shifted_action = jnp.zeros((batch_size, n_agent, action_dim))
-    output_action = jnp.zeros((batch_size, n_agent, action_dim))
-    output_action_log = jnp.zeros((batch_size, n_agent))
+    B, N, _ = obs_rep.shape
+    shifted_action = jnp.zeros((B, N, action_dim))
+    output_action = jnp.zeros((B, N, action_dim))
+    output_action_log = jnp.zeros((B, N))
 
-    for i in range(n_agent):
+    for i in range(N):
         act_mean = decoder(shifted_action, obs_rep)[:, i, :]  # (B, A)
         action_std = jax.nn.softplus(decoder.log_std)
 
@@ -159,7 +159,7 @@ def continuous_autoregressive_act(
         output_action = output_action.at[:, i, :].set(action)
         output_action_log = output_action_log.at[:, i].set(action_log)
 
-        update_shifted_action = i + 1 < n_agent
+        update_shifted_action = i + 1 < N
         shifted_action = jax.lax.cond(
             update_shifted_action,
             lambda action=action, i=i, shifted_action=shifted_action: shifted_action.at[
