@@ -34,9 +34,9 @@ class SelfAttention(nn.Module):
         self.proj = nn.Dense(self.n_embd, kernel_init=orthogonal(0.01))
 
         # causal mask to ensure that attention is only applied to the left in the input sequence
-        self.mask = jnp.tril(jnp.ones((self.n_agent + 1, self.n_agent + 1))).reshape(
-            1, 1, self.n_agent + 1, self.n_agent + 1
-        )
+        self.mask = jnp.tril(jnp.ones((self.n_agent + 1, self.n_agent + 1)))[
+            jnp.newaxis, jnp.newaxis
+        ]
 
     def __call__(self, key: chex.Array, value: chex.Array, query: chex.Array) -> chex.Array:
         # Shape names:
