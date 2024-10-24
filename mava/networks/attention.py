@@ -76,6 +76,4 @@ class SelfAttention(nn.Module):
         y = y.transpose((0, 2, 1, 3))
         y = y.reshape(B, L, D)
 
-        # output projection
-        y = self.proj(y)
-        return y  # (B, L, D)
+        return self.proj(y)  # (B, L, D)
