@@ -104,9 +104,9 @@ class Encoder(nn.Module):
         x = obs_embeddings
 
         rep = self.blocks(self.ln(x))
-        v_loc = self.head(rep)
+        value = self.head(rep)
 
-        return jnp.squeeze(v_loc, axis=-1), rep
+        return jnp.squeeze(value, axis=-1), rep
 
 
 class DecodeBlock(nn.Module):
@@ -274,7 +274,7 @@ class MultiAgentTransformer(nn.Module):
         legal_actions: chex.Array,  # (B, N, A)
         key: chex.PRNGKey,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        v_loc, obs_rep = self.encoder(obs)
+        value, obs_rep = self.encoder(obs)
 
         action_log, entropy = self.train_function(
             decoder=self.decoder,
@@ -285,7 +285,7 @@ class MultiAgentTransformer(nn.Module):
             key=key,
         )
 
-        return action_log, v_loc, entropy
+        return action_log, value, entropy
 
     def get_actions(
         self,
@@ -293,7 +293,7 @@ class MultiAgentTransformer(nn.Module):
         legal_actions: chex.Array,  # (B, N, A)
         key: chex.PRNGKey,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        v_loc, obs_rep = self.encoder(obs)
+        value, obs_rep = self.encoder(obs)
         output_action, output_action_log = self.act_function(
             decoder=self.decoder,
             obs_rep=obs_rep,
@@ -301,4 +301,4 @@ class MultiAgentTransformer(nn.Module):
             legal_actions=legal_actions,
             key=key,
         )
-        return output_action, output_action_log, v_loc
+        return output_action, output_action_log, value
