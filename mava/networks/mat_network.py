@@ -27,6 +27,7 @@ from mava.networks.utils.mat.decode import (
     discrete_autoregressive_act,
     discrete_parallel_act,
 )
+from mava.utils.network_utils import _CONTINUOUS, _DISCRETE
 
 
 class EncodeBlock(nn.Module):
@@ -151,14 +152,14 @@ class Decoder(nn.Module):
     n_embd: int
     n_head: int
     n_agent: int
-    action_space_type: str = "discrete"
+    action_space_type: str = _DISCRETE
     use_swiglu: bool = False
     use_rmsnorm: bool = False
 
     def setup(self) -> None:
         ln = nn.RMSNorm if self.use_rmsnorm else nn.LayerNorm
 
-        if self.action_space_type == "discrete":
+        if self.action_space_type == _DISCRETE:
             self.action_encoder = nn.Sequential(
                 [
                     nn.Dense(self.n_embd, use_bias=False, kernel_init=orthogonal(jnp.sqrt(2))),
@@ -173,7 +174,7 @@ class Decoder(nn.Module):
 
         # Always initialize log_std but set to None for discrete action spaces
         # This ensures the attribute exists but signals it should not be used.
-        if self.action_space_type == "discrete":
+        if self.action_space_type == _DISCRETE:
             self.log_std = None
 
         self.obs_encoder = nn.Sequential(
@@ -221,7 +222,7 @@ class MultiAgentTransformer(nn.Module):
     n_embd: int
     n_head: int
     n_agent: int
-    action_space_type: str = "discrete"
+    action_space_type: str = _DISCRETE
     use_swiglu: bool = False
     use_rmsnorm: bool = False
 
@@ -233,7 +234,7 @@ class MultiAgentTransformer(nn.Module):
     # E: model embedding dimension
 
     def setup(self) -> None:
-        if self.action_space_type not in ["discrete", "continuous"]:
+        if self.action_space_type not in [_DISCRETE, _CONTINUOUS]:
             raise ValueError(f"Invalid action space type: {self.action_space_type}")
 
         self.encoder = Encoder(
@@ -258,10 +259,10 @@ class MultiAgentTransformer(nn.Module):
             use_rmsnorm=self.use_rmsnorm,
         )
 
-        if self.action_space_type == "discrete":
+        if self.action_space_type == _DISCRETE:
             self.act_function = discrete_autoregressive_act
             self.train_function = discrete_parallel_act
-        elif self.action_space_type == "continuous":
+        elif self.action_space_type == _CONTINUOUS:
             self.act_function = continuous_autoregressive_act
             self.train_function = continuous_parallel_act
         else:
