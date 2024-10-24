@@ -31,6 +31,19 @@ from mava.types import MavaObservation
 from mava.utils.network_utils import _CONTINUOUS, _DISCRETE
 
 
+def _make_mlp(n_embd: int, use_swiglu: bool) -> nn.Module:
+    if use_swiglu:
+        return SwiGLU(n_embd, n_embd)
+
+    return nn.Sequential(
+        [
+            nn.Dense(n_embd, kernel_init=orthogonal(jnp.sqrt(2))),
+            nn.gelu,
+            nn.Dense(n_embd, kernel_init=orthogonal(0.01)),
+        ],
+    )
+
+
 class EncodeBlock(nn.Module):
     n_embd: int
     n_head: int
@@ -46,16 +59,7 @@ class EncodeBlock(nn.Module):
 
         self.attn = SelfAttention(self.n_embd, self.n_head, self.n_agent, self.masked)
 
-        if self.use_swiglu:
-            self.mlp = SwiGLU(self.n_embd, self.n_embd)
-        else:
-            self.mlp = nn.Sequential(
-                [
-                    nn.Dense(self.n_embd, kernel_init=orthogonal(jnp.sqrt(2))),
-                    nn.gelu,
-                    nn.Dense(self.n_embd, kernel_init=orthogonal(0.01)),
-                ],
-            )
+        self.mlp = _make_mlp(self.n_embd, self.use_swiglu)
 
     def __call__(self, x: chex.Array) -> chex.Array:
         x = self.ln1(x + self.attn(x, x, x))
@@ -128,16 +132,7 @@ class DecodeBlock(nn.Module):
         self.attn1 = SelfAttention(self.n_embd, self.n_head, self.n_agent, self.masked)
         self.attn2 = SelfAttention(self.n_embd, self.n_head, self.n_agent, self.masked)
 
-        if self.use_swiglu:
-            self.mlp = SwiGLU(self.n_embd, self.n_embd)
-        else:
-            self.mlp = nn.Sequential(
-                [
-                    nn.Dense(self.n_embd, kernel_init=orthogonal(jnp.sqrt(2))),
-                    nn.gelu,
-                    nn.Dense(self.n_embd, kernel_init=orthogonal(0.01)),
-                ],
-            )
+        self.mlp = _make_mlp(self.n_embd, self.use_swiglu)
 
     def __call__(self, x: chex.Array, rep_enc: chex.Array) -> chex.Array:
         x = self.ln1(x + self.attn1(x, x, x))
