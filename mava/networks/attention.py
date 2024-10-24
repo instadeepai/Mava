@@ -17,6 +17,8 @@ import jax.numpy as jnp
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
+# TODO: Use einops for all the reshapes and matrix multiplications
+
 
 class SelfAttention(nn.Module):
     n_embd: int
