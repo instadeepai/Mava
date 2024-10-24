@@ -21,22 +21,10 @@ from typing_extensions import NamedTuple
 from mava.types import State
 
 
-class Params(NamedTuple):
-    """Parameters of a network with only an actor."""
-
-    actor_params: FrozenDict
-
-
-class OptStates(NamedTuple):
-    """OptStates of actor only learner."""
-
-    actor_opt_state: OptState
-
-
 class LearnerState(NamedTuple):
     """State of the learner."""
 
-    params: Params
+    params: FrozenDict
     opt_state: OptState
     key: chex.PRNGKey
     env_state: State

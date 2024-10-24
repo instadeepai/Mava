@@ -20,7 +20,6 @@ from typing import Any, Dict, Optional, Tuple, Type, Union
 import absl.logging as absl_logging
 import orbax.checkpoint
 from chex import Numeric
-from flax.core.frozen_dict import FrozenDict
 from jax import tree
 from omegaconf import DictConfig, OmegaConf
 
@@ -30,7 +29,7 @@ from mava.types import MavaState
 # Keep track of the version of the checkpointer
 # Any breaking API changes should be reflected in the major version (e.g. v0.1 -> v1.0)
 # whereas minor versions (e.g. v0.1 -> v0.2) indicate backwards compatibility
-CHECKPOINTER_VERSION = 1.0
+CHECKPOINTER_VERSION = 2.0
 
 
 class Checkpointer:
@@ -187,22 +186,13 @@ class Checkpointer:
         # The type of params to restore is the same type as the `input_params`
         TParams = type(input_params)  # noqa: N806
 
-        # Check the type of `input_params` for compatibility.
-        # This is a sanity check to ensure correct handling of parameter types.
-        # In Flax 0.6.11, parameters were typically of the `FrozenDict` type,
-        # but in later versions, a regular dictionary is used.
-        if isinstance(input_params.actor_params, FrozenDict):
-            restored_params = TParams(**FrozenDict(restored_learner_state_raw["params"]))
-        else:
-            restored_params = TParams(**restored_learner_state_raw["params"])
+        # We no longer check if params are in a FrozenDict since we require Flax >= 0.8.1
+        restored_params = TParams(**restored_learner_state_raw["params"])
 
         # Restore hidden states if required
         restored_hstates = None
         if restore_hstates and THiddenState is not None:
-            if isinstance(input_params.actor_params, FrozenDict):
-                restored_hstates = THiddenState(**FrozenDict(restored_learner_state_raw["hstates"]))
-            else:
-                restored_hstates = THiddenState(**restored_learner_state_raw["hstates"])
+            restored_hstates = THiddenState(**restored_learner_state_raw["hstates"])
 
         return restored_params, restored_hstates
 

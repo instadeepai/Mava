@@ -31,7 +31,7 @@ from rich.pretty import pprint
 
 from mava.evaluator import ActorState, get_eval_fn
 from mava.networks.mat_network import MultiAgentTransformer
-from mava.systems.mat.types import LearnerState, OptStates, Params
+from mava.systems.mat.types import LearnerState
 from mava.systems.ppo.types import PPOTransition
 from mava.types import (
     ActorApply,
@@ -77,11 +77,11 @@ def get_learner_fn(
 
         Args:
             learner_state (NamedTuple):
-                - params (Params): The current model parameters.
-                - opt_state (OptStates): The current optimizer states.
-                - key (PRNGKey): The random number generator state.
-                - env_state (State): The environment state.
-                - last_timestep (TimeStep): The last timestep in the current trajectory.
+                - params: The current model parameters.
+                - opt_state: The current optimizer states.
+                - key: The random number generator state.
+                - env_state: The environment state.
+                - last_timestep: The last timestep in the current trajectory.
             _ (Any): The current metrics info.
         """
 
@@ -92,7 +92,7 @@ def get_learner_fn(
             # SELECT ACTION
             key, policy_key = jax.random.split(key)
             action, log_prob, value = actor_action_select_fn(  # type: ignore
-                params.actor_params,
+                params,
                 last_timestep.observation,
                 policy_key,
             )
@@ -134,7 +134,7 @@ def get_learner_fn(
 
         key, last_val_key = jax.random.split(key)
         _, _, last_val = actor_action_select_fn(  # type: ignore
-            params.actor_params,
+            params,
             last_timestep.observation,
             last_val_key,
         )
@@ -178,8 +178,8 @@ def get_learner_fn(
                 params, opt_state, key = train_state
                 traj_batch, advantages, targets = batch_info
 
-                def _actor_loss_fn(
-                    actor_params: FrozenDict,
+                def _loss_fn(
+                    params: FrozenDict,
                     traj_batch: PPOTransition,
                     gae: chex.Array,
                     value_targets: chex.Array,
@@ -189,7 +189,7 @@ def get_learner_fn(
                     # RERUN NETWORK
 
                     log_prob, value, entropy = actor_apply_fn(  # type: ignore
-                        actor_params,
+                        params,
                         traj_batch.obs,
                         traj_batch.action,
                         entropy_key,
@@ -233,9 +233,9 @@ def get_learner_fn(
 
                 # CALCULATE ACTOR LOSS
                 key, entropy_key = jax.random.split(key)
-                actor_grad_fn = jax.value_and_grad(_actor_loss_fn, has_aux=True)
+                actor_grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
                 actor_loss_info, actor_grads = actor_grad_fn(
-                    params.actor_params,
+                    params,
                     traj_batch,
                     advantages,
                     targets,
@@ -251,14 +251,8 @@ def get_learner_fn(
                 )
 
                 # UPDATE ACTOR PARAMS AND OPTIMISER STATE
-                actor_updates, actor_new_opt_state = actor_update_fn(
-                    actor_grads, opt_state.actor_opt_state
-                )
-                actor_new_params = optax.apply_updates(params.actor_params, actor_updates)
-
-                # PACK NEW PARAMS AND OPTIMISER STATE
-                new_params = Params(actor_new_params)
-                new_opt_state = OptStates(actor_new_opt_state)
+                actor_updates, new_opt_state = actor_update_fn(actor_grads, opt_state)
+                new_params = optax.apply_updates(params, actor_updates)
 
                 # PACK LOSS INFO
                 total_loss = actor_loss_info[0]
@@ -299,24 +293,10 @@ def get_learner_fn(
                 _update_minibatch, (params, opt_state, entropy_key), minibatches
             )
 
-            update_state = (
-                params,
-                opt_state,
-                traj_batch,
-                advantages,
-                targets,
-                key,
-            )
+            update_state = params, opt_state, traj_batch, advantages, targets, key
             return update_state, loss_info
 
-        update_state = (
-            params,
-            opt_state,
-            traj_batch,
-            advantages,
-            targets,
-            key,
-        )
+        update_state = params, opt_state, traj_batch, advantages, targets, key
 
         # UPDATE EPOCHS
         update_state, loss_info = jax.lax.scan(
@@ -339,11 +319,11 @@ def get_learner_fn(
 
         Args:
             learner_state (NamedTuple):
-                - params (Params): The initial model parameters.
-                - opt_state (OptStates): The initial optimiser state.
-                - key (chex.PRNGKey): The random number generator state.
-                - env_state (LogEnvState): The environment state.
-                - timesteps (TimeStep): The initial timestep in the initial trajectory.
+                - params: The initial model parameters.
+                - opt_state: The initial optimiser state.
+                - key: The random number generator state.
+                - env_state: The environment state.
+                - timesteps: The initial timestep in the initial trajectory.
         """
 
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
@@ -406,11 +386,8 @@ def learner_setup(
     )
 
     # Initialise actor params and optimiser state.
-    actor_params = actor_network.init(actor_net_key, init_x, init_action, jax.random.PRNGKey(0))
-    actor_opt_state = actor_optim.init(actor_params)
-
-    # Pack params.
-    params = Params(actor_params)
+    params = actor_network.init(actor_net_key, init_x, init_action, jax.random.PRNGKey(0))
+    opt_state = actor_optim.init(params)
 
     # Pack apply and update functions.
     apply_fns = (
@@ -448,7 +425,6 @@ def learner_setup(
 
     # Define params to be replicated across devices and batches.
     key, step_keys = jax.random.split(key)
-    opt_state = OptStates(actor_opt_state)
     replicate_learner = (params, opt_state, step_keys)
 
     # Duplicate learner for update_batch_size.
@@ -474,7 +450,7 @@ def run_experiment(_config: DictConfig) -> float:
     env, eval_env = environments.make(config)
 
     # PRNG keys.
-    key, key_e, actor_net_key = jax.random.split(jax.random.PRNGKey(config.system.seed), num=3)
+    key, key_e, actor_net_key, _ = jax.random.split(jax.random.PRNGKey(config.system.seed), num=4)
 
     # Setup learner.
     learn, actor_network, learner_state = learner_setup(env, (key, actor_net_key), config)
@@ -556,7 +532,7 @@ def run_experiment(_config: DictConfig) -> float:
             logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
-        trained_params = unreplicate_batch_dim(learner_state.params.actor_params)
+        trained_params = unreplicate_batch_dim(learner_state.params)
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
