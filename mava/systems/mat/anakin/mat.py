@@ -556,9 +556,6 @@ def run_experiment(_config: DictConfig) -> float:
             logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
         logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
 
-        # Prepare for evaluation.
-        start_time = time.time()
-
         trained_params = unreplicate_batch_dim(learner_state.params.actor_params)
         key_e, *eval_keys = jax.random.split(key_e, n_devices + 1)
         eval_keys = jnp.stack(eval_keys)
