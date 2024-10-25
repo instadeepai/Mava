@@ -214,7 +214,6 @@ class JaxMarlWrapper(Wrapper, ABC):
     def step(
         self, state: JaxMarlState, action: Array
     ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
-        # todo: how do you know if it's a truncation with only dones?
         key, step_key = jax.random.split(state.key)
         obs, env_state, reward, done, _ = self._env.step(
             step_key, state.state, unbatchify(action, self.agents)

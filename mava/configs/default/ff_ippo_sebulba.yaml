@@ -1,9 +1,9 @@
 defaults:
   - logger: logger
-  - arch: anakin
+  - arch: sebulba
   - system: ppo/ff_ippo
   - network: mlp  # [mlp, continuous_mlp, cnn]
-  - env: rware  # [cleaner, connector, gigastep, lbf, mabrax, matrax, rware, smax]
+  - env: lbf_gym  # [rware_gym, lbf_gym]
   - _self_
 
 hydra:

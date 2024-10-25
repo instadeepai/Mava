@@ -20,7 +20,7 @@ from jumanji.types import TimeStep
 from optax._src.base import OptState
 from typing_extensions import NamedTuple
 
-from mava.types import Action, Done, HiddenState, State, Value
+from mava.types import Action, Done, HiddenState, Observation, State, Value
 
 
 class Params(NamedTuple):
@@ -74,7 +74,7 @@ class PPOTransition(NamedTuple):
     value: Value
     reward: chex.Array
     log_prob: chex.Array
-    obs: chex.Array
+    obs: Observation
     info: Dict
 
 

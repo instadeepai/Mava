@@ -71,5 +71,4 @@ def unreplicate_batch_dim(x: Any) -> Any:
 
 def switch_leading_axes(arr: chex.Array) -> chex.Array:
     """Switches the first two axes, generally used for BT -> TB."""
-    arr = tree.map(lambda x: jax.numpy.swapaxes(x, 0, 1), arr)
-    return arr
+    return tree.map(lambda x: x.swapaxes(0, 1), arr)
