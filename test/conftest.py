@@ -12,16 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List, TypeAlias
+from typing import Dict, List, TypeAlias
+from test.utils import ConfigValue
 
 import pytest
 
-_ConfSingleValue: TypeAlias = bool | int | float
-ConfigValue: TypeAlias = _ConfSingleValue | List[_ConfSingleValue] | Dict[str, _ConfSingleValue]
-
 
 @pytest.fixture
-def fast_config_modifications() -> Dict[str, ConfigValue]:
+def fast_config() -> Dict[str, ConfigValue]:
     return {
         # ---------- system config ---------
         # common
@@ -52,25 +50,3 @@ def fast_config_modifications() -> Dict[str, ConfigValue]:
         "channel_sizes": [1, 1],
         "use_layer_norm": False,
     }
-
-
-def find_replace(d: Dict[str, Any], replacements: Dict[str, ConfigValue]) -> Dict[str, ConfigValue]:
-    """Recursively searches through a dictionary and replaces values for specified keys.
-
-    Args:
-        d: Dictionary to search through
-        replacements: The keys and values to replace
-    """
-
-    def _find_replace_recursive(current_dict: Dict[str, ConfigValue]) -> Dict[str, ConfigValue]:
-        """Helper function that recursively searches and replaces values."""
-        x = {}
-        for k, v in current_dict.items():
-            if isinstance(v, dict):
-                current_dict[k] = _find_replace_recursive(v)
-            elif k in replacements:
-                current_dict[k] = replacements[k]
-
-        return current_dict
-
-    return _find_replace_recursive(d)
