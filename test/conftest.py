@@ -40,7 +40,7 @@ def fast_config_modifications() -> Dict[str, ConfigValue]:
         # iql
         "min_buffer_size": 4,
         "sample_batch_size": 1,
-        "sample_sequence_length": 1,
+        "sample_sequence_length": 2,
         # ---------- arch config ----------
         "num_envs": 1,
         "num_eval_episodes": 1,
@@ -65,14 +65,12 @@ def find_replace(d: Dict[str, Any], replacements: Dict[str, ConfigValue]) -> Dic
     def _find_replace_recursive(current_dict: Dict[str, ConfigValue]) -> Dict[str, ConfigValue]:
         """Helper function that recursively searches and replaces values."""
         x = {}
-        for k, v in list(current_dict.items()):
+        for k, v in current_dict.items():
             if isinstance(v, dict):
-                v = _find_replace_recursive(v)
+                current_dict[k] = _find_replace_recursive(v)
             elif k in replacements:
-                v = replacements[k]
+                current_dict[k] = replacements[k]
 
-            x[k] = v
-
-        return x
+        return current_dict
 
     return _find_replace_recursive(d)
