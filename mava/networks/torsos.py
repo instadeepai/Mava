@@ -59,7 +59,9 @@ class CNNTorso(nn.Module):
     def __call__(self, observation: chex.Array) -> chex.Array:
         """Forward pass."""
         x = observation
-        for channel, kernel, stride in zip(self.channel_sizes, self.kernel_sizes, self.strides):
+        for channel, kernel, stride in zip(
+            self.channel_sizes, self.kernel_sizes, self.strides, strict=True
+        ):
             x = nn.Conv(channel, (kernel, kernel), (stride, stride))(x)
             if self.use_layer_norm:
                 x = nn.LayerNorm(use_scale=False)(x)

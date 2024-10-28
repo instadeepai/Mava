@@ -138,11 +138,11 @@ def make_jaxmarl_env(
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
 
     # Create jaxmarl envs.
-    train_env = _jaxmarl_registry[config.env.env_name](
+    train_env: MarlEnv = _jaxmarl_registry[config.env.env_name](
         jaxmarl.make(env_name, **kwargs),
         add_global_state,
     )
-    eval_env = _jaxmarl_registry[config.env.env_name](
+    eval_env: MarlEnv = _jaxmarl_registry[config.env.env_name](
         jaxmarl.make(env_name, **kwargs),
         add_global_state,
     )
@@ -205,8 +205,8 @@ def make_gigastep_env(
     kwargs = config.env.kwargs
     scenario = ScenarioBuilder.from_config(config.env.scenario.task_config)
 
-    train_env = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
-    eval_env = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
+    train_env: MarlEnv = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
+    eval_env: MarlEnv = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
 
     train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
     return train_env, eval_env

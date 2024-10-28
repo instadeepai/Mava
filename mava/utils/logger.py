@@ -296,7 +296,7 @@ class ConsoleLogger(BaseLogger):
         for value in data.values():
             value = value.item() if isinstance(value, jax.Array) else value
             values.append(f"{value:.3f}" if isinstance(value, float) else str(value))
-        log_str = " | ".join([f"{k}: {v}" for k, v in zip(keys, values)])
+        log_str = " | ".join([f"{k}: {v}" for k, v in zip(keys, values, strict=True)])
 
         self.logger.info(
             f"{colour}{Style.BRIGHT}{event.value.upper()} - {log_str}{Style.RESET_ALL}"

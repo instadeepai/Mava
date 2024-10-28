@@ -17,7 +17,6 @@ from typing import Any, Callable, Dict, Generic, Protocol, Tuple, TypeVar
 import chex
 import jumanji.specs as specs
 from flax.core.frozen_dict import FrozenDict
-from jumanji import Environment
 from jumanji.types import TimeStep
 from tensorflow_probability.substrates.jax.distributions import Distribution
 from typing_extensions import NamedTuple, TypeAlias
@@ -103,7 +102,7 @@ class MarlEnv(Protocol):
         ...
 
     @property
-    def unwrapped(self) -> Environment:
+    def unwrapped(self) -> Any:
         """Retuns: the innermost environment (without any wrappers applied)."""
         ...
 
