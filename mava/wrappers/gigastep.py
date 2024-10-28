@@ -201,7 +201,7 @@ class GigastepWrapper(Wrapper):
         if self.has_global_state:
             global_state = specs.BoundedArray(
                 (self.num_agents, self._env.observation_space.shape[0] * self._env.n_agents),
-                jnp.int32,
+                jnp.float32,
                 0,
                 255,
                 "global_state",
