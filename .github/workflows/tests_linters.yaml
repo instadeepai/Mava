@@ -4,26 +4,36 @@ on: [ pull_request ]
 
 jobs:
   tests-and-linters:
-    name: "Python ${{ matrix.python-version }} on ${{ matrix.os }}"
-    runs-on: "${{ matrix.os }}"
+    name: "Python ${{ matrix.python-version }} on ubuntu-latest"
+    runs-on: ubuntu-latest
     timeout-minutes: 10
 
     strategy:
       matrix:
         python-version: ["3.12", "3.11"]
-        os: [ubuntu-latest]
 
     steps:
       - name: Checkout mava
-        uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.4.26"
+          enable-cache: true
+          cache-dependency-glob: "requirements/requirements**.txt"  # invalidate cache when requirements file changes
+
+      - uses: actions/setup-python@v5
         with:
             python-version: "${{ matrix.python-version }}"
-      - name: Upgrade pip
-        run: pip install --upgrade pip
+
       - name: Install python dependencies 🔧
-        run: pip install .[dev]
+        run: uv pip install .[dev]
+        env:
+          UV_SYSTEM_PYTHON: 1
+
       - name: Run linters 🖌️
         run: pre-commit run --all-files --verbose
+
       - name: Run tests 🧪
         run: pytest -p no:warnings

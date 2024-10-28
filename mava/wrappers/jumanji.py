@@ -150,7 +150,7 @@ class RwareWrapper(JumanjiMarlWrapper):
         inner_spec = super().observation_spec()
         spec = inner_spec.replace(agents_view=inner_spec.agents_view.replace(dtype=float))
         if self.add_global_state:
-            spec = inner_spec.replace(global_state=inner_spec.global_state.replace(dtype=float))
+            spec = spec.replace(global_state=inner_spec.global_state.replace(dtype=float))
 
         return spec
 
@@ -210,7 +210,7 @@ class LbfWrapper(JumanjiMarlWrapper):
         inner_spec = super().observation_spec()
         spec = inner_spec.replace(agents_view=inner_spec.agents_view.replace(dtype=float))
         if self.add_global_state:
-            spec = inner_spec.replace(global_state=inner_spec.global_state.replace(dtype=float))
+            spec = spec.replace(global_state=inner_spec.global_state.replace(dtype=float))
 
         return spec
 
