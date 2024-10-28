@@ -33,7 +33,7 @@ ppo_systems = [
     "ppo.anakin.rec_ippo",
     "ppo.anakin.rec_mappo",
 ]
-q_learning_systems = ["q_learning.anakin.rec_iql"]
+q_learning_systems = ["q_learning.anakin.rec_iql", "q_learning.anakin.rec_qmix"]
 sac_systems = ["sac.anakin.ff_isac", "sac.anakin.ff_masac"]
 
 discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax"]
