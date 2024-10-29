@@ -399,7 +399,7 @@ def get_learner_step_fn(
             batch = tree.map(
                 lambda x: x.reshape(
                     config.system.recurrent_chunk_size,
-                    config.arch.num_envs * num_recurrent_chunks,
+                    num_learner_envs * num_recurrent_chunks,
                     *x.shape[2:],
                 ),
                 batch,
