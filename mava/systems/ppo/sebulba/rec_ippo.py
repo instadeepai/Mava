@@ -39,8 +39,9 @@ from jax.sharding import PartitionSpec as P
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import get_num_eval_envs, get_sebulba_eval_fn as get_eval_fn, make_rec_eval_act_fn
-from mava.evaluator import make_ff_eval_act_fn
+from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
+from mava.evaluator import get_num_eval_envs, make_rec_eval_act_fn
+
 from mava.networks import RecurrentActor as Actor
 from mava.networks import RecurrentValueNet as Critic
 from mava.systems.ppo.types import HiddenStates, RNNLearnerState, OptStates, Params, RNNPPOTransition
@@ -149,12 +150,12 @@ def rollout(
                     params = params_source.get()  # Get the latest parameters from the learner
 
                 obs_tpu = tree.map(move_to_device, timestep.observation)
-                dones_tpu = tree.map(move_to_device, dones)
+                last_dones = tree.map(move_to_device, dones)
 
                 # Sample action from the policy and squeeze out the batch dimension.
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
-                    action, log_prob, value, hstates_tpu = act_fn(params, obs_tpu, dones_tpu, hstates_tpu, act_key)
+                    action, log_prob, value, hstates_tpu = act_fn(params, obs_tpu, last_dones, hstates_tpu, act_key)
                     value, action, log_prob = value.squeeze(0), action.squeeze(0), log_prob.squeeze(0)
                     cpu_action = jax.device_get(action)
 
@@ -167,7 +168,7 @@ def rollout(
                 # Append data to storage
                 traj.append(
                     RNNPPOTransition(
-                        dones,
+                        last_dones,
                         action,
                         value,
                         timestep.reward,
@@ -734,7 +735,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Create an initial hidden state used for resetting memory for evaluation
     eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
     eval_hs = ScannedRNN.initialize_carry(
-        (len(devices), eval_batch_size, config.system.num_agents),
+        (eval_batch_size, config.system.num_agents),
         config.network.hidden_state_dim,
     )
 
@@ -846,7 +847,7 @@ def run_experiment(_config: DictConfig) -> float:
         # simon
         eval_batch_size = get_num_eval_envs(config, absolute_metric=True)
         eval_hs = ScannedRNN.initialize_carry(
-            (len(devices), eval_batch_size, config.system.num_agents),
+            (eval_batch_size, config.system.num_agents),
             config.network.hidden_state_dim,
         )
 
