@@ -76,6 +76,29 @@ class CNNTorso(nn.Module):
         return jax.lax.collapse(x, -3)
 
 
+class SwiGLU(nn.Module):
+    """SwiGLU module.
+    A gated variation of a standard feedforward layer using a Swish activation function.
+    For more details see: https://arxiv.org/abs/2002.05202
+    """
+
+    hidden_dim: int
+    embed_dim: int
+
+    def setup(self) -> None:
+        self.W_linear = self.param(
+            "W_linear", nn.initializers.zeros, (self.embed_dim, self.hidden_dim)
+        )
+        self.W_gate = self.param("W_gate", nn.initializers.zeros, (self.embed_dim, self.hidden_dim))
+        self.W_output = self.param(
+            "W_output", nn.initializers.zeros, (self.hidden_dim, self.embed_dim)
+        )
+
+    def __call__(self, x: chex.Array) -> chex.Array:
+        gated_output = jax.nn.swish(x @ self.W_gate) * (x @ self.W_linear)
+        return gated_output @ self.W_output
+
+
 def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
     """Get the activation function."""
     activation_fns: Dict[str, Callable[[chex.Array], chex.Array]] = {

@@ -2,7 +2,7 @@ brax==0.10.3
 colorama
 distrax
 flashbax~=0.1.0
-flax
+flax>=0.8.1
 gigastep @ git+https://github.com/mlech26l/gigastep
 hydra-core==1.3.2
 id-marl-eval @ git+https://github.com/instadeepai/marl-eval

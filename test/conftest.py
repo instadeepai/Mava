@@ -50,4 +50,8 @@ def fast_config() -> Dict[str, ConfigValue]:
         "layer_sizes": [4],
         "channel_sizes": [1, 1],
         "use_layer_norm": False,
+        # -------- transformer specific --------
+        "n_block": 1,
+        "n_head": 1,
+        "n_embd": 8,
     }

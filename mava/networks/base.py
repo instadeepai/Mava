@@ -271,7 +271,7 @@ class QMixingNetwork(nn.Module):
         agent_qs: chex.Array,
         env_global_state: chex.Array,
     ) -> chex.Array:
-        B, T = agent_qs.shape[:2]  # batch size #noqa: N806
+        B, T = agent_qs.shape[:2]  # batch size
 
         agent_qs = jnp.reshape(agent_qs, (B, T, 1, self.num_agents))
 
