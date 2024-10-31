@@ -405,7 +405,7 @@ def get_learner_step_fn(
                 batch,
             )
             permutation = jax.random.permutation(
-                shuffle_key, config.arch.num_envs * num_recurrent_chunks
+                shuffle_key, num_learner_envs * num_recurrent_chunks
             )
             shuffled_batch = tree.map(lambda x: jnp.take(x, permutation, axis=1), batch)
             reshaped_batch = tree.map(
@@ -733,7 +733,8 @@ def run_experiment(_config: DictConfig) -> float:
 
     # simon
     # Create an initial hidden state used for resetting memory for evaluation
-    eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
+    # eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
+    eval_batch_size = min(config.arch.num_eval_episodes, config.arch.num_envs)
     eval_hs = ScannedRNN.initialize_carry(
         (eval_batch_size, config.system.num_agents),
         config.network.hidden_state_dim,
