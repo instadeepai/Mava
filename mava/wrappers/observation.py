@@ -15,6 +15,7 @@
 from typing import Tuple, Union
 
 import chex
+import jax
 import jax.numpy as jnp
 from jumanji import specs
 from jumanji.types import TimeStep
@@ -80,3 +81,119 @@ class AgentIDWrapper(Wrapper):
         agents_view = specs.Array((self._env.num_agents, num_obs_features), dtype, "agents_view")
 
         return obs_spec.replace(agents_view=agents_view)
+
+
+class AddStartFlagAndPrevAction(Wrapper):
+    """Wrapper that adds a start flag and the previous action to the observation."""
+
+    def __init__(self, env: MarlEnv, add_prev_action: bool = True):
+        super().__init__(env)
+        self.add_prev_action = add_prev_action
+
+        # Get the action dimension
+        if isinstance(self.action_spec(), specs.DiscreteArray):
+            self.action_dim = self.action_spec().num_values
+            self.discrete = True
+        else:
+            self.action_dim = self.action_spec().shape[0]
+            self.discrete = False
+
+        # Check if the observation is flat
+        if not len(self.observation_spec().agents_view.shape) == 1:
+            raise ValueError("The observation must be flat.")
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep[Observation]]:
+        state, timestep = self._env.reset(key)
+        start_flag = jnp.array(1.0)[jnp.newaxis]
+        prev_action = jnp.zeros(self.action_dim)
+        agents_view = timestep.observation.agents_view
+        if self.add_prev_action:
+            new_agent_view = jnp.concatenate([start_flag, prev_action, agents_view])
+        else:
+            new_agent_view = jnp.concatenate([start_flag, agents_view])
+        timestep = timestep.replace(
+            observation=timestep.observation._replace(
+                agents_view=new_agent_view,
+            )
+        )
+        return state, timestep
+
+    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep[Observation]]:
+        state, timestep = self._env.step(state, action)
+        start_flag = jnp.array(0.0)[jnp.newaxis]
+        prev_action = action
+        if self.discrete:
+            prev_action = jax.nn.one_hot(prev_action, self.action_dim)
+        agents_view = timestep.observation.agents_view
+        if self.add_prev_action:
+            new_agent_view = jnp.concatenate([start_flag, prev_action, agents_view])
+        else:
+            new_agent_view = jnp.concatenate([start_flag, agents_view])
+        timestep = timestep.replace(
+            observation=timestep.observation._replace(
+                agents_view=new_agent_view,
+            )
+        )
+        return state, timestep
+
+    def observation_spec(
+        self,
+    ) -> Union[specs.Spec[Observation], specs.Spec[ObservationGlobalState]]:
+        if self.add_prev_action:
+            new_agent_view_shape = (
+                1 + self.action_dim + self._env.observation_spec().agents_view.shape[0]
+            )
+        else:
+            new_agent_view_shape = 1 + self._env.observation_spec().agents_view.shape[0]
+
+        return self._env.observation_spec().replace(
+            agents_view=specs.Array(
+                shape=(new_agent_view_shape,),
+                dtype=jnp.float32,
+            )
+        )
+
+
+class AgentIndexWrapper(Wrapper):
+    """A simple wrapper expands the dimensions of the observation at index 0 to add a
+    dummy agent index.
+    """
+
+    def __init__(self, env: MarlEnv) -> None:
+        super().__init__(env)
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
+        state, timestep = self._env.reset(key)
+        expanded_obs = jax.tree_map(lambda x: jnp.expand_dims(x, axis=0), timestep.observation)
+        reward = jnp.expand_dims(timestep.reward, axis=0)
+        return state, timestep.replace(observation=expanded_obs, reward=reward)
+
+    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
+        state, timestep = self._env.step(state, action)
+        expanded_obs = jax.tree_map(lambda x: jnp.expand_dims(x, axis=0), timestep.observation)
+        reward = jnp.expand_dims(timestep.reward, axis=0)
+        return state, timestep.replace(observation=expanded_obs, reward=reward)
+
+    def observation_spec(
+        self,
+    ) -> Union[specs.Spec[Observation], specs.Spec[ObservationGlobalState]]:
+        initial_obs_spec = super().observation_spec()
+
+        return specs.Spec(
+            Observation,
+            "ObservationSpec",
+            agents_view=specs.Array(
+                shape=(1, *initial_obs_spec.agents_view.shape),
+                dtype=initial_obs_spec.agents_view.dtype,
+                name="agents_view",
+            ),
+            action_mask=specs.Array(
+                shape=(
+                    1,
+                    self.action_spec().num_values,
+                ),
+                dtype=jnp.float32,
+                name="action_mask",
+            ),
+            step_count=specs.Array(shape=(1,), dtype=jnp.int32, name="step_count"),
+        )

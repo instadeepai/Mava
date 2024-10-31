@@ -35,11 +35,14 @@ from omegaconf import DictConfig
 
 from mava.types import MarlEnv
 from mava.wrappers import (
+    AddStartFlagAndPrevAction,
     AgentIDWrapper,
+    AgentIndexWrapper,
     AutoResetWrapper,
     CleanerWrapper,
     ConnectorWrapper,
     GigastepWrapper,
+    GymnaxWrapper,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
@@ -64,6 +67,12 @@ _jumanji_registry = {
 _matrax_registry = {"Matrax": MatraxWrapper}
 _jaxmarl_registry: Dict[str, Type[JaxMarlWrapper]] = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
+_craftax_registry = {
+    "Craftax-Classic-Pixels-v1": GymnaxWrapper,
+    "Craftax-Symbolic-v1": GymnaxWrapper,
+    "Craftax-Pixels-v1": GymnaxWrapper,
+    "Craftax-Classic-Symbolic-v1": GymnaxWrapper,
+}
 
 
 def add_extra_wrappers(
@@ -212,6 +221,58 @@ def make_gigastep_env(
     return train_env, eval_env
 
 
+def make_craftax_env(
+    env_name: str, config: DictConfig, add_global_state: bool = False
+) -> Tuple[MarlEnv, MarlEnv]:
+    """
+    Create a craftax environment for training and evaluation.
+
+    Args:
+        env_name (str): The name of the environment to create.
+        config (Dict): The configuration of the environment.
+
+    Returns:
+        A tuple of the environments.
+    """
+    # We put the imports here so as to avoid the loading and processing of craftax
+    # environments which happen in the imports
+    from craftax.craftax.envs.craftax_pixels_env import CraftaxPixelsEnv
+    from craftax.craftax.envs.craftax_symbolic_env import CraftaxSymbolicEnv
+    from craftax.craftax_classic.envs.craftax_pixels_env import CraftaxClassicPixelsEnv
+    from craftax.craftax_classic.envs.craftax_symbolic_env import (
+        CraftaxClassicSymbolicEnv,
+    )
+
+    # Config generator and select the wrapper.
+    craftax_environments = {
+        "Craftax-Classic-Symbolic-v1": CraftaxClassicSymbolicEnv,
+        "Craftax-Classic-Pixels-v1": CraftaxClassicPixelsEnv,
+        "Craftax-Symbolic-v1": CraftaxSymbolicEnv,
+        "Craftax-Pixels-v1": CraftaxPixelsEnv,
+    }
+
+    wrapper = _craftax_registry[env_name]
+
+    # Create envs.
+    train_env = craftax_environments[env_name](**config.env.kwargs)
+    eval_env = craftax_environments[env_name](**config.env.kwargs)
+
+    env_params = train_env.default_params
+    eval_env_params = eval_env.default_params
+
+    train_env = wrapper(train_env, env_params)
+    eval_env = wrapper(eval_env, eval_env_params)
+
+    train_env = AddStartFlagAndPrevAction(train_env, add_prev_action=True)
+    eval_env = AddStartFlagAndPrevAction(eval_env, add_prev_action=True)
+
+    train_env, eval_env = AgentIndexWrapper(train_env), AgentIndexWrapper(eval_env)
+
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+
+    return train_env, eval_env
+
+
 def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
     """
     Create environments for training and evaluation.
@@ -236,5 +297,7 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, M
         return make_matrax_env(env_name, config, add_global_state)
     elif env_name in _gigastep_registry:
         return make_gigastep_env(env_name, config, add_global_state)
+    elif env_name in _craftax_registry:
+        return make_craftax_env(env_name, config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")
