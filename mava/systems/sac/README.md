@@ -5,7 +5,8 @@ We provide 3 implementations of multi-agent SAC.
 * [ff-MASAC](https://github.com/instadeepai/Mava/blob/feat/develop/mava/systems/sac/anakin/ff_masac.py): feed forward multi-agent SAC
 * [ff-HASAC](https://github.com/instadeepai/Mava/blob/feat/develop/mava/systems/sac/anakin/ff_hasac.py): recurrent independant SAC
 
-Where independant SAC uses independant learners and multi-agent SAC uses a CTDE style of training with a centralized critic and HASAC uses heterogenous style, sequential updates.
+Where independant SAC uses independant learners and multi-agent SAC uses a CTDE style of training with a centralized critic and HASAC uses heterogenous style, sequential updates.  
+Note: independant SAC is included for completeness, however we find that it does not perform well.
 
 ## Relevant papers
 * [Single agent Soft Actor Critic](https://arxiv.org/pdf/1801.01290)
