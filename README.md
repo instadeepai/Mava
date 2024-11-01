@@ -111,7 +111,7 @@ Additionally, we also have a [Quickstart notebook][quickstart] that can be used 
 </details>
 
 ## Performance and Speed 🚀
-We have performed a rigorus benchmark over 45 different scenarios and 6 different environment suites to determine the performance of Mava's implementation. For more results please see the [Sable paper][sable].
+We have performed a rigorus benchmark across 45 different scenarios and 6 different environment suites to validate the performance of Mava's algorithm implementations. For more detailed results please see the [Sable paper][sable].
 
 <p align="center">
     <a href="docs/images/benchmark_results/rware.png">
@@ -136,7 +136,7 @@ We have performed a rigorus benchmark over 45 different scenarios and 6 differen
     <a href="docs/images/benchmark_results/legend.jpg">
         <img src="docs/images/benchmark_results/legend.jpg" alt="Legend" width="60%" style="display:inline-block; margin-right: 10px;"/>
     </a>
-    <div style="text-align:center; margin-top: 10px;"> Mava's algorithm performance, each algorithm was tuned for 40 trials with the TPE optimizer and benchmarked over 10 seeds for each scenario. Environments from top left Robot Warehouse (aggregated over 15 scenarios) Level Based Foraging (aggregated over 7 scenarios) SMAX (aggregated over 11 environments) Connector (aggregated over 4 environments) MaBrax (aggregated over 5 environments) Multi-Particle Env (aggregated over 3 environments)</div>
+    <div style="text-align:center; margin-top: 10px;"> Mava's algorithm performance, each algorithm was tuned for 40 trials with the TPE optimizer and benchmarked over 10 seeds for each scenario. Environments from top left Robot Warehouse (aggregated over 15 scenarios) Level Based Foraging (aggregated over 7 scenarios) SMAX (aggregated over 11 scenarios) Connector (aggregated over 4 scenarios) MaBrax (aggregated over 5 scenarios) Multi-Particle Env (aggregated over 3 scenarios)</div>
 </p>
 
 todo: speed plot - 1 bar plot: torch based vs anakin vs sebulba
@@ -153,7 +153,13 @@ Please read our [contributing docs](docs/CONTRIBUTING.md) for details on how to 
 
 We plan to iteratively expand Mava in the following increments:
 
-- Add sebulba versions of more algorithms
+- [x] Support for more environments.
+- [x] More robust recurrent systems.
+- [x] Support for non JAX-based environments.
+- [ ] Add sebulba versions of more algorithms.
+- [x] Support for off-policy algorithms.
+- [x] Continuous action space environments and algorithms.
+- [ ] Allow systems to easily scale across multiple TPUs/GPUs
 
 Please do follow along as we develop this next phase!
 
