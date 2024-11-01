@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import functools
-from typing import Any, Callable, Dict, List, Sequence, Tuple, Union
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
 import chex
 import hydra
@@ -236,6 +236,76 @@ class RecQNetwork(nn.Module):
         return hidden_state, eps_greedy_dist
 
 
+class QMixingNetwork(nn.Module):
+    num_actions: int
+    num_agents: int
+    hyper_hidden_dim: int = 64
+    embed_dim: int = 32
+    norm_env_states: bool = True
+
+    def setup(self) -> None:
+        self.hyper_w1: MLPTorso = MLPTorso(
+            (self.hyper_hidden_dim, self.embed_dim * self.num_agents),
+            activate_final=False,
+        )
+
+        self.hyper_b1: MLPTorso = MLPTorso(
+            (self.embed_dim,),
+            activate_final=False,
+        )
+
+        self.hyper_w2: MLPTorso = MLPTorso(
+            (self.hyper_hidden_dim, self.embed_dim),
+            activate_final=False,
+        )
+
+        self.hyper_b2: MLPTorso = MLPTorso(
+            (self.embed_dim, 1),
+            activate_final=False,
+        )
+
+        self.layer_norm: nn.Module = nn.LayerNorm()
+
+    @nn.compact
+    def __call__(
+        self,
+        agent_qs: chex.Array,
+        env_global_state: chex.Array,
+    ) -> chex.Array:
+        B, T = agent_qs.shape[:2]  # batch size
+
+        agent_qs = jnp.reshape(agent_qs, (B, T, 1, self.num_agents))
+
+        if self.norm_env_states:
+            states = self.layer_norm(env_global_state)
+        else:
+            states = env_global_state
+
+        # First layer
+        w1 = jnp.abs(self.hyper_w1(states))
+        b1 = self.hyper_b1(states)
+        w1 = jnp.reshape(w1, (B, T, self.num_agents, self.embed_dim))
+        b1 = jnp.reshape(b1, (B, T, 1, self.embed_dim))
+
+        # Matrix multiplication
+        hidden = nn.elu(jnp.matmul(agent_qs, w1) + b1)
+
+        # Second layer
+        w2 = jnp.abs(self.hyper_w2(states))
+        b2 = self.hyper_b2(states)
+
+        w2 = jnp.reshape(w2, (B, T, self.embed_dim, 1))
+        b2 = jnp.reshape(b2, (B, T, 1, 1))
+
+        # Compute final output
+        y = jnp.matmul(hidden, w2) + b2
+
+        # Reshape
+        q_tot = jnp.reshape(y, (B, T, 1))
+
+        return q_tot
+
+
 class CompositeNetwork(nn.Module):
     """Composite Network. Takes in a sequence of layers and applies them sequentially."""
 
@@ -255,7 +325,6 @@ def chained_torsos(torso_cfgs: List[Dict[str, Any]]) -> nn.Module:
     """Create a network by chaining multiple torsos together using a list of configs.
     This makes use of hydra to instantiate the modules and the composite network
     to chain them together.
-
     Args:
         torso_cfgs: List of dictionaries containing the configuration for each torso.
             These configs should use the same format as the individual torso configs."""
