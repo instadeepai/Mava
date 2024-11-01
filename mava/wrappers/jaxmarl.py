@@ -300,6 +300,10 @@ class JaxMarlWrapper(Wrapper, ABC):
             name="discount",
         )
 
+    @property
+    def unwrapped(self) -> MultiAgentEnv:
+        return self._env
+
     @abstractmethod
     def action_mask(self, wrapped_env_state: Any) -> Array:
         """Get action mask for each agent."""

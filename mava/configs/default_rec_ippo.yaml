@@ -1,7 +1,0 @@
-defaults:
-  - logger: rec_ippo
-  - arch: anakin
-  - system: ppo/rec_ippo
-  - network: rnn  # [rnn, rcnn]
-  - env: rware  # [cleaner, connector, gigastep, lbf, mabrax, matrax, rware, smax]
-  - _self_
