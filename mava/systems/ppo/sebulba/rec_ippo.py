@@ -524,8 +524,9 @@ def learner_thread(
                 metrics.append((ep_metrics, train_metrics))
 
                 # Update all the params sources so all actors can get the latest params
+                params = jax.block_until_ready(learner_state.params)
                 for source in params_sources:
-                    source.update(learner_state.params)
+                    source.update(params)
 
         # Pass all the metrics and  params to the main thread (evaluator) for logging and evaluation
         ep_metrics, train_metrics = tree.map(lambda *x: np.asarray(x), *metrics)

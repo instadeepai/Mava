@@ -161,7 +161,7 @@ class ParamsSource(threading.Thread):
         while not self.lifetime.should_stop():
             try:
                 waiting = self.new_value.get(block=True, timeout=1)
-                self.value = jax.device_put(jax.block_until_ready(waiting), self.device)
+                self.value = jax.device_put(waiting, self.device)
             except queue.Empty:
                 continue
 
