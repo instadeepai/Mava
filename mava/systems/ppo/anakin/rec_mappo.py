@@ -49,6 +49,7 @@ from mava.types import (
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
+from mava.utils.gae import calculate_gae
 from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.network_utils import get_action_head
@@ -175,29 +176,7 @@ def get_learner_fn(
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
 
-        def _calculate_gae(
-            traj_batch: RNNPPOTransition, last_val: chex.Array, last_done: chex.Array
-        ) -> Tuple[chex.Array, chex.Array]:
-            def _get_advantages(
-                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
-            ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
-                gae, next_value, next_done = carry
-                done, value, reward = transition.done, transition.value, transition.reward
-                gamma = config.system.gamma
-                delta = reward + gamma * next_value * (1 - next_done) - value
-                gae = delta + gamma * config.system.gae_lambda * (1 - next_done) * gae
-                return (gae, value, done), gae
-
-            _, advantages = jax.lax.scan(
-                _get_advantages,
-                (jnp.zeros_like(last_val), last_val, last_done),
-                traj_batch,
-                reverse=True,
-                unroll=16,
-            )
-            return advantages, advantages + traj_batch.value
-
-        advantages, targets = _calculate_gae(traj_batch, last_val, last_done)
+        advantages, targets = calculate_gae(traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""

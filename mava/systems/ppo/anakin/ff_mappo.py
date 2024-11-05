@@ -35,6 +35,7 @@ from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransitio
 from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn, MarlEnv
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
+from mava.utils.gae import calculate_gae
 from mava.utils.jax_utils import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.network_utils import get_action_head
@@ -76,7 +77,7 @@ def get_learner_fn(
 
         def _env_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, PPOTransition]:
             """Step the environment."""
-            params, opt_states, key, env_state, last_timestep = learner_state
+            params, opt_states, key, env_state, last_timestep, last_done = learner_state
 
             # SELECT ACTION
             key, policy_key = jax.random.split(key)
@@ -96,9 +97,9 @@ def get_learner_fn(
             info = timestep.extras["episode_metrics"]
 
             transition = PPOTransition(
-                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
+                last_done, action, value, timestep.reward, log_prob, last_timestep.observation, info
             )
-            learner_state = LearnerState(params, opt_states, key, env_state, timestep)
+            learner_state = LearnerState(params, opt_states, key, env_state, timestep, done)
             return learner_state, transition
 
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
@@ -107,37 +108,10 @@ def get_learner_fn(
         )
 
         # CALCULATE ADVANTAGE
-        params, opt_states, key, env_state, last_timestep = learner_state
+        params, opt_states, key, env_state, last_timestep, last_done = learner_state
         last_val = critic_apply_fn(params.critic_params, last_timestep.observation)
 
-        def _calculate_gae(
-            traj_batch: PPOTransition, last_val: chex.Array
-        ) -> Tuple[chex.Array, chex.Array]:
-            """Calculate the GAE."""
-
-            def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
-                """Calculate the GAE for a single transition."""
-                gae, next_value = gae_and_next_value
-                done, value, reward = (
-                    transition.done,
-                    transition.value,
-                    transition.reward,
-                )
-                gamma = config.system.gamma
-                delta = reward + gamma * next_value * (1 - done) - value
-                gae = delta + gamma * config.system.gae_lambda * (1 - done) * gae
-                return (gae, value), gae
-
-            _, advantages = jax.lax.scan(
-                _get_advantages,
-                (jnp.zeros_like(last_val), last_val),
-                traj_batch,
-                reverse=True,
-                unroll=16,
-            )
-            return advantages, advantages + traj_batch.value
-
-        advantages, targets = _calculate_gae(traj_batch, last_val)
+        advantages, targets = calculate_gae(traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
@@ -296,7 +270,7 @@ def get_learner_fn(
         )
 
         params, opt_states, traj_batch, advantages, targets, key = update_state
-        learner_state = LearnerState(params, opt_states, key, env_state, last_timestep)
+        learner_state = LearnerState(params, opt_states, key, env_state, last_timestep, last_done)
         metric = traj_batch.info
         return learner_state, (metric, loss_info)
 
@@ -414,7 +388,10 @@ def learner_setup(
         params = restored_params
 
     # Define params to be replicated across devices and batches.
-    key, step_keys = jax.random.split(key)
+    dones = jnp.zeros(
+        (config.arch.num_envs, config.system.num_agents),
+        dtype=bool,
+    )
     opt_states = OptStates(actor_opt_state, critic_opt_state)
     replicate_learner = (params, opt_states, step_keys)
 
@@ -427,7 +404,7 @@ def learner_setup(
 
     # Initialise learner state.
     params, opt_states, step_keys = replicate_learner
-    init_learner_state = LearnerState(params, opt_states, step_keys, env_states, timesteps)
+    init_learner_state = LearnerState(params, opt_states, step_keys, env_states, timesteps, dones)
 
     return learn, actor_network, init_learner_state
 
