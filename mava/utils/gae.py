@@ -14,7 +14,6 @@ def calculate_gae(
     ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
         gae, next_value, next_done = carry
         done, value, reward = transition.done, transition.value, transition.reward
-        gamma = gamma
         delta = reward + gamma * next_value * (1 - next_done) - value
         gae = delta + gamma * gae_lambda * (1 - next_done) * gae
         return (gae, value, done), gae

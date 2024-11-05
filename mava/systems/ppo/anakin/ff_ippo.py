@@ -410,7 +410,7 @@ def learner_setup(
     )
     key, step_keys = jax.random.split(key)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
-    replicate_learner = (params, opt_states, step_keys)
+    replicate_learner = (params, opt_states, step_keys, dones)
 
     # Duplicate learner for update_batch_size.
     broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
@@ -420,7 +420,7 @@ def learner_setup(
     replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())
 
     # Initialise learner state.
-    params, opt_states, step_keys = replicate_learner
+    params, opt_states, step_keys, dones = replicate_learner
     init_learner_state = LearnerState(params, opt_states, step_keys, env_states, timesteps, dones)
 
     return learn, actor_network, init_learner_state

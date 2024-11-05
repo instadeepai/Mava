@@ -52,6 +52,7 @@ class LearnerState(NamedTuple):
     key: chex.PRNGKey
     env_state: State
     timestep: TimeStep
+    dones: Done
 
 
 class RNNLearnerState(NamedTuple):
