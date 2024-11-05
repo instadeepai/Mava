@@ -18,6 +18,7 @@ from functools import cached_property
 from typing import Tuple, Union
 
 import chex
+import jax
 import jax.numpy as jnp
 from jumanji import specs
 from jumanji.env import Environment
@@ -303,6 +304,146 @@ class ConnectorWrapper(JumanjiMarlWrapper):
                 dtype=float,
                 name="global_state",
                 minimum=0.0,
+                maximum=1.0,
+            )
+            obs_data["global_state"] = global_state
+            return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
+
+        return specs.Spec(Observation, "ObservationSpec", **obs_data)
+
+
+def _slice_around(pos: chex.Array, fov: int) -> Tuple[chex.Array, chex.Array]:
+    """Return the start and length of a slice that when used to index a grid will
+    return a 2*fov+1 x 2*fov+1 sub-grid centered around pos.
+
+    Returns are meant to be used with a `jax.lax.dynamic_slice`
+    """
+    # Because we pad the grid by fov we need to shift the pos to the position
+    # it will be in the padded grid.
+    shifted_pos = pos + fov
+
+    start_x = shifted_pos[0] - fov
+    start_y = shifted_pos[1] - fov
+    return start_x, start_y
+
+
+# get location coordinates from 2D grid
+def _get_location(grid: chex.Array) -> chex.Array:
+    row_len = grid.shape[-1]
+    index = jnp.argmax(grid)
+    return jnp.asarray((jnp.floor(index / row_len), jnp.remainder(index, row_len)), dtype=int)
+
+
+class VectorConnectorWrapper(JumanjiMarlWrapper):
+    """Multi-agent wrapper for the MaConnector environment.
+
+    This wrapper transforms the grid-based observation to a vector of features. This env should
+    have the AgentID wrapper applied to it since there is not longer a channel that can encode
+    AgentID information.
+    """
+
+    def __init__(self, env: MaConnector, add_global_state: bool = False):
+        super().__init__(env, add_global_state)
+        self._env: MaConnector
+        self.fov = 2
+
+    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+        """Modify the timestep for the Connector environment."""
+
+        # TARGET = 3 = The number of different types of items on the grid.
+        def create_agents_view(grid: chex.Array) -> chex.Array:
+            positions = jnp.where(grid % TARGET == POSITION, True, False)
+            targets = jnp.where((grid % TARGET == 0) & (grid != EMPTY), True, False)
+            paths = jnp.where(grid % TARGET == PATH, True, False)
+
+            # group positions and paths
+            blockers = jnp.where(positions, 1, jnp.where(paths, -1, 0))
+
+            position_per_agent = grid == POSITION
+            target_per_agent = grid == TARGET
+
+            # group agents own target and other targets
+            combined_targets = jnp.where(target_per_agent, 1, jnp.where(targets, -1, 0))
+
+            # get coordinates of each agent's location and target
+            position_coords = jax.vmap(_get_location)(position_per_agent)
+            target_coords = jax.vmap(_get_location)(target_per_agent)
+
+            def _create_one_agent_view(i: int) -> chex.Array:
+                slice_len = 2 * self.fov + 1, 2 * self.fov + 1
+                slice_x, slice_y = _slice_around(position_coords[i], self.fov)
+                padded_blockers = jnp.pad(blockers[i], self.fov, constant_values=True)
+
+                blockers_around_agent = jax.lax.dynamic_slice(
+                    padded_blockers, (slice_x, slice_y), slice_len
+                )
+                blockers_around_agent = jnp.reshape(blockers_around_agent, -1).astype(float)
+
+                my_pos = position_coords[i] / grid[0].size
+                my_target = target_coords[i] / grid[0].size
+
+                padded_combined_targets = jnp.pad(
+                    combined_targets[i], self.fov, constant_values=True
+                )
+
+                targets_around_agent = jax.lax.dynamic_slice(
+                    padded_combined_targets, (slice_x, slice_y), slice_len
+                )
+                targets_around_agent = jnp.reshape(targets_around_agent, -1).astype(float)
+
+                return jnp.concatenate(
+                    [my_pos, my_target, blockers_around_agent, targets_around_agent],
+                    dtype=float,
+                )
+
+            return jax.vmap(_create_one_agent_view)(jnp.arange(self.num_agents))
+
+        obs_data = {
+            "agents_view": create_agents_view(timestep.observation.grid),
+            "action_mask": timestep.observation.action_mask,
+            "step_count": jnp.repeat(timestep.observation.step_count, self.num_agents),
+        }
+
+        # The episode is won if all agents have connected.
+        extras = timestep.extras | {"won_episode": timestep.extras["ratio_connections"] == 1.0}
+
+        return timestep.replace(observation=Observation(**obs_data), extras=extras)
+
+    def observation_spec(
+        self,
+    ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
+        """Specification of the observation of the environment."""
+        step_count = specs.BoundedArray(
+            (self.num_agents,),
+            int,
+            jnp.zeros(self.num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self.num_agents),
+            "step_count",
+        )
+
+        # 2 sets of tiles in fov (blockers and targets) + xy position of agent and target
+        tiles_in_fov = (self.fov * 2 + 1) ** 2
+        single_agent_obs = 4 + tiles_in_fov * 2
+        agents_view = specs.BoundedArray(
+            shape=(self.num_agents, single_agent_obs),
+            dtype=float,
+            name="agents_view",
+            minimum=-1.0,
+            maximum=1.0,
+        )
+
+        obs_data = {
+            "agents_view": agents_view,
+            "action_mask": self._env.observation_spec().action_mask,
+            "step_count": step_count,
+        }
+
+        if self.add_global_state:
+            global_state = specs.BoundedArray(
+                shape=(self.num_agents, self.num_agents * single_agent_obs),
+                dtype=float,
+                name="global_state",
+                minimum=-1.0,
                 maximum=1.0,
             )
             obs_data["global_state"] = global_state

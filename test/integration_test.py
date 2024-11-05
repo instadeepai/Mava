@@ -38,7 +38,7 @@ sac_systems = ["sac.anakin.ff_isac", "sac.anakin.ff_masac", "sac.anakin.ff_hasac
 q_learning_systems = ["q_learning.anakin.rec_iql", "q_learning.anakin.rec_qmix"]
 transformer_systems = ["mat.anakin.mat"]
 
-discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax"]
+discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax", "vector-connector"]
 cnn_envs = ["cleaner", "connector"]
 continuous_envs = ["mabrax"]
 
