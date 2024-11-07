@@ -180,7 +180,9 @@ def get_learner_fn(
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
 
-        advantages, targets = calculate_gae(traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda)
+        advantages, targets = calculate_gae(
+            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+        )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""

@@ -111,7 +111,9 @@ def get_learner_fn(
         params, opt_states, key, env_state, last_timestep, last_done = learner_state
         last_val = critic_apply_fn(params.critic_params, last_timestep.observation)
 
-        advantages, targets = calculate_gae(traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda)
+        advantages, targets = calculate_gae(
+            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+        )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
