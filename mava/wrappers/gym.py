@@ -28,6 +28,8 @@ from gymnasium import spaces
 from gymnasium.spaces.utils import is_space_dtype_shape_equiv
 from gymnasium.vector.utils import write_to_shared_memory
 from numpy.typing import NDArray
+from smac.env import StarCraft2Env
+from chex import Array 
 
 from mava.types import Observation, ObservationGlobalState
 
@@ -145,6 +147,114 @@ class SmacWrapper(GymWrapper):
     def get_action_mask(self, info: Dict) -> NDArray:
         return np.array(self._env.unwrapped.get_avail_actions())
 
+class SMACFullWrapper(gymnasium.Wrapper):
+    """Environment wrapper SMAC."""
+
+    def __init__(
+        self,
+        env: StarCraft2Env, 
+        use_shared_rewards: bool = True,
+        add_global_state: bool = False,
+    ): 
+        # super().__init__(env)
+        self.env = env
+        self.use_shared_rewards = use_shared_rewards
+        self.add_global_state = add_global_state
+        self._agents = [f"agent_{n}" for n in range(self.env.n_agents)]
+        
+        self.num_agents = len(self._agents)
+        self.num_actions = self.env.n_actions
+        
+        self.environment_label = f"smac_v1/{self.env.map_name}"
+        self._reset_next_step = True
+        self._done = False
+        self.max_episode_length = self.env.episode_limit
+        self._metadata = self.env.get_env_info()
+
+        _obs_shape = (self.num_agents, self.env.get_obs_size())
+        _obs_low, _obs_high, _obs_dtype = (-1, 1, np.float32)
+        self._observation_space = spaces.Box(
+            low=_obs_low, high=_obs_high, shape=_obs_shape, dtype=_obs_dtype
+        )
+        # self._action_space = spaces.MultiDiscrete(
+        #     nvec=[self.num_actions] * self.num_agents,
+        #     dtype=np.int32,
+        # )
+        # tuple(n_agents * [sa_action_space])
+        single_agent_action_space = spaces.Discrete(self.num_actions)
+        self._action_space = spaces.Tuple(
+            tuple([single_agent_action_space] * self.num_agents)
+        )
+
+        self._cached_spec = None
+
+    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> Tuple[NDArray, Dict]:
+        """Resets the env."""
+        # if seed is not None:
+        #     self.unwrapped.seed(seed)
+
+        # Reset the environment
+        agents_view, info = self.env.reset()
+        self._done = False
+        self._reset_next_step = False
+
+        info = {"action_mask": self.get_action_mask()}
+        if self.add_global_state:
+            info["global_obs"] = self.get_global_obs()
+
+        return np.array(agents_view), info
+
+    def step(self, actions: List):
+        """Steps in env."""
+
+        # Possibly reset the environment
+        if self._reset_next_step:
+            return self.reset()
+
+        # Step the SMAC environment
+        reward, self._done, _ = self.env.step(actions)
+
+        # Get the next observations
+        agents_view = self.env.get_obs()
+        info = {"action_mask": self.get_action_mask()}
+
+        if self.add_global_state:
+            info["global_obs"] = self.get_global_obs(agents_view)
+
+        # smac always has shared rewards
+        reward = np.array([reward] * self.num_agents)
+
+        if self._done:
+            self._reset_next_step = True
+        
+        # NOTE: return done twice as termination and truncation for now. 
+        return np.array(agents_view), reward, self._done, False, info
+
+    def get_action_mask(self) -> List:
+        """Get legal actions from the environment."""
+        legal_actions = []
+        for i, _ in enumerate(self._agents):
+            legal_actions.append(
+                np.array(self.env.get_avail_agent_actions(i), dtype="float32")
+            )
+        return np.array(legal_actions)
+
+    def get_stats(self) -> Optional[Dict]:
+        """Return extra stats to be logged."""
+        return self.env.get_stats()
+    
+    def get_battles_won(self) -> Optional[Dict]:
+        """Return extra stats to be logged."""
+        return self.env.battles_won
+    
+    def get_global_obs(self) -> NDArray:
+        state = self.env.get_state()
+        state = np.array(state)
+        return np.tile(state, (self.num_agents, 1))
+    
+    @property
+    def unwrapped(self):
+        return self.env
 
 class GymRecordEpisodeMetrics(gymnasium.Wrapper):
     """Record the episode returns and lengths."""
@@ -222,9 +332,9 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
 
     def modify_space(self, space: spaces.Space) -> spaces.Space:
         if isinstance(space, spaces.Box):
-            new_shape = (space.shape[0] + len(self.agent_ids),)
+            new_shape = (self.env.num_agents, space.shape[1] + self.env.num_agents)
             return spaces.Box(
-                low=space.low[0], high=space.high[0], shape=new_shape, dtype=space.dtype
+                low=space.low[0][0], high=space.high[0][0], shape=new_shape, dtype=space.dtype
             )
         elif isinstance(space, spaces.Tuple):
             return spaces.Tuple(self.modify_space(s) for s in space)
@@ -269,12 +379,12 @@ class GymToJumanji:
         """Create an observation from the raw observation and environment state."""
 
         # (N, B, O) -> (B, N, O)
-        obs = np.array(obs).swapaxes(0, 1)
+        # obs = np.array(obs).swapaxes(0, 1)
         action_mask = np.stack(info["action_mask"])
         obs_data = {"agents_view": obs, "action_mask": action_mask}
 
         if "global_obs" in info:
-            global_obs = np.array(info["global_obs"]).swapaxes(0, 1)
+            global_obs = np.array(info["global_obs"]) #.swapaxes(0, 1)
             obs_data["global_state"] = global_obs
             return ObservationGlobalState(**obs_data)
         else:
@@ -298,6 +408,8 @@ class GymToJumanji:
 
     def close(self) -> None:
         self.env.close()
+
+
 
 
 # Copied form Gymnasium/blob/main/gymnasium/vector/async_vector_env.py

@@ -57,6 +57,8 @@ from mava.wrappers import (
     SmaxWrapper,
     async_multiagent_worker,
 )
+from mava.wrappers.gym import SMACFullWrapper
+from smac.env import StarCraft2Env
 from mava.wrappers.jaxmarl import JaxMarlWrapper
 
 # Registry mapping environment names to their generator and wrapper classes.
@@ -258,6 +260,41 @@ def make_gym_env(
 
     envs = gymnasium.vector.AsyncVectorEnv(
         [lambda: create_gym_env(config, add_global_state) for _ in range(num_env)],
+        worker=async_multiagent_worker,
+    )
+
+    envs = GymToJumanji(envs)
+
+    return envs
+
+def make_smac_env(
+    config: DictConfig,
+    num_env: int,
+    add_global_state: bool = False,
+) -> GymToJumanji:
+    """
+     Create a gymnasium environment.
+
+    Args:
+        config (Dict): The configuration of the environment.
+        num_env (int) : The number of parallel envs to create.
+        add_global_state (bool): Whether to add the global state to the observation. Default False.
+
+    Returns:
+        Async environments.
+    """
+    config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
+
+    def create_smac_env(config: DictConfig, add_global_state: bool = False) -> gymnasium.Env:
+        env = StarCraft2Env(map_name="3m")
+        wrapped_env = SMACFullWrapper(env, config.env.use_shared_rewards, add_global_state)
+        if config.system.add_agent_id:
+            wrapped_env = GymAgentIDWrapper(wrapped_env)
+        wrapped_env = GymRecordEpisodeMetrics(wrapped_env)
+        return wrapped_env
+
+    envs = gymnasium.vector.AsyncVectorEnv(
+        [lambda: create_smac_env(config, add_global_state) for _ in range(num_env)],
         worker=async_multiagent_worker,
     )
 
