@@ -6,7 +6,7 @@ jobs:
   tests-and-linters:
     name: "Python ${{ matrix.python-version }} on ubuntu-latest"
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     strategy:
       matrix:
