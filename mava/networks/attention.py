@@ -42,36 +42,36 @@ class SelfAttention(nn.Module):
     def __call__(self, key: chex.Array, value: chex.Array, query: chex.Array) -> chex.Array:
         # Shape names:
         # B: batch size
-        # L: sequence length
+        # S: sequence length
         # E: embedding dimension
         # hs: head size
         # nh: number of heads
 
-        B, L, D = key.shape
+        B, S, D = key.shape
 
         # calculate query, key, values for all heads in batch and move
         # head forward to be the batch dim
-        # (B, L, E) -> (B, nh, L, hs)
-        k = self.key(key).reshape(B, L, self.n_head, D // self.n_head).transpose((0, 2, 1, 3))
-        q = self.query(query).reshape(B, L, self.n_head, D // self.n_head).transpose((0, 2, 1, 3))
-        v = self.value(value).reshape(B, L, self.n_head, D // self.n_head).transpose((0, 2, 1, 3))
+        # (B, S, E) -> (B, nh, S, hs)
+        k = self.key(key).reshape(B, S, self.n_head, D // self.n_head).transpose((0, 2, 1, 3))
+        q = self.query(query).reshape(B, S, self.n_head, D // self.n_head).transpose((0, 2, 1, 3))
+        v = self.value(value).reshape(B, S, self.n_head, D // self.n_head).transpose((0, 2, 1, 3))
 
-        # causal attention: (B, nh, L, hs) x (B, nh, hs, L) -> (B, nh, L, L)
+        # causal attention: (B, nh, S, hs) x (B, nh, hs, S) -> (B, nh, S, S)
         att = jnp.matmul(q, k.transpose((0, 1, 3, 2))) * (1.0 / jnp.sqrt(k.shape[-1]))
 
         # mask out attention for all agents
         if self.masked:
             att = jnp.where(
-                self.mask[:, :, :L, :L] == 0,
+                self.mask[:, :, :S, :S] == 0,
                 jnp.finfo(jnp.float32).min,
                 att,
             )
 
         att = nn.softmax(att, axis=-1)
 
-        y = jnp.matmul(att, v)  # (B, nh, L, L) x (B, nh, L, hs) -> (B, nh, L, hs)
+        y = jnp.matmul(att, v)  # (B, nh, S, S) x (B, nh, S, hs) -> (B, nh, S, hs)
         # re-assemble all head outputs side by side
         y = y.transpose((0, 2, 1, 3))
-        y = y.reshape(B, L, D)
+        y = y.reshape(B, S, D)
 
-        return self.proj(y)  # (B, L, D)
+        return self.proj(y)  # (B, S, D)

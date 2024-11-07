@@ -22,6 +22,7 @@ from mava.wrappers.jumanji import (
     ConnectorWrapper,
     LbfWrapper,
     RwareWrapper,
+    VectorConnectorWrapper,
 )
 from mava.wrappers.matrax import MatraxWrapper
 from mava.wrappers.observation import AgentIDWrapper
