@@ -74,11 +74,11 @@ class GymnaxWrapper(Wrapper):
         self._env_params = env_params
         self.num_agents = 1
         self.time_limit = env_params.max_timesteps
-        self.action_dim = env.action_space().n
         if isinstance(self.action_spec(), DiscreteArray):
             n_actions = self.action_spec().num_values
         else:
             n_actions = self.action_spec().shape[0]
+        self.action_dim = env.action_space().n
         self._legal_action_mask = jnp.ones((n_actions,), dtype=jnp.float32)
 
     def reset(self, key: chex.PRNGKey) -> Tuple[GymnaxEnvState, TimeStep]:

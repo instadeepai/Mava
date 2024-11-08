@@ -412,8 +412,12 @@ def learner_setup(
     key, net_key = keys
 
     # Get number of agents and actions.
-    action_dim = int(env.action_spec().num_values[0])
-    n_agents = env.action_spec().shape[0]
+    if config.env.env_name == "Craftax":
+        action_dim = int(env.action_spec().num_values)
+        n_agents = 1
+    else:
+        action_dim = int(env.action_spec().num_values[0])
+        n_agents = env.action_spec().shape[0]
     config.system.num_agents = n_agents
     config.system.num_actions = action_dim
 

@@ -68,12 +68,7 @@ _jumanji_registry = {
 _matrax_registry = {"Matrax": MatraxWrapper}
 _jaxmarl_registry = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
-_craftax_registry = {
-    "Craftax-Classic-Pixels-v1": GymnaxWrapper,
-    "Craftax-Symbolic-v1": GymnaxWrapper,
-    "Craftax-Pixels-v1": GymnaxWrapper,
-    "Craftax-Classic-Symbolic-v1": GymnaxWrapper,
-}
+_craftax_registry = {"Craftax": GymnaxWrapper}
 
 
 def add_extra_wrappers(
@@ -216,9 +211,7 @@ def make_gigastep_env(
     return train_env, eval_env
 
 
-def make_craftax_env(
-    env_name: str, config: DictConfig, add_global_state: bool = False
-) -> Tuple[MarlEnv, MarlEnv]:
+def make_craftax_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
     """
     Create a craftax environment for training and evaluation.
 
@@ -246,11 +239,11 @@ def make_craftax_env(
         "Craftax-Pixels-v1": CraftaxPixelsEnv,
     }
 
-    wrapper = _craftax_registry[env_name]
+    wrapper = _craftax_registry[config.env.env_name]
 
     # Create envs.
-    train_env = craftax_environments[env_name](**config.env.kwargs)
-    eval_env = craftax_environments[env_name](**config.env.kwargs)
+    train_env = craftax_environments[config.env.scenario.name](**config.env.kwargs)
+    eval_env = craftax_environments[config.env.scenario.name](**config.env.kwargs)
 
     env_params = train_env.default_params
     eval_env_params = eval_env.default_params
@@ -258,10 +251,11 @@ def make_craftax_env(
     train_env = wrapper(train_env, env_params)
     eval_env = wrapper(eval_env, eval_env_params)
 
+    train_env = AgentIndexWrapper(train_env)
+    eval_env = AgentIndexWrapper(eval_env)
+
     train_env = AddStartFlagAndPrevAction(train_env, add_prev_action=True)
     eval_env = AddStartFlagAndPrevAction(eval_env, add_prev_action=True)
-
-    train_env, eval_env = AgentIndexWrapper(train_env), AgentIndexWrapper(eval_env)
 
     train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
 
@@ -293,6 +287,6 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, M
     elif env_name in _gigastep_registry:
         return make_gigastep_env(config, add_global_state)
     elif env_name in _craftax_registry:
-        return make_craftax_env(env_name, config, add_global_state)
+        return make_craftax_env(config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")
