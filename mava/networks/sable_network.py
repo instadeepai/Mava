@@ -43,6 +43,8 @@ class EncodeBlock(nn.Module):
     n_agents: int
 
     def setup(self) -> None:
+        if self.use_timestep_encoding:
+            self.pos_encoding = PositionalEncoding(self.net_config.embed_dim)
         self.ln1 = nn.RMSNorm()
         self.ln2 = nn.RMSNorm()
 
@@ -62,6 +64,8 @@ class EncodeBlock(nn.Module):
     ) -> chex.Array:
         """Applies Chunkwise MultiScaleRetention."""
         ret, updated_hstate = self.retn(
+        if self.use_timestep_encoding:
+            key, query, value = self.pos_encoding(key, query, value, step_count)
             key=x, query=x, value=x, hstate=hstate, dones=dones, step_count=step_count
         )
         x = self.ln1(x + ret)
@@ -71,6 +75,8 @@ class EncodeBlock(nn.Module):
     def recurrent(self, x: chex.Array, hstate: chex.Array, step_count: chex.Array) -> chex.Array:
         """Applies Recurrent MultiScaleRetention."""
         ret, updated_hstate = self.retn.recurrent(
+        if self.use_timestep_encoding:
+            key_n, query_n, value_n = self.pos_encoding(key_n, query_n, value_n, step_count)
             key_n=x, query_n=x, value_n=x, hstate=hstate, step_count=step_count
         )
         x = self.ln1(x + ret)
@@ -341,7 +347,8 @@ class Decoder(nn.Module):
         return logit, updated_hstates
 
 
-class SableNetwork(nn.Module):
+    """Sable network module."""
+    use_timestep_encoding: bool = False
     """Sable network module."""
 
     n_agents: int
@@ -349,6 +356,7 @@ class SableNetwork(nn.Module):
     action_dim: int
     net_config: SableNetworkConfig
     memory_config: DictConfig
+    use_timestep_encoding: bool = False
     action_space_type: str = _DISCRETE
 
     def setup(self) -> None:
