@@ -45,7 +45,7 @@ def calculate_gae(
         gae_lambda (float): GAE mixing parameter.
         unroll (int): how much XLA should unroll the scan used to calculate GAE.
     
-    Returns Tuple[(B, T, A), (B, T, A)]: advantages and target values.
+    Returns Tuple[(B, T, N), (B, T, N)]: advantages and target values.
     """
     
     def _get_advantages(
