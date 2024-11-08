@@ -38,9 +38,9 @@ def calculate_gae(
     https://arxiv.org/abs/1707.06347
     
     Args:
-        traj_batch (B, T, A, ...): a batch of trajectories.
-        last_val  (B, A): value of the final timestep.
-        last_done (B, A): whether the last timestep was a terminated or truncated.
+        traj_batch (B, T, N, ...): a batch of trajectories.
+        last_val  (B, N): value of the final timestep.
+        last_done (B, N): whether the last timestep was a terminated or truncated.
         gamma (float): discount factor.
         gae_lambda (float): GAE mixing parameter.
         unroll (int): how much XLA should unroll the scan used to calculate GAE.
