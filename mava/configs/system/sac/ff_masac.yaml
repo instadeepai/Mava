@@ -12,14 +12,14 @@ num_updates: 625000 # Number of updates
 explore_steps: 5000  # number of steps to take with random actions at the start of training
 update_batch_size: 1 # number of vectorised gradient updates per device.
 
-rollout_length: 2 # number of environment steps per vectorised environment.
+rollout_length: 8 # number of environment steps per vectorised environment.
 epochs: 32 # number of learn epochs per training data batch.
-policy_update_delay: 4  # the delay before training the policy -
+policy_update_delay: 2  # the delay before training the policy -
 # Every `policy_update_delay` q network learning steps the policy network is trained.
 # It is trained `policy_update_delay` times to compensate, this is a TD3 trick.
 
 # sizes
-buffer_size: 1000000  # size of the replay buffer. Note: total size is this * num_devices
+buffer_size: 100_000  # size of the replay buffer. Note: total size is this * num_devices
 batch_size: 32
 
 # learning rates
@@ -32,6 +32,6 @@ max_grad_norm: 10
 tau: 0.005  # smoothing coefficient for target networks
 gamma: 0.99  # discount factor
 
-autotune: True  # whether to autotune alpha
+autotune: False  # whether to autotune alpha
 target_entropy_scale: 5.0  # scale factor for target entropy (when auto-tuning)
 init_alpha: 0.1  # initial entropy value when not using autotune

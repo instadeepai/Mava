@@ -283,19 +283,21 @@ def make_update_fns(
         key: chex.PRNGKey,
     ) -> Array:
         pi = actor_net.apply(actor_params, obs)
-        new_actions = pi.sample(seed=key)
-        log_prob = pi.log_prob(new_actions)
+        action_probs = jax.nn.softmax(pi.distribution.logits)
+        action_log_probs = jax.nn.log_softmax(pi.distribution.logits)
+        # new_actions = pi.sample(seed=key)
+        # log_prob = pi.log_prob(new_actions)
 
         # Updated joint actions are done so that each agent's central critic sees what all
         # other agents did in the past, but it sees how its agent's policy is currently acting.
         # This is done by placing new_action[i] in joint_actions[i].
-        joint_actions = get_updated_joint_actions(actions, new_actions)
+        # joint_actions = get_updated_joint_actions(actions, new_actions)
 
-        qval_1 = q_net.apply(q_params.q1, obs, joint_actions)
-        qval_2 = q_net.apply(q_params.q2, obs, joint_actions)
+        qval_1 = q_net.apply(q_params.q1, obs)
+        qval_2 = q_net.apply(q_params.q2, obs)
         min_q_val = jnp.minimum(qval_1, qval_2)
 
-        return ((alpha * log_prob) - min_q_val).mean()
+        return (action_probs * (alpha * action_log_probs) - min_q_val).mean()
 
     def alpha_loss_fn(log_alpha: Array, log_pi: Array, target_entropy: Array) -> Array:
         return jnp.mean(-jnp.exp(log_alpha) * (log_pi + target_entropy))
@@ -307,6 +309,7 @@ def make_update_fns(
         """Update the Q parameters."""
         # Calculate Q target values.
         pi = actor_net.apply(params.actor, data.next_obs)
+        # todo: there should be a better way to get probs from dist
         next_action_probs = jax.nn.softmax(pi.distribution.logits)
         next_action_log_probs = jax.nn.log_softmax(pi.distribution.logits)
 
