@@ -39,7 +39,7 @@ q_learning_systems = ["q_learning.anakin.rec_iql", "q_learning.anakin.rec_qmix"]
 transformer_systems = ["mat.anakin.mat"]
 sable_systems = ["sable.anakin.ff_sable", "sable.anakin.rec_sable"]
 
-discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax"]
+discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax", "vector-connector"]
 cnn_envs = ["cleaner", "connector"]
 continuous_envs = ["mabrax"]
 
@@ -133,7 +133,7 @@ def test_transformer_system(fast_config: dict, system_path: str) -> None:
 @pytest.mark.parametrize("env_name", discrete_envs)
 def test_discrete_env(fast_config: dict, env_name: str) -> None:
     """Test all discrete envs on random systems."""
-    system_path = random.choice(ppo_systems + q_learning_systems + sable_systems)
+    system_path = random.choice(ppo_systems + q_learning_systems)
     _, _, system_name = system_path.split(".")
 
     with initialize(version_base=None, config_path=config_path):

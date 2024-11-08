@@ -67,6 +67,22 @@ def merge_leading_dims(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
     return x.reshape(new_shape)
 
 
+def concat_time_and_agents(x: chex.Array) -> chex.Array:
+    """Concatenates the time and agent dimensions in the input tensor.
+
+    Args:
+    ----
+        x: Input tensor of shape (Time, Batch, Agents, ...).
+
+    Returns:
+    -------
+        chex.Array: Tensor of shape (Batch, Time x Agents, ...).
+    """
+    x = jnp.moveaxis(x, 0, 1)
+    x = jnp.reshape(x, (x.shape[0], x.shape[1] * x.shape[2], *x.shape[3:]))
+    return x
+
+
 def unreplicate_n_dims(x: Any, unreplicate_depth: int = 2) -> Any:
     """Unreplicates a pytree by removing the first `unreplicate_depth` axes.
 

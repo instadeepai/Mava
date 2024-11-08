@@ -31,7 +31,7 @@ from rich.pretty import pprint
 
 from mava.evaluator import ActorState, get_eval_fn
 from mava.networks.mat_network import MultiAgentTransformer
-from mava.systems.mat.types import ExecutionApply, LearnerState, TrainingApply
+from mava.systems.mat.types import ActorApply, LearnerApply, LearnerState
 from mava.systems.ppo.types import PPOTransition
 from mava.types import (
     ExperimentOutput,
@@ -55,7 +55,7 @@ from mava.wrappers.episode_metrics import get_final_step_metrics
 
 def get_learner_fn(
     env: MarlEnv,
-    apply_fns: Tuple[ExecutionApply, TrainingApply],
+    apply_fns: Tuple[ActorApply, LearnerApply],
     update_fn: optax.TransformUpdateFn,
     config: DictConfig,
 ) -> LearnerFn[LearnerState]:
@@ -479,6 +479,10 @@ def run_experiment(_config: DictConfig) -> float:
     assert (
         config.system.num_updates > config.arch.num_evaluation
     ), "Number of updates per evaluation must be less than total number of updates."
+
+    assert (
+        config.arch.num_envs % config.system.num_minibatches == 0
+    ), "Number of envs must be divisibile by number of minibatches."
 
     # Calculate number of updates per evaluation.
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation

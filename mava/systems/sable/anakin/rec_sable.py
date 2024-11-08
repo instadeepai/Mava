@@ -27,24 +27,26 @@ from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict as Params
 from jax import tree
 from jumanji.env import Environment
+from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import get_eval_fn, get_num_eval_envs, make_rec_sable_act_fn
+from mava.evaluator import ActorState, EvalActFn, get_eval_fn, get_num_eval_envs
 from mava.networks import SableNetwork
+from mava.networks.utils.sable import get_init_hidden_state
 from mava.systems.sable.types import (
-    ExecutionApply,
+    ActorApply,
     HiddenStates,
-    TrainingApply,
+    LearnerApply,
     Transition,
 )
 from mava.systems.sable.types import RecLearnerState as LearnerState
-from mava.types import ExperimentOutput, LearnerFn, MarlEnv
+from mava.types import Action, ExperimentOutput, LearnerFn, MarlEnv
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
+from mava.utils.jax_utils import concat_time_and_agents, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.sable_utils import concat_time_and_agents, get_init_hidden_state
+from mava.utils.network_utils import get_action_head
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
@@ -52,7 +54,7 @@ from mava.wrappers.episode_metrics import get_final_step_metrics
 
 def get_learner_fn(
     env: Environment,
-    apply_fns: Tuple[ExecutionApply, TrainingApply],
+    apply_fns: Tuple[ActorApply, LearnerApply],
     update_fn: optax.TransformUpdateFn,
     config: DictConfig,
 ) -> LearnerFn[LearnerState]:
@@ -97,9 +99,6 @@ def get_learner_fn(
                 hstates,
                 policy_key,
             )
-            action = jnp.squeeze(action, axis=-1)
-            log_prob = jnp.squeeze(log_prob, axis=-1)
-            value = jnp.squeeze(value, axis=-1)
 
             # STEP ENVIRONMENT
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
@@ -133,7 +132,7 @@ def get_learner_fn(
             return learner_state, transition
 
         # COPY OLD HIDDEN STATES: TO BE USED IN THE TRAINING LOOP
-        prev_hstates = tree.map(lambda x: jnp.copy(x), learner_state.hidden_state)
+        prev_hstates = tree.map(lambda x: jnp.copy(x), learner_state.hstates)
 
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
         learner_state, traj_batch = jax.lax.scan(
@@ -149,7 +148,6 @@ def get_learner_fn(
         _, _, current_val, _ = sable_action_select_fn(  # type: ignore
             params, last_timestep.observation, updated_hstates, last_val_key
         )
-        current_val = jnp.squeeze(current_val, axis=-1)
         current_done = tree.map(
             lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
             last_timestep.last(),
@@ -213,9 +211,6 @@ def get_learner_fn(
                         prev_hstates,
                         traj_batch.done,
                     )
-                    log_prob = jnp.squeeze(log_prob, axis=-1)
-                    value = jnp.squeeze(value, axis=-1)
-                    entropy = jnp.squeeze(entropy, axis=-1)
 
                     # CALCULATE ACTOR LOSS
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -304,26 +299,24 @@ def get_learner_fn(
             batch_size = config.arch.num_envs
             batch_perm = jax.random.permutation(batch_shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
-            batch = jax.tree_util.tree_map(lambda x: jnp.take(x, batch_perm, axis=1), batch)
+            batch = tree.map(lambda x: jnp.take(x, batch_perm, axis=1), batch)
 
             # Shuffle hidden states
-            prev_hstates = jax.tree_util.tree_map(
-                lambda x: jnp.take(x, batch_perm, axis=0), prev_hstates
-            )
+            prev_hstates = tree.map(lambda x: jnp.take(x, batch_perm, axis=0), prev_hstates)
 
             # Shuffle agents
             agent_perm = jax.random.permutation(agent_shuffle_key, config.system.num_agents)
-            batch = jax.tree_util.tree_map(lambda x: jnp.take(x, agent_perm, axis=2), batch)
+            batch = tree.map(lambda x: jnp.take(x, agent_perm, axis=2), batch)
 
             # CONCATENATE TIME AND AGENTS
-            batch = jax.tree_util.tree_map(concat_time_and_agents, batch)
+            batch = tree.map(concat_time_and_agents, batch)
 
             # SPLIT INTO MINIBATCHES
-            minibatches = jax.tree_util.tree_map(
+            minibatches = tree.map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 batch,
             )
-            prev_hs_minibatch = jax.tree_util.tree_map(
+            prev_hs_minibatch = tree.map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 prev_hstates,
             )
@@ -424,13 +417,24 @@ def learner_setup(
     config.system.num_agents = n_agents
     config.system.num_actions = action_dim
 
+    # Setting the chunksize - smaller chunks save memory at the cost of speed
+    if config.network.memory_config.timestep_chunk_size:
+        config.network.memory_config.chunk_size = (
+            config.network.memory_config.timestep_chunk_size * n_agents
+        )
+    else:
+        config.network.memory_config.chunk_size = config.system.rollout_length * n_agents
+
+    _, action_space_type = get_action_head(env)
+
     # Define network.
     sable_network = SableNetwork(
         n_agents=n_agents,
+        n_agents_per_chunk=n_agents,
         action_dim=action_dim,
         net_config=config.network.net_config,
         memory_config=config.network.memory_config,
-        action_space_type="discrete",
+        action_space_type=action_space_type,
     )
 
     # Define optimiser.
@@ -452,7 +456,7 @@ def learner_setup(
         init_obs,
         init_hs,
         net_key,
-        method="init_net",
+        method="get_actions",
     )
     opt_state = optim.init(params)
 
@@ -461,10 +465,9 @@ def learner_setup(
         partial(sable_network.apply, method="get_actions"),  # Execution function
         sable_network.apply,  # Training function
     )
-    update_fn = optim.update
 
     # Get batched iterated update and replicate it to pmap it over cores.
-    learn = get_learner_fn(env, apply_fns, update_fn, config)
+    learn = get_learner_fn(env, apply_fns, optim.update, config)
     learn = jax.pmap(learn, axis_name="device")
 
     # Initialise environment states and timesteps: across devices and batches.
@@ -496,7 +499,7 @@ def learner_setup(
         )
         # Update the params and hidden states
         params = restored_params
-        init_hstates = restored_hstates if restored_hstates else init_hstates  # type: ignore
+        init_hstates = restored_hstates if restored_hstates else init_hstates
 
     # Define params to be replicated across devices and batches.
     key, step_keys = jax.random.split(key)
@@ -520,7 +523,7 @@ def learner_setup(
         key=step_keys,
         env_state=env_states,
         timestep=timesteps,
-        hidden_state=init_hstates,
+        hstates=init_hstates,
     )
 
     return learn, apply_fns[0], init_learner_state
@@ -542,6 +545,23 @@ def run_experiment(_config: DictConfig) -> float:
     learn, sable_execution_fn, learner_state = learner_setup(env, (key, net_key), config)
 
     # Setup evaluator.
+    def make_rec_sable_act_fn(actor_apply_fn: ActorApply) -> EvalActFn:
+        _hidden_state = "hidden_state"
+
+        def eval_act_fn(
+            params: Params, timestep: TimeStep, key: chex.PRNGKey, actor_state: ActorState
+        ) -> Tuple[Action, Dict]:
+            hidden_state = actor_state[_hidden_state]
+            output_action, _, _, hidden_state = actor_apply_fn(  # type: ignore
+                params,
+                timestep.observation,
+                hidden_state,
+                key,
+            )
+            return output_action, {_hidden_state: hidden_state}
+
+        return eval_act_fn
+
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
     eval_act_fn = make_rec_sable_act_fn(sable_execution_fn)
@@ -665,7 +685,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
 
     # Run experiment.
     eval_performance = run_experiment(cfg)
-    print(f"{Fore.CYAN}{Style.BRIGHT}Sable Memory experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}Rec Sable experiment completed{Style.RESET_ALL}")
     return eval_performance
 
 

@@ -11,6 +11,6 @@ memory_config:
   # --- Positional encoding ---
   timestep_positional_encoding: False # Timestamp positional encoding for Sable memory.
   # --- Chunking ---
-  # Chunking the sequence into smaller parts to fit into memory.
-  use_chunkwise: False # Whether to chunk the sequence.
-  timestep_chunk_size: 32 # Size of the chunk: calculated over timesteps dim.
+  timestep_chunk_size: ~ # Size of the chunk: calculated over timesteps dim.
+  # For example a chunksize of 2 results in a sequence length of 2 * num_agents because there num_agents observations within a timestep
+  # If unspecified, the rollout length is used as the chunk size which means that the entire rollout is computed in parallel during training.

@@ -32,8 +32,9 @@ class SableNetworkConfig(NamedTuple):
 class HiddenStates(NamedTuple):
     """Hidden states for the encoder and decoder."""
 
-    encoder_hstate: Array
-    decoder_hstate: Tuple[Array, Array]
+    encoder: Array
+    decoder_self_retn: Array
+    decoder_cross_retn: Array
 
 
 class RecLearnerState(NamedTuple):
@@ -44,11 +45,11 @@ class RecLearnerState(NamedTuple):
     key: PRNGKey
     env_state: Array
     timestep: TimeStep
-    hidden_state: HiddenStates
+    hstates: HiddenStates
 
 
 class FFLearnerState(NamedTuple):
-    """State of the learner for Non-Memory Sable"""
+    """State of the learner for ff-Sable"""
 
     params: FrozenDict
     opt_states: OptState
@@ -69,10 +70,10 @@ class Transition(NamedTuple):
     info: Dict
 
 
-ExecutionApply = Callable[
+ActorApply = Callable[
     [FrozenDict, Array, Array, HiddenStates, PRNGKey],
     Tuple[Array, Array, Array, Array, HiddenStates],
 ]
-TrainingApply = Callable[
+LearnerApply = Callable[
     [FrozenDict, Array, Array, Array, HiddenStates, Array, PRNGKey], Tuple[Array, Array, Array]
 ]

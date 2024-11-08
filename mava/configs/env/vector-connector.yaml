@@ -1,0 +1,21 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+  - scenario: con-5x5x3a # [con-5x5x3a, con-7x7x5a, con-10x10x10a, con-15x15x23a]
+# Further environment config details in "con-10x10x5a" file.
+
+env_name: VectorMaConnector # Used for logging purposes.
+
+# Defines the metric that will be used to evaluate the performance of the agent.
+# This metric is returned at the end of an experiment and can be used for hyperparameter tuning.
+eval_metric: episode_return
+
+# Whether the environment observations encode implicit agent IDs. If True, the AgentID wrapper is not used.
+# This is false since the vector observation wrapper for connector cannot encode Agent IDs by default.
+implicit_agent_id: False
+# Whether or not to log the winrate of this environment. This should not be changed as not all
+# environments have a winrate metric.
+log_win_rate: False
+
+kwargs:
+  {} # time limit set in scenario

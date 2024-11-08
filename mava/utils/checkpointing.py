@@ -15,7 +15,7 @@
 import os
 import warnings
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple, Type, Union
+from typing import Any, Dict, Optional, Tuple, Type
 
 import absl.logging as absl_logging
 import orbax.checkpoint
@@ -23,8 +23,6 @@ from chex import Numeric
 from jax import tree
 from omegaconf import DictConfig, OmegaConf
 
-from mava.systems.ppo.types import HiddenStates
-from mava.systems.sable.types import HiddenStates as SableHiddenStates
 from mava.types import MavaState
 
 # Keep track of the version of the checkpointer
@@ -152,7 +150,7 @@ class Checkpointer:
         timestep: Optional[int] = None,
         restore_hstates: bool = False,
         THiddenState: Optional[Type] = None,  # noqa: N803
-    ) -> Tuple[Any, Union[HiddenStates, SableHiddenStates, None]]:
+    ) -> Tuple[Any, Optional[Any]]:
         """Restore the params and the hidden state (in case of RNNs)
 
         Args:
@@ -193,16 +191,7 @@ class Checkpointer:
         # Restore hidden states if required
         restored_hstates = None
         if restore_hstates and THiddenState is not None:
-            if "hidden_state" in restored_learner_state_raw.keys():
-                restored_hstates = THiddenState(
-                    encoder_hstate=restored_learner_state_raw["hidden_state"]["encoder_hstate"],
-                    decoder_hstate=(
-                        restored_learner_state_raw["hidden_state"]["decoder_hstate"][0],
-                        restored_learner_state_raw["hidden_state"]["decoder_hstate"][1],
-                    ),
-                )
-            else:
-                restored_hstates = THiddenState(**restored_learner_state_raw["hstates"])
+            restored_hstates = THiddenState(**restored_learner_state_raw["hstates"])
 
         return restored_params, restored_hstates
 
