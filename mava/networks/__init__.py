@@ -21,5 +21,6 @@ from mava.networks.base import (
     RecurrentActor,
     RecurrentValueNet,
     ScannedRNN,
+    FeedForwardDiscreteQNet
 )
 from mava.networks.sable_network import SableNetwork

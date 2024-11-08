@@ -94,6 +94,33 @@ class FeedForwardQNet(nn.Module):
 
         return jnp.squeeze(y, axis=-1)
 
+class FeedForwardDiscreteQNet(nn.Module):
+    """Feedforward Q Network. Returns the value of an observation-action pair."""
+
+    torso: nn.Module
+    num_actions: int
+    centralised_critic: bool = False
+
+    def setup(self) -> None:
+        self.critic = nn.Dense(self.num_actions, kernel_init=orthogonal(1.0))
+
+    def __call__(
+        self,
+        observation: Union[Observation, ObservationGlobalState],
+    ) -> chex.Array:
+        if self.centralised_critic:
+            if not isinstance(observation, ObservationGlobalState):
+                raise ValueError("Global state must be provided to the centralised critic.")
+            # Get global state in the case of a centralised critic.
+            observation = observation.global_state
+        else:
+            # Get single agent view in the case of a decentralised critic.
+            observation = observation.agents_view
+
+        x = self.torso(observation)
+        y = self.critic(x)
+
+        return y
 
 class ScannedRNN(nn.Module):
     hidden_state_dim: int = 128
