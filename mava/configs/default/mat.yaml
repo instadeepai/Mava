@@ -3,7 +3,7 @@ defaults:
   - arch: anakin
   - system: mat/mat
   - network: transformer
-  - env: rware # [gigastep, lbf, mabrax, matrax, rware, smax]
+  - env: lbf # [gigastep, lbf, mabrax, matrax, rware, smax]
   - _self_
 
 hydra:

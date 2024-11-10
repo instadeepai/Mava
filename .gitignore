@@ -143,7 +143,7 @@ mava/include
 mava/workspace.code-workspace
 
 # learner_state checkpoints
-checkpoints
+checkpoints*
 
 # vaults
 vaults

@@ -68,7 +68,7 @@ _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 
 def add_extra_wrappers(
-    train_env: MarlEnv, eval_env: MarlEnv, config: DictConfig
+    train_env: MarlEnv, eval_env: MarlEnv, config: DictConfig, render: bool = False
 ) -> Tuple[MarlEnv, MarlEnv]:
     # Disable the AgentID wrapper if the environment has implicit agent IDs.
     config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
@@ -79,12 +79,15 @@ def add_extra_wrappers(
 
     train_env = AutoResetWrapper(train_env)
     train_env = RecordEpisodeMetrics(train_env)
-    eval_env = RecordEpisodeMetrics(eval_env)
+    if not render:
+        eval_env = RecordEpisodeMetrics(eval_env)
 
     return train_env, eval_env
 
 
-def make_jumanji_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
+def make_jumanji_env(
+    config: DictConfig, add_global_state: bool = False, render: bool = False
+) -> Tuple[MarlEnv, MarlEnv]:
     """
     Create a Jumanji environments for training and evaluation.
 
@@ -111,7 +114,7 @@ def make_jumanji_env(config: DictConfig, add_global_state: bool = False) -> Tupl
     train_env = wrapper(train_env, add_global_state=add_global_state)
     eval_env = wrapper(eval_env, add_global_state=add_global_state)
 
-    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config, render)
     return train_env, eval_env
 
 
@@ -207,7 +210,9 @@ def make_gigastep_env(
     return train_env, eval_env
 
 
-def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
+def make(
+    config: DictConfig, add_global_state: bool = False, render: bool = False
+) -> Tuple[MarlEnv, MarlEnv]:
     """
     Create environments for training and evaluation.
 
@@ -224,7 +229,7 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, M
     env_name = config.env.env_name
 
     if env_name in _jumanji_registry:
-        return make_jumanji_env(config, add_global_state)
+        return make_jumanji_env(config, add_global_state, render)
     elif env_name in _jaxmarl_registry:
         return make_jaxmarl_env(config, add_global_state)
     elif env_name in _matrax_registry:
