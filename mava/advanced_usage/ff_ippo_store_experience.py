@@ -31,8 +31,8 @@ from optax._src.base import OptState
 from rich.pretty import pprint
 
 from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
-from mava.networks.base import FeedForwardActor as Actor
-from mava.networks.base import FeedForwardValueNet as Critic
+from mava.networks import FeedForwardActor as Actor
+from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
 from mava.types import ActorApply, CriticApply, ExperimentOutput, MarlEnv, MavaState
 from mava.utils.checkpointing import Checkpointer

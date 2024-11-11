@@ -1,0 +1,16 @@
+# ---  Retention for Memory Sable ---
+net_config:
+  n_block: 1 # Number of blocks
+  embed_dim: 64 # Embedding dimension
+  n_head: 1 # Number of heads
+
+memory_config:
+  type: "rec_sable" # Type of the network.
+  # --- Memory  factor ---
+  decay_scaling_factor: 0.8 # Decay scaling factor for the kappa parameter: kappa = kappa * decay_scaling_factor
+  # --- Positional encoding ---
+  timestep_positional_encoding: False # Timestamp positional encoding for Sable memory.
+  # --- Chunking ---
+  timestep_chunk_size: ~ # Size of the chunk: calculated over timesteps dim.
+  # For example a chunksize of 2 results in a sequence length of 2 * num_agents because there num_agents observations within a timestep
+  # If unspecified, the rollout length is used as the chunk size which means that the entire rollout is computed in parallel during training.

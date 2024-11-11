@@ -13,13 +13,13 @@
 # limitations under the License.
 # ruff: noqa: F401
 
-from mava.networks.base import (
-    FeedForwardActor,
-    FeedForwardQNet,
-    FeedForwardValueNet,
-    RecQNetwork,
-    RecurrentActor,
-    RecurrentValueNet,
-    ScannedRNN,
+from mava.networks.utils.sable.decode import (
+    autoregressive_act,
+    train_decoder_fn,
 )
-from mava.networks.sable_network import SableNetwork
+from mava.networks.utils.sable.encode import (
+    act_encoder_fn,
+    train_encoder_fn,
+)
+from mava.networks.utils.sable.get_init_hstates import get_init_hidden_state
+from mava.networks.utils.sable.positional_encoding import PositionalEncoding

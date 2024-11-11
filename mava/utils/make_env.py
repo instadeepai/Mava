@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple, Type
+from typing import Tuple
 
 import jaxmarl
 import jumanji
@@ -46,23 +46,24 @@ from mava.wrappers import (
     RecordEpisodeMetrics,
     RwareWrapper,
     SmaxWrapper,
+    VectorConnectorWrapper,
 )
-from mava.wrappers.jaxmarl import JaxMarlWrapper
 
 # Registry mapping environment names to their generator and wrapper classes.
 _jumanji_registry = {
-    "RobotWarehouse-v0": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
-    "LevelBasedForaging-v0": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
-    "MaConnector-v2": {
+    "RobotWarehouse": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
+    "LevelBasedForaging": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
+    "MaConnector": {"generator": ConnectorRandomGenerator, "wrapper": ConnectorWrapper},
+    "VectorMaConnector": {
         "generator": ConnectorRandomGenerator,
-        "wrapper": ConnectorWrapper,
+        "wrapper": VectorConnectorWrapper,
     },
-    "Cleaner-v0": {"generator": CleanerRandomGenerator, "wrapper": CleanerWrapper},
+    "Cleaner": {"generator": CleanerRandomGenerator, "wrapper": CleanerWrapper},
 }
 
 # Registry mapping environment names directly to the corresponding wrapper classes.
 _matrax_registry = {"Matrax": MatraxWrapper}
-_jaxmarl_registry: Dict[str, Type[JaxMarlWrapper]] = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
+_jaxmarl_registry = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 
@@ -83,9 +84,7 @@ def add_extra_wrappers(
     return train_env, eval_env
 
 
-def make_jumanji_env(
-    env_name: str, config: DictConfig, add_global_state: bool = False
-) -> Tuple[MarlEnv, MarlEnv]:
+def make_jumanji_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
     """
     Create a Jumanji environments for training and evaluation.
 
@@ -101,14 +100,14 @@ def make_jumanji_env(
 
     """
     # Config generator and select the wrapper.
-    generator = _jumanji_registry[env_name]["generator"]
+    generator = _jumanji_registry[config.env.env_name]["generator"]
     generator = generator(**config.env.scenario.task_config)
-    wrapper = _jumanji_registry[env_name]["wrapper"]
+    wrapper = _jumanji_registry[config.env.env_name]["wrapper"]
 
     # Create envs.
     env_config = {**config.env.kwargs, **config.env.scenario.env_kwargs}
-    train_env = jumanji.make(env_name, generator=generator, **env_config)
-    eval_env = jumanji.make(env_name, generator=generator, **env_config)
+    train_env = jumanji.make(config.env.scenario.name, generator=generator, **env_config)
+    eval_env = jumanji.make(config.env.scenario.name, generator=generator, **env_config)
     train_env = wrapper(train_env, add_global_state=add_global_state)
     eval_env = wrapper(eval_env, add_global_state=add_global_state)
 
@@ -116,9 +115,7 @@ def make_jumanji_env(
     return train_env, eval_env
 
 
-def make_jaxmarl_env(
-    env_name: str, config: DictConfig, add_global_state: bool = False
-) -> Tuple[MarlEnv, MarlEnv]:
+def make_jaxmarl_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
     """
      Create a JAXMARL environment.
 
@@ -134,16 +131,16 @@ def make_jaxmarl_env(
 
     """
     kwargs = dict(config.env.kwargs)
-    if "smax" in env_name.lower():
+    if "smax" in config.env.env_name.lower():
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
 
     # Create jaxmarl envs.
     train_env: MarlEnv = _jaxmarl_registry[config.env.env_name](
-        jaxmarl.make(env_name, **kwargs),
+        jaxmarl.make(config.env.scenario.name, **kwargs),
         add_global_state,
     )
     eval_env: MarlEnv = _jaxmarl_registry[config.env.env_name](
-        jaxmarl.make(env_name, **kwargs),
+        jaxmarl.make(config.env.scenario.name, **kwargs),
         add_global_state,
     )
 
@@ -152,9 +149,7 @@ def make_jaxmarl_env(
     return train_env, eval_env
 
 
-def make_matrax_env(
-    env_name: str, config: DictConfig, add_global_state: bool = False
-) -> Tuple[MarlEnv, MarlEnv]:
+def make_matrax_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
     """
     Creates Matrax environments for training and evaluation.
 
@@ -170,7 +165,7 @@ def make_matrax_env(
 
     """
     # Select the Matrax wrapper.
-    wrapper = _matrax_registry[env_name]
+    wrapper = _matrax_registry[config.env.scenario.name]
 
     # Create envs.
     task_name = config["env"]["scenario"]["task_name"]
@@ -184,7 +179,7 @@ def make_matrax_env(
 
 
 def make_gigastep_env(
-    env_name: str, config: DictConfig, add_global_state: bool = False
+    config: DictConfig, add_global_state: bool = False
 ) -> Tuple[MarlEnv, MarlEnv]:
     """
      Create a Gigastep environment.
@@ -200,7 +195,7 @@ def make_gigastep_env(
         A tuple of the environments.
 
     """
-    wrapper = _gigastep_registry[env_name]
+    wrapper = _gigastep_registry[config.env.scenario.name]
 
     kwargs = config.env.kwargs
     scenario = ScenarioBuilder.from_config(config.env.scenario.task_config)
@@ -226,15 +221,15 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, M
         A tuple of the environments.
 
     """
-    env_name = config.env.scenario.name
+    env_name = config.env.env_name
 
     if env_name in _jumanji_registry:
-        return make_jumanji_env(env_name, config, add_global_state)
-    elif env_name in jaxmarl.registered_envs:
-        return make_jaxmarl_env(env_name, config, add_global_state)
+        return make_jumanji_env(config, add_global_state)
+    elif env_name in _jaxmarl_registry:
+        return make_jaxmarl_env(config, add_global_state)
     elif env_name in _matrax_registry:
-        return make_matrax_env(env_name, config, add_global_state)
+        return make_matrax_env(config, add_global_state)
     elif env_name in _gigastep_registry:
-        return make_gigastep_env(env_name, config, add_global_state)
+        return make_gigastep_env(config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")
