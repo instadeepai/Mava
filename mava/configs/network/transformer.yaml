@@ -1,0 +1,6 @@
+# --- Network params ---
+n_block: 1 # Transformer blocks
+embed_dim: 64 # Transformer embedding dimension
+n_head: 1 # Transformer heads
+use_rmsnorm: False # Whether to use RMSNorm instead of LayerNorm
+use_swiglu: False # Use SwiGLU instead of a 2-layer MLP for the feedforward networks

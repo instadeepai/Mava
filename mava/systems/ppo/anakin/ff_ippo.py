@@ -479,6 +479,10 @@ def run_experiment(_config: DictConfig) -> float:
         config.system.num_updates > config.arch.num_evaluation
     ), "Number of updates per evaluation must be less than total number of updates."
 
+    assert (
+        config.arch.num_envs % config.system.num_minibatches == 0
+    ), "Number of envs must be divisibile by number of minibatches."
+
     # Calculate number of updates per evaluation.
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
     steps_per_rollout = (

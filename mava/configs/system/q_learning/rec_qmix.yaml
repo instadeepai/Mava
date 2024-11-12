@@ -1,0 +1,35 @@
+# --- Defaults REC-QMIX ---
+total_timesteps: ~ # Set the total environment steps.
+# If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
+num_updates: 10000 # Number of updates.
+seed: 42
+
+# --- Agent observations ---
+add_agent_id: True
+
+# --- RL hyperparameters ---
+min_buffer_size: 32
+update_batch_size: 1 # Number of vectorised gradient updates per device.
+
+rollout_length: 8 # Number of environment steps per vectorised environment.
+epochs: 4 # Number of learn epochs per training data batch.
+
+# sizes
+buffer_size: 1000 # size of the replay buffer. Note: total size is this * num_devices
+sample_batch_size: 128  # size of training data batch sampled from the buffer
+sample_sequence_length: 20 # 20 transitions are sampled, giving 19 complete data points
+
+# learning rates
+q_lr: 3e-5  # the learning rate of the Q network network optimizer
+max_grad_norm: 10 # value used to clip optimiser - set big for no clipping
+
+# Q Learning related
+hard_update: True
+update_period: 200
+tau: 0.01  # smoothing coefficient for target networks
+gamma: 0.99  # discount factor
+
+eps_min: 0.05
+eps_decay: 1e5
+
+qmix_embed_dim: 32

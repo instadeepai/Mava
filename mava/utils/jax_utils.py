@@ -14,13 +14,31 @@
 
 # TODO: Rewrite this file to handle only JAX arrays.
 
-from typing import Any
+from typing import Any, Tuple, Union
 
 import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import tree
+from typing_extensions import TypeAlias
+
+# Different types used for indexing arrays: int/slice or tuple of int/slice
+Indexer: TypeAlias = Union[int, slice, Tuple[slice, ...], Tuple[int, ...]]
+
+
+def tree_slice(pytree: chex.ArrayTree, i: Indexer) -> chex.ArrayTree:
+    """Returns: a new pytree where for each leaf: leaf[i] is returned."""
+    return tree.map(lambda x: x[i], pytree)
+
+
+def tree_at_set(old_tree: chex.ArrayTree, i: Indexer, new_tree: chex.ArrayTree) -> chex.ArrayTree:
+    """Update `old_tree` at position `i` with `new_tree`.
+    Both trees must have equal dtypes and structures.
+    """
+    chex.assert_trees_all_equal_structs(old_tree, new_tree)
+    chex.assert_trees_all_equal_dtypes(old_tree, new_tree)
+    return tree.map(lambda old, new: old.at[i].set(new), old_tree, new_tree)
 
 
 def ndim_at_least(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
@@ -47,6 +65,22 @@ def merge_leading_dims(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
 
     new_shape = (np.prod(x.shape[:num_dims]),) + x.shape[num_dims:]
     return x.reshape(new_shape)
+
+
+def concat_time_and_agents(x: chex.Array) -> chex.Array:
+    """Concatenates the time and agent dimensions in the input tensor.
+
+    Args:
+    ----
+        x: Input tensor of shape (Time, Batch, Agents, ...).
+
+    Returns:
+    -------
+        chex.Array: Tensor of shape (Batch, Time x Agents, ...).
+    """
+    x = jnp.moveaxis(x, 0, 1)
+    x = jnp.reshape(x, (x.shape[0], x.shape[1] * x.shape[2], *x.shape[3:]))
+    return x
 
 
 def unreplicate_n_dims(x: Any, unreplicate_depth: int = 2) -> Any:

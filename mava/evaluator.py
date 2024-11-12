@@ -137,7 +137,7 @@ def get_eval_fn(
             env_state, ts = jax.vmap(env.reset)(reset_keys)
 
             step_state = env_state, ts, key, init_act_state
-            _, timesteps = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit))
+            _, timesteps = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit + 1))
 
             metrics = timesteps.extras["episode_metrics"]
             if config.env.log_win_rate:
@@ -155,7 +155,7 @@ def get_eval_fn(
         # So in evaluation we have num_envs parallel envs and loop enough times
         # so that we do at least `eval_episodes` number of episodes.
         _, metrics = jax.lax.scan(_episode, key, xs=None, length=episode_loops)
-        metrics: Metrics = tree.map(lambda x: x.reshape(-1), metrics)  # flatten metrics
+        metrics = tree.map(lambda x: x.reshape(-1), metrics)  # flatten metrics
         return metrics
 
     def timed_eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:
@@ -163,7 +163,7 @@ def get_eval_fn(
         start_time = time.time()
 
         metrics = jax.pmap(eval_fn)(params, key, init_act_state)
-        metrics: Metrics = jax.block_until_ready(metrics)
+        metrics = jax.block_until_ready(metrics)
 
         end_time = time.time()
         total_timesteps = jnp.sum(metrics["episode_length"])

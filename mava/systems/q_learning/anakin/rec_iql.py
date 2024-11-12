@@ -29,7 +29,6 @@ from flashbax.buffers.flat_buffer import TrajectoryBuffer
 from flax.core.scope import FrozenVariableDict
 from flax.linen import FrozenDict
 from jax import Array, tree
-from jumanji.env import Environment
 from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
@@ -45,7 +44,7 @@ from mava.systems.q_learning.types import (
     TrainState,
     Transition,
 )
-from mava.types import Observation
+from mava.types import MarlEnv, Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
@@ -61,7 +60,7 @@ from mava.wrappers import episode_metrics
 def init(
     cfg: DictConfig,
 ) -> Tuple[
-    Tuple[Environment, Environment],
+    Tuple[MarlEnv, MarlEnv],
     RecQNetwork,
     optax.GradientTransformation,
     TrajectoryBuffer,
@@ -69,24 +68,7 @@ def init(
     MavaLogger,
     PRNGKey,
 ]:
-    """Initialize system by creating the envs, networks etc.
-
-    Args:
-    ----
-        cfg: System configuration.
-
-    Returns:
-    -------
-        Tuple containing:
-            Tuple[Environment, Environment]: The environment and evaluation environment.
-            RecQNetwork: Recurrent Q network.
-            optax.GradientTransformation: Optimiser for RecQNetwork.
-            TrajectoryBuffer: The replay buffer.
-            LearnerState: The initial learner state.
-            MavaLogger: The logger.
-            PRNGKey: The random key.
-
-    """
+    """Initialize system by creating the envs, networks etc."""
     logger = MavaLogger(cfg)
 
     key = jax.random.PRNGKey(cfg.system.seed)
@@ -103,17 +85,19 @@ def init(
     num_agents = env.num_agents
 
     key, q_key = jax.random.split(key, 2)
+
     # Shape legend:
-    # T: Time (dummy dimension size = 1)
-    # B: Batch (dummy dimension size = 1)
-    # A: Agent
-    # Make dummy inputs to init recurrent Q network -> need shape (T, B, A, ...)
-    init_obs = env.observation_spec().generate_value()  # (A, ...)
-    # (B, T, A, ...)
+    # T: Time
+    # B: Batch
+    # N: Agent
+
+    # Make dummy inputs to init recurrent Q network -> need shape (T, B, N, ...)
+    init_obs = env.observation_spec().generate_value()  # (N, ...)
+    # (B, T, N, ...)
     init_obs_batched = tree.map(lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs)
     init_term_or_trunc = jnp.zeros((1, 1, 1), dtype=bool)  # (T, B, 1)
     init_x = (init_obs_batched, init_term_or_trunc)  # pack the RNN dummy inputs
-    # (B, A, ...)
+    # (B, N, ...)
     init_hidden_state = ScannedRNN.initialize_carry(
         (cfg.arch.num_envs, num_agents), cfg.network.hidden_state_dim
     )
@@ -146,9 +130,9 @@ def init(
     init_hidden_state = replicate(init_hidden_state)
 
     # Create dummy transition
-    init_acts = env.action_spec().generate_value()  # (A,)
+    init_acts = env.action_spec().generate_value()  # (N,)
     init_transition = Transition(
-        obs=init_obs,  # (A, ...)
+        obs=init_obs,  # (N, ...)
         action=init_acts,
         reward=jnp.zeros((num_agents,), dtype=float),
         terminal=jnp.zeros((1,), dtype=bool),  # one flag for all agents
@@ -159,7 +143,7 @@ def init(
     # Initialise trajectory buffer
     rb = fbx.make_trajectory_buffer(
         # n transitions gives n-1 full data points
-        sample_sequence_length=cfg.system.sample_sequence_length + 1,
+        sample_sequence_length=cfg.system.sample_sequence_length,
         period=1,  # sample any unique trajectory
         add_batch_size=cfg.arch.num_envs,
         sample_batch_size=cfg.system.sample_batch_size,
@@ -216,45 +200,18 @@ def init(
 
 def make_update_fns(
     cfg: DictConfig,
-    env: Environment,
+    env: MarlEnv,
     q_net: RecQNetwork,
     opt: optax.GradientTransformation,
     rb: TrajectoryBuffer,
-) -> Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]]:
-    """Create the update function for the Q-learner.
-
-    Args:
-    ----
-        cfg: System configuration.
-        env: Learning environment.
-        q_net: Recurrent q network.
-        opt: Optimiser for the recurrent Q network.
-        rb: The replay buffer.
-
-    Returns:
-    -------
-        The update function.
-
-    """
+) -> Callable[[LearnerState[QNetParams]], Tuple[LearnerState[QNetParams], Tuple[Metrics, Metrics]]]:
+    """Create the update function for the Q-learner."""
     # ---- Acting functions ----
 
     def select_eps_greedy_action(
         action_selection_state: ActionSelectionState, obs: Observation, term_or_trunc: Array
     ) -> Tuple[ActionSelectionState, Array]:
-        """Select action to take in epsilon-greedy way. Batch and agent dims are included.
-
-        Args:
-        ----
-            action_selection_state: Tuple of online parameters, previous hidden state,
-                environment timestep (used to calculate epsilon) and a random key.
-            obs: The observation from the previous timestep.
-            term_or_trunc: The flag timestep.last() from the previous timestep.
-
-        Returns:
-        -------
-            A tuple of the updated action selection state and the chosen action.
-
-        """
+        """Select action to take in epsilon-greedy way. Batch and agent dims are included."""
         params, hidden_state, t, key = action_selection_state
 
         eps = jnp.maximum(
@@ -271,7 +228,7 @@ def make_update_fns(
         new_key, explore_key = jax.random.split(key, 2)
 
         action = eps_greedy_dist.sample(seed=explore_key)
-        action = action[0, ...]  # (1, B, A) -> (B, A)
+        action = action[0, ...]  # (1, B, N) -> (B, N)
 
         next_action_selection_state = ActionSelectionState(
             params, next_hidden_state, t + cfg.arch.num_envs, new_key
@@ -371,24 +328,24 @@ def make_update_fns(
         return q_loss, loss_info
 
     def update_q(
-        params: QNetParams, opt_states: optax.OptState, data: Transition, t_train: int
+        params: QNetParams, opt_states: optax.OptState, data_full: Transition, t_train: int
     ) -> Tuple[QNetParams, optax.OptState, Metrics]:
         """Update the Q parameters."""
         # Get data aligned with current/next timestep
-        data_first = tree.map(lambda x: x[:, :-1, ...], data)
-        data_next = tree.map(lambda x: x[:, 1:, ...], data)
+        data = tree.map(lambda x: x[:, :-1, ...], data_full)
+        data_next = tree.map(lambda x: x[:, 1:, ...], data_full)
 
-        obs = data_first.obs
-        term_or_trunc = data_first.term_or_trunc
-        reward = data_first.reward
-        action = data_first.action
+        obs = data.obs
+        term_or_trunc = data.term_or_trunc
+        reward = data.reward
+        action = data.action
 
         # The three following variables all come from the same time step.
         # They are stored and accessed in this way because of the `AutoResetWrapper`.
-        # At the end of an episode `data_first.next_obs` and `data_next.obs` will be
-        # different, which is why we need to store both. Thus `data_first.next_obs`
+        # At the end of an episode `data.next_obs` and `data_next.obs` will be
+        # different, which is why we need to store both. Thus `data.next_obs`
         # aligns with the `terminal` from `data_next`.
-        next_obs = data_first.next_obs
+        next_obs = data.next_obs
         next_term_or_trunc = data_next.term_or_trunc
         next_terminal = data_next.terminal
 
@@ -443,7 +400,9 @@ def make_update_fns(
 
         return next_params, next_opt_state, q_loss_info
 
-    def train(train_state: TrainState, _: Any) -> Tuple[TrainState, Metrics]:
+    def train(
+        train_state: TrainState[QNetParams], _: Any
+    ) -> Tuple[TrainState[QNetParams], Metrics]:
         """Sample, train and repack."""
         # unpack and get keys
         buffer_state, params, opt_states, t_train, key = train_state
@@ -468,8 +427,8 @@ def make_update_fns(
     scanned_train = lambda state: lax.scan(train, state, None, length=cfg.system.epochs)
 
     def update_step(
-        learner_state: LearnerState, _: Any
-    ) -> Tuple[LearnerState, Tuple[Metrics, Metrics]]:
+        learner_state: LearnerState[QNetParams], _: Any
+    ) -> Tuple[LearnerState[QNetParams], Tuple[Metrics, Metrics]]:
         """Interact, then learn."""
         # unpack and get random keys
         (
@@ -527,7 +486,7 @@ def make_update_fns(
         donate_argnums=0,
     )
 
-    return pmaped_update_step  # type:ignore
+    return pmaped_update_step
 
 
 def run_experiment(cfg: DictConfig) -> float:
@@ -565,8 +524,7 @@ def run_experiment(cfg: DictConfig) -> float:
         term_or_trunc = timestep.last()
         net_input = (timestep.observation, term_or_trunc[..., jnp.newaxis])
         net_input = tree.map(lambda x: x[jnp.newaxis], net_input)  # add batch dim to obs
-
-        next_hidden_state, eps_greedy_dist = q_net.apply(params, hidden_state, net_input, 0.0)
+        next_hidden_state, eps_greedy_dist = q_net.apply(params, hidden_state, net_input)
         action = eps_greedy_dist.sample(seed=key).squeeze(0)
         return action, {"hidden_state": next_hidden_state}
 
@@ -587,6 +545,7 @@ def run_experiment(cfg: DictConfig) -> float:
     )
 
     max_episode_return = -jnp.inf
+    best_params = copy.deepcopy(unreplicate_batch_dim(learner_state.params.online))
 
     # Main loop:
     for eval_idx, t in enumerate(
@@ -619,6 +578,7 @@ def run_experiment(cfg: DictConfig) -> float:
         eval_keys = jax.random.split(eval_key, cfg.arch.n_devices)
         eval_params = unreplicate_batch_dim(learner_state.params.online)
         eval_metrics = evaluator(eval_params, eval_keys, {"hidden_state": eval_hs})
+        jax.block_until_ready(eval_metrics)
         logger.log(eval_metrics, t, eval_idx, LogEvent.EVAL)
         episode_return = jnp.mean(eval_metrics["episode_return"])
 
@@ -655,7 +615,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     logger.stop()
 
-    return float(eval_performance)
+    return eval_performance
 
 
 @hydra.main(
@@ -670,11 +630,11 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     cfg.logger.system_name = "rec_iql"
 
     # Run experiment.
-    final_return = run_experiment(cfg)
+    eval_performance = run_experiment(cfg)
 
     print(f"{Fore.CYAN}{Style.BRIGHT}IDQN experiment completed{Style.RESET_ALL}")
 
-    return float(final_return)
+    return eval_performance
 
 
 if __name__ == "__main__":

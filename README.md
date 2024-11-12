@@ -159,7 +159,7 @@ cd mava
 pip install -e .
 ```
 
-We have tested `Mava` on Python 3.11 and 3.12, but earlier versions may also work. Note that because the installation of JAX differs depending on your hardware accelerator,
+We have tested `Mava` on Python 3.11 and 3.12, but earlier versions may also work. Specifically, we use Python 3.10 for the Quickstart notebook on Google Colab since Colab uses Python 3.10 by default. Note that because the installation of JAX differs depending on your hardware accelerator,
 we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth installation guides including Docker builds and virtual environments, please see our [detailed installation guide](docs/DETAILED_INSTALL.md).
 
 ## Quickstart ⚡

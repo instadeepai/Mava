@@ -1,0 +1,10 @@
+# ---  Retention for ff-Sable ---
+net_config:
+  n_block: 1 # Number of blocks
+  embed_dim: 64 # Embedding dimension
+  n_head: 1 # Number of heads
+
+memory_config:
+  type: "ff_sable" # Type of the network.
+  agents_chunk_size: ~ # Size of the chunk: calculated over agents dim. This directly sets the sequence length for chunkwise retention
+  # If unspecified, the number of agents is used as the chunk size which means that we calculate full self-retention over all agents.

@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Generic, Optional, Protocol, Tuple, TypeVar
+from typing import Any, Callable, Dict, Generic, Optional, Protocol, Tuple, TypeVar, Union
 
 import chex
 import jumanji.specs as specs
 from flax.core.frozen_dict import FrozenDict
-from jumanji import Environment
 from jumanji.types import TimeStep
 from tensorflow_probability.substrates.jax.distributions import Distribution
 from typing_extensions import NamedTuple, TypeAlias
@@ -103,7 +102,7 @@ class MarlEnv(Protocol):
         ...
 
     @property
-    def unwrapped(self) -> Environment:
+    def unwrapped(self) -> Any:
         """Retuns: the innermost environment (without any wrappers applied)."""
         ...
 
@@ -136,7 +135,7 @@ class ObservationGlobalState(NamedTuple):
 
 RNNObservation: TypeAlias = Tuple[Observation, Done]
 RNNGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
-
+MavaObservation: TypeAlias = Union[Observation, ObservationGlobalState]
 
 # `MavaState` is the main type passed around in our systems. It is often used as a scan carry.
 # Types like: `LearnerState` (mava/systems/<system_name>/types.py) are `MavaState`s.

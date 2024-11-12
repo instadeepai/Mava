@@ -1,0 +1,14 @@
+# The config of the tiny-2ag-hard environment
+name: RobotWarehouse-v0
+task_name: tiny-2ag-hard
+
+task_config:
+  column_height: 8
+  shelf_rows: 1
+  shelf_columns: 3
+  num_agents: 2
+  sensor_range: 1
+  request_queue_size: 1
+
+env_kwargs:
+  {}  # there are no scenario specific env_kwargs for this env
