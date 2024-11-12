@@ -27,6 +27,7 @@ from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper
 
 from mava.types import Observation
+from mava.wrappers.init_info import craftax_init_info
 
 if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
     from dataclasses import dataclass
@@ -85,14 +86,14 @@ class GymnaxWrapper(Wrapper):
         key, reset_key = jax.random.split(key)
         obs, gymnax_state = self._env.reset(reset_key, self._env_params)
         obs = Observation(obs, self._legal_action_mask, jnp.array(0))
-        timestep = restart(obs, extras={})
+        timestep = restart(obs, extras={"env_info": craftax_init_info})
         state = GymnaxEnvState(key=key, gymnax_env_state=gymnax_state, step_count=jnp.array(0))
         return state, timestep
 
     def step(self, state: GymnaxEnvState, action: chex.Array) -> Tuple[GymnaxEnvState, TimeStep]:
         key, key_step = jax.random.split(state.key)
         action = action.squeeze(-1)
-        obs, gymnax_state, reward, done, _ = self._env.step(
+        obs, gymnax_state, reward, done, info = self._env.step(
             key_step, state.gymnax_env_state, action, self._env_params
         )
         state = GymnaxEnvState(
@@ -104,7 +105,7 @@ class GymnaxWrapper(Wrapper):
             reward=reward,
             discount=jnp.array(1.0 - done),
             step_type=jax.lax.select(done, StepType.LAST, StepType.MID),
-            extras={},
+            extras={"env_info": info},
         )
         return state, timestep
 

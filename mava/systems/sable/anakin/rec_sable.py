@@ -31,7 +31,8 @@ from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import ActorState, EvalActFn, get_eval_fn, get_num_eval_envs
+from mava.evaluator import ActorState, EvalActFn, get_num_eval_envs
+from mava.evaluator import get_while_eval_fn as get_eval_fn
 from mava.networks import SableNetwork
 from mava.networks.utils.sable import get_init_hidden_state
 from mava.systems.sable.types import (
@@ -635,8 +636,11 @@ def run_experiment(_config: DictConfig) -> float:
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
         # Evaluate.
-        eval_metrics = evaluator(trained_params, eval_keys, {"hidden_state": eval_hs})
+        eval_metrics, special_eval_metrics = evaluator(
+            trained_params, eval_keys, {"hidden_state": eval_hs}
+        )
         logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
+        logger.log(special_eval_metrics, t, eval_step, LogEvent.ACHIEVEMENTS)
         episode_return = jnp.mean(eval_metrics["episode_return"])
 
         if save_checkpoint:
@@ -665,7 +669,7 @@ def run_experiment(_config: DictConfig) -> float:
         abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=True)
         eval_keys = jax.random.split(key, n_devices)
 
-        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {"hidden_state": abs_hs})
+        eval_metrics, _ = abs_metric_evaluator(best_params, eval_keys, {"hidden_state": abs_hs})
 
         t = int(steps_per_rollout * (eval_step + 1))
         logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)

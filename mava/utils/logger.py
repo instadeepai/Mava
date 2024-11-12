@@ -39,6 +39,7 @@ class LogEvent(Enum):
     EVAL = "evaluator"
     ABSOLUTE = "absolute"
     MISC = "misc"
+    ACHIEVEMENTS = "achievements"
 
 
 class MavaLogger:
@@ -71,6 +72,9 @@ class MavaLogger:
 
         if event == LogEvent.TRAIN:
             # We only want to log mean losses, max/min/std don't matter.
+            metrics = tree.map(np.mean, metrics)
+        elif event == LogEvent.ACHIEVEMENTS:
+            # We only want to log mean achievements, max/min/std don't matter.
             metrics = tree.map(np.mean, metrics)
         else:
             # {metric1_name: [metrics], metric2_name: ...} ->
@@ -260,6 +264,7 @@ class ConsoleLogger(BaseLogger):
         LogEvent.ABSOLUTE: Fore.BLUE,
         LogEvent.ACT: Fore.CYAN,
         LogEvent.MISC: Fore.YELLOW,
+        LogEvent.ACHIEVEMENTS: Fore.RED,
     }
 
     def __init__(self, cfg: DictConfig, unique_token: str) -> None:
