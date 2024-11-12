@@ -35,6 +35,7 @@ from omegaconf import DictConfig
 
 from mava.types import MarlEnv
 from mava.wrappers import (
+    AddStartFlagAndPrevAction,
     AgentIDWrapper,
     AutoResetWrapper,
     CleanerWrapper,
@@ -76,6 +77,10 @@ def add_extra_wrappers(
     if config.system.add_agent_id:
         train_env = AgentIDWrapper(train_env)
         eval_env = AgentIDWrapper(eval_env)
+
+    if config.system.add_soe_flag:
+        train_env = AddStartFlagAndPrevAction(train_env, config.system.add_prev_action)
+        eval_env = AddStartFlagAndPrevAction(eval_env, config.system.add_prev_action)
 
     train_env = AutoResetWrapper(train_env)
     train_env = RecordEpisodeMetrics(train_env)

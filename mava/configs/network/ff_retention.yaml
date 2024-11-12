@@ -1,8 +1,8 @@
 # ---  Retention for ff-Sable ---
 net_config:
   n_block: 1 # Number of blocks
-  embed_dim: 128 # Embedding dimension
-  n_head: 4 # Number of heads
+  embed_dim: 64 # Embedding dimension
+  n_head: 1 # Number of heads
 
 memory_config:
   type: "ff_sable" # Type of the network.

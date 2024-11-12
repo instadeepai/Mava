@@ -21,3 +21,7 @@ ent_coef: 0.01 # Entropy regularisation term for loss function.
 vf_coef: 0.5 # Critic weight in
 max_grad_norm: 10.0 # Maximum norm of the gradients for a weight update.
 decay_learning_rates: False # Whether learning rates should be linearly decayed during training.
+
+# Start of episode token
+add_soe_flag: True
+add_prev_action: True

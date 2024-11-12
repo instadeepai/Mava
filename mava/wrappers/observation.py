@@ -15,6 +15,7 @@
 from typing import Tuple, Union
 
 import chex
+import jax
 import jax.numpy as jnp
 from jumanji import specs
 from jumanji.types import TimeStep
@@ -80,3 +81,78 @@ class AgentIDWrapper(Wrapper):
         agents_view = specs.Array((self._env.num_agents, num_obs_features), dtype, "agents_view")
 
         return obs_spec.replace(agents_view=agents_view)
+
+
+class AddStartFlagAndPrevAction(Wrapper):
+    """Wrapper that adds a start flag and the previous action to the observation."""
+
+    # NOTE: This will only support discrete action spaces for now
+
+    def __init__(self, env: MarlEnv, add_prev_action: bool = True):
+        super().__init__(env)
+        self._env: MarlEnv
+        self.num_agents = self._env.num_agents
+        self.time_limit = self._env.time_limit
+        self.action_dim = self._env.action_dim
+        self.add_prev_action = add_prev_action
+
+        # Check if the observation is flat
+        # Changed tis since there will be a leading agent dimension
+        if not len(self.observation_spec().agents_view.shape) == 2:
+            raise ValueError("The observation must be flat.")
+
+    def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep[Observation]]:
+        state, timestep = self._env.reset(key)
+        start_flag = jnp.ones((self.num_agents, 1))
+        prev_action = jnp.zeros((self.num_agents, self.action_dim))
+        agents_view = timestep.observation.agents_view
+        if self.add_prev_action:
+            new_agents_view = jnp.concatenate([start_flag, prev_action, agents_view], axis=-1)
+        else:
+            new_agents_view = jnp.concatenate([start_flag, agents_view], axis=-1)
+        timestep = timestep.replace(
+            observation=timestep.observation._replace(
+                agents_view=new_agents_view,
+            )
+        )
+        return state, timestep
+
+    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep[Observation]]:
+        state, timestep = self._env.step(state, action)
+        start_flag = jnp.zeros((self.num_agents, 1))
+        prev_action = jax.nn.one_hot(action, self.action_dim)
+        agents_view = timestep.observation.agents_view
+        if self.add_prev_action:
+            new_agent_view = jnp.concatenate([start_flag, prev_action, agents_view], axis=-1)
+        else:
+            new_agent_view = jnp.concatenate([start_flag, agents_view], axis=-1)
+        timestep = timestep.replace(
+            observation=timestep.observation._replace(
+                agents_view=new_agent_view,
+            )
+        )
+        return state, timestep
+
+    def observation_spec(
+        self,
+    ) -> Union[specs.Spec[Observation], specs.Spec[ObservationGlobalState]]:
+        initial_obs_spec = self._env.observation_spec()
+
+        if self.add_prev_action:
+            new_agent_view_shape = (
+                self.num_agents,
+                1 + self.action_dim + initial_obs_spec.agents_view.shape[1],
+            )
+        else:
+            new_agent_view_shape = (
+                self.num_agents,
+                1 + initial_obs_spec.agents_view.shape[1],
+            )
+
+        return self._env.observation_spec().replace(
+            agents_view=specs.Array(
+                shape=new_agent_view_shape,
+                dtype=jnp.float32,
+                name="agents_view",
+            )
+        )
