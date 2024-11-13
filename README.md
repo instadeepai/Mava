@@ -10,10 +10,7 @@
 
 <div align="center">
 <a href="https://www.python.org/doc/versions/">
-      <img src="https://img.shields.io/badge/python-3.12-blue" alt="Python Versions">
-</a>
-<a href="https://www.python.org/doc/versions/">
-      <img src="https://img.shields.io/badge/python-3.11-blue" alt="Python Versions">
+      <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12-blue" alt="Python Versions">
 </a>
 <a  href="https://github.com/instadeepai/Mava/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-orange.svg" alt="License" />
