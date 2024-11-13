@@ -31,8 +31,8 @@ from optax._src.base import OptState
 from rich.pretty import pprint
 
 from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
-from mava.networks.base import FeedForwardActor as Actor
-from mava.networks.base import FeedForwardValueNet as Critic
+from mava.networks import FeedForwardActor as Actor
+from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
 from mava.types import ActorApply, CriticApply, ExperimentOutput, MarlEnv, MavaState
 from mava.utils.checkpointing import Checkpointer
@@ -361,7 +361,7 @@ def learner_setup(
 
     # Define network and optimiser.
     actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
-    action_head, _ = get_action_head(env)
+    action_head, _ = get_action_head(env.action_spec())
     actor_action_head = hydra.utils.instantiate(action_head, action_dim=env.action_dim)
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 
@@ -548,11 +548,9 @@ def run_experiment(_config: DictConfig) -> None:
     def _reshape_experience(experience: Dict[str, chex.Array]) -> Dict[str, chex.Array]:
         """Reshape experience to match buffer."""
         # Swap the T and NE axes (D, NU, UB, T, NE, ...) -> (D, NU, UB, NE, T, ...)
-        experience: Dict[str, chex.Array] = tree.map(lambda x: x.swapaxes(3, 4), experience)
+        experience = tree.map(lambda x: x.swapaxes(3, 4), experience)
         # Merge 4 leading dimensions into 1. (D, NU, UB, NE, T ...) -> (D * NU * UB * NE, T, ...)
-        experience: Dict[str, chex.Array] = tree.map(
-            lambda x: x.reshape(-1, *x.shape[4:]), experience
-        )
+        experience = tree.map(lambda x: x.reshape(-1, *x.shape[4:]), experience)
         return experience
 
     # Use vault to record experience

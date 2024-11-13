@@ -1,0 +1,14 @@
+# The config of the large-4ag-hard environment
+name: RobotWarehouse-v0
+task_name: large-4ag-hard
+
+task_config:
+  column_height: 8
+  shelf_rows: 3
+  shelf_columns: 5
+  num_agents: 4
+  sensor_range: 1
+  request_queue_size: 2
+
+env_kwargs:
+  {}  # there are no scenario specific env_kwargs for this env

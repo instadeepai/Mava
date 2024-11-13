@@ -49,10 +49,10 @@ from mava.systems.sac.types import (
 from mava.types import MarlEnv, Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
+from mava.utils.config import check_total_timesteps
 from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.network_utils import get_action_head
-from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.wrappers import episode_metrics
 
 
@@ -111,8 +111,10 @@ def init(
 
     # Making actor network
     actor_torso = hydra.utils.instantiate(cfg.network.actor_network.pre_torso)
-    action_head, _ = get_action_head(env)
-    actor_action_head = hydra.utils.instantiate(action_head, action_dim=env.action_dim)
+    action_head, _ = get_action_head(env.action_spec())
+    actor_action_head = hydra.utils.instantiate(
+        action_head, action_dim=env.action_dim, independent_std=False
+    )
     actor_network = Actor(actor_torso, actor_action_head)
     actor_params = actor_network.init(actor_key, obs_single_batched)
 
@@ -241,23 +243,6 @@ def make_update_fns(
     actor_opt, q_opt, alpha_opt = optims
 
     full_action_shape = (cfg.arch.num_envs, *env.action_spec().shape)
-
-    def step(
-        action: Array, obs: Observation, env_state: State, buffer_state: BufferState
-    ) -> Tuple[Array, State, BufferState, Dict]:
-        """Given an action, step the environment and add to the buffer."""
-        env_state, timestep = jax.vmap(env.step)(env_state, action)
-        next_obs = timestep.observation
-        rewards = timestep.reward
-        terms = ~timestep.discount.astype(bool)
-        infos = timestep.extras
-
-        real_next_obs = infos["real_next_obs"]
-
-        transition = Transition(obs, action, rewards, terms, real_next_obs)
-        buffer_state = rb.add(buffer_state, transition)
-
-        return next_obs, env_state, buffer_state, infos["episode_metrics"]
 
     # losses:
     def q_loss_fn(
@@ -414,6 +399,24 @@ def make_update_fns(
         losses = q_loss_info | act_loss_info
 
         return (buffer_state, params, opt_states, t, key), losses
+
+    # Acting
+    def step(
+        action: Array, obs: Observation, env_state: State, buffer_state: BufferState
+    ) -> Tuple[Array, State, BufferState, Dict]:
+        """Given an action, step the environment and add to the buffer."""
+        env_state, timestep = jax.vmap(env.step)(env_state, action)
+        next_obs = timestep.observation
+        rewards = timestep.reward
+        terms = ~timestep.discount.astype(bool)
+        infos = timestep.extras
+
+        real_next_obs = infos["real_next_obs"]
+
+        transition = Transition(obs, action, rewards, terms, real_next_obs)
+        buffer_state = rb.add(buffer_state, transition)
+
+        return next_obs, env_state, buffer_state, infos["episode_metrics"]
 
     def act(
         carry: Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], _: Any

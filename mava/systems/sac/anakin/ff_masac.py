@@ -50,10 +50,10 @@ from mava.types import MarlEnv, ObservationGlobalState
 from mava.utils import make_env as environments
 from mava.utils.centralised_training import get_joint_action, get_updated_joint_actions
 from mava.utils.checkpointing import Checkpointer
+from mava.utils.config import check_total_timesteps
 from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.network_utils import get_action_head
-from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.wrappers import episode_metrics
 
 
@@ -114,8 +114,10 @@ def init(
 
     # Making actor network
     actor_torso = hydra.utils.instantiate(cfg.network.actor_network.pre_torso)
-    action_head, _ = get_action_head(env)
-    actor_action_head = hydra.utils.instantiate(action_head, action_dim=env.action_dim)
+    action_head, _ = get_action_head(env.action_spec())
+    actor_action_head = hydra.utils.instantiate(
+        action_head, action_dim=env.action_dim, independent_std=False
+    )
     actor_network = Actor(actor_torso, actor_action_head)
     actor_params = actor_network.init(actor_key, obs_single_batched)
 
@@ -244,23 +246,6 @@ def make_update_fns(
     actor_opt, q_opt, alpha_opt = optims
 
     full_action_shape = (cfg.arch.num_envs, *env.action_spec().shape)
-
-    def step(
-        action: Array, obs: ObservationGlobalState, env_state: State, buffer_state: BufferState
-    ) -> Tuple[Array, State, BufferState, Dict]:
-        """Given an action, step the environment and add to the buffer."""
-        env_state, timestep = jax.vmap(env.step)(env_state, action)
-        next_obs = timestep.observation
-        rewards = timestep.reward
-        terms = ~timestep.discount.astype(bool)
-        infos = timestep.extras
-
-        real_next_obs = infos["real_next_obs"]
-
-        transition = Transition(obs, action, rewards, terms, real_next_obs)
-        buffer_state = rb.add(buffer_state, transition)
-
-        return next_obs, env_state, buffer_state, infos["episode_metrics"]
 
     # losses:
     def q_loss_fn(
@@ -432,6 +417,24 @@ def make_update_fns(
 
         return (buffer_state, params, opt_states, t, key), losses
 
+    # Acting
+    def step(
+        action: Array, obs: ObservationGlobalState, env_state: State, buffer_state: BufferState
+    ) -> Tuple[Array, State, BufferState, Dict]:
+        """Given an action, step the environment and add to the buffer."""
+        env_state, timestep = jax.vmap(env.step)(env_state, action)
+        next_obs = timestep.observation
+        rewards = timestep.reward
+        terms = ~timestep.discount.astype(bool)
+        infos = timestep.extras
+
+        real_next_obs = infos["real_next_obs"]
+
+        transition = Transition(obs, action, rewards, terms, real_next_obs)
+        buffer_state = rb.add(buffer_state, transition)
+
+        return next_obs, env_state, buffer_state, infos["episode_metrics"]
+
     def act(
         carry: Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], _: Any
     ) -> Tuple[Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], Dict]:
@@ -566,9 +569,6 @@ def run_experiment(cfg: DictConfig) -> float:
         t += steps_per_rollout  # Completed rollout so add to step count.
 
         # Log:
-        # Add learn steps here because anakin steps per second is learn + act steps
-        # But we also want to make sure we're counting env steps correctly so
-        # learn steps is not included in the loop counter.
         elapsed_time = time.time() - start_time
         final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
         final_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
@@ -578,9 +578,6 @@ def run_experiment(cfg: DictConfig) -> float:
         if ep_completed:
             logger.log(final_metrics, t, eval_idx, LogEvent.ACT)
         logger.log(loss_metrics, t, eval_idx, LogEvent.TRAIN)
-
-        # Prepare for evaluation.
-        start_time = time.time()
 
         # Evaluate:
         key, eval_key = jax.random.split(key)

@@ -298,3 +298,7 @@ class GigastepWrapper(Wrapper):
 
         """
         return jax.random.randint(key, (obs.shape[0],), 0, self.action_dim)
+
+    @property
+    def unwrapped(self) -> GigastepEnv:
+        return self._env
