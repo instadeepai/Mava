@@ -82,7 +82,7 @@ def test_ppo_system(fast_config: dict, system_path: str) -> None:
 def test_sable_system(fast_config: dict, system_path: str) -> None:
     """Test all sable systems on random envs."""
     _, _, system_name = system_path.split(".")
-    env = random.choice(discrete_envs)
+    env = random.choice(continuous_envs + discrete_envs)
 
     with initialize(version_base=None, config_path=config_path):
         cfg = compose(config_name=f"{system_name}", overrides=[f"env={env}"])

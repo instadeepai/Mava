@@ -26,8 +26,10 @@ from mava.networks.retention import MultiScaleRetention
 from mava.networks.torsos import SwiGLU
 from mava.networks.utils.sable import (
     act_encoder_fn,
-    autoregressive_act,
-    train_decoder_fn,
+    continuous_autoregressive_act,
+    continuous_train_decoder_fn,
+    discrete_autoregressive_act,
+    discrete_train_decoder_fn,
     train_encoder_fn,
 )
 from mava.systems.sable.types import HiddenStates, SableNetworkConfig
@@ -352,7 +354,7 @@ class SableNetwork(nn.Module):
     action_space_type: str = _DISCRETE
 
     def setup(self) -> None:
-        if self.action_space_type not in [_DISCRETE]:
+        if self.action_space_type not in [_DISCRETE, _CONTINUOUS]:
             raise ValueError(f"Invalid action space type: {self.action_space_type}")
 
         assert (
@@ -385,15 +387,27 @@ class SableNetwork(nn.Module):
             train_encoder_fn,
             chunk_size=self.memory_config.chunk_size,
         )
-        self.train_decoder_fn = partial(
-            train_decoder_fn, n_agents=self.n_agents, chunk_size=self.memory_config.chunk_size
-        )
-
         self.act_encoder_fn = partial(
             act_encoder_fn,
             chunk_size=self.n_agents_per_chunk,
         )
-        self.autoregressive_act = autoregressive_act
+        if self.action_space_type == _CONTINUOUS:
+            self.train_decoder_fn = partial(
+                continuous_train_decoder_fn,
+                n_agents=self.n_agents,
+                chunk_size=self.memory_config.chunk_size,
+                action_dim=self.action_dim,
+            )
+            self.autoregressive_act = partial(
+                continuous_autoregressive_act, action_dim=self.action_dim
+            )
+        else:
+            self.train_decoder_fn = partial(
+                discrete_train_decoder_fn,
+                n_agents=self.n_agents,
+                chunk_size=self.memory_config.chunk_size,
+            )
+            self.autoregressive_act = discrete_autoregressive_act  # type: ignore
 
     def __call__(
         self,
@@ -424,9 +438,7 @@ class SableNetwork(nn.Module):
             rng_key=rng_key,
         )
 
-        action_log = jnp.squeeze(action_log, axis=-1)
         value = jnp.squeeze(value, axis=-1)
-        entropy = jnp.squeeze(entropy, axis=-1)
         return value, action_log, entropy
 
     def get_actions(
@@ -467,7 +479,5 @@ class SableNetwork(nn.Module):
             decoder_cross_retn=updated_dec_hs[1],
         )
 
-        output_actions = jnp.squeeze(output_actions, axis=-1)
-        output_actions_log = jnp.squeeze(output_actions_log, axis=-1)
         value = jnp.squeeze(value, axis=-1)
         return output_actions, output_actions_log, value, updated_hs

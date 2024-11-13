@@ -14,8 +14,10 @@
 # ruff: noqa: F401
 
 from mava.networks.utils.sable.decode import (
-    autoregressive_act,
-    train_decoder_fn,
+    continuous_autoregressive_act,
+    continuous_train_decoder_fn,
+    discrete_autoregressive_act,
+    discrete_train_decoder_fn,
 )
 from mava.networks.utils.sable.encode import (
     act_encoder_fn,

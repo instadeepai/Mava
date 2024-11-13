@@ -3,7 +3,7 @@ defaults:
   - arch: anakin
   - system: sable/rec_sable
   - network: rec_retention
-  - env: rware  # [cleaner, connector, gigastep, lbf, rware, smax]
+  - env: rware  # [cleaner, connector, gigastep, lbf, rware, smax, mabrax]
   - _self_
 
 hydra:
