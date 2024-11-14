@@ -15,7 +15,7 @@
 import copy
 import time
 from functools import partial
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, NamedTuple, Tuple
 
 import chex
 import flax
@@ -24,11 +24,13 @@ import jax
 import jax.numpy as jnp
 import optax
 from colorama import Fore, Style
+from flax.core.frozen_dict import FrozenDict
 from flax.core.frozen_dict import FrozenDict as Params
 from jax import tree
 from jumanji.env import Environment
 from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
+from optax._src.base import OptState
 from rich.pretty import pprint
 
 from mava.evaluator import ActorState, EvalActFn, get_eval_fn, get_num_eval_envs
@@ -40,7 +42,6 @@ from mava.systems.sable.types import (
     LearnerApply,
     Transition,
 )
-from mava.systems.sable.types import RecLearnerState as LearnerState
 from mava.types import Action, ExperimentOutput, LearnerFn, MarlEnv
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
@@ -50,6 +51,48 @@ from mava.utils.network_utils import get_action_head
 from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
+
+
+class RewardMoments(NamedTuple):
+    """Reward moments."""
+
+    mean: chex.Array = jnp.array(0.0)
+    var: chex.Array = jnp.array(1.0)
+    count: chex.Array = jnp.array(1e-8)
+
+
+class LearnerState(NamedTuple):
+    """State of the learner for Memory Sable"""
+
+    params: FrozenDict
+    opt_states: OptState
+    key: chex.PRNGKey
+    env_state: chex.Array
+    timestep: TimeStep
+    hstates: HiddenStates
+    reward_moments: RewardMoments
+
+
+def update_mean_var_count_from_moments(
+    mean: chex.Array,
+    var: chex.Array,
+    count: chex.Array,
+    batch_mean: chex.Array,
+    batch_var: chex.Array,
+    batch_count: chex.Array,
+) -> Tuple[chex.Array, chex.Array, chex.Array]:
+    """Updates the mean, var and count using the previous mean, var, count and batch values."""
+    delta = batch_mean - mean
+    tot_count = count + batch_count
+
+    new_mean = mean + delta * batch_count / tot_count
+    m_a = var * count
+    m_b = batch_var * batch_count
+    m2 = m_a + m_b + jnp.square(delta) * count * batch_count / tot_count
+    new_var = m2 / tot_count
+    new_count = tot_count
+
+    return new_mean, new_var, new_count
 
 
 def get_learner_fn(
@@ -86,7 +129,9 @@ def get_learner_fn(
 
         def _env_step(learner_state: LearnerState, _: int) -> Tuple[LearnerState, Transition]:
             """Step the environment."""
-            params, opt_states, key, env_state, last_timestep, hstates = learner_state
+            params, opt_states, key, env_state, last_timestep, hstates, reward_moments = (
+                learner_state
+            )
 
             # SELECT ACTION
             key, policy_key = jax.random.split(key)
@@ -119,16 +164,40 @@ def get_learner_fn(
                 lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
                 last_timestep.last(),
             )
+
+            normalised_reward = (timestep.reward - reward_moments.mean) / (
+                jnp.sqrt(reward_moments.var)
+            )
+
+            batch_mean = jnp.mean(timestep.reward)
+            batch_std = jnp.std(timestep.reward)
+            batch_count = jnp.array(
+                timestep.reward.shape[0]
+            )  # could be .size but let's treat the batch size as num_envs
+
+            new_mean, new_var, new_count = update_mean_var_count_from_moments(
+                reward_moments.mean,
+                reward_moments.var,
+                reward_moments.count,
+                batch_mean,
+                batch_std,
+                batch_count,
+            )
+
+            reward_moments = RewardMoments(mean=new_mean, var=new_var, count=new_count)
+
             transition = Transition(
                 prev_done,
                 action,
                 value,
-                timestep.reward,
+                normalised_reward,
                 log_prob,
                 last_timestep.observation,
                 info,
             )
-            learner_state = LearnerState(params, opt_states, key, env_state, timestep, hstates)
+            learner_state = LearnerState(
+                params, opt_states, key, env_state, timestep, hstates, reward_moments
+            )
             return learner_state, transition
 
         # COPY OLD HIDDEN STATES: TO BE USED IN THE TRAINING LOOP
@@ -143,7 +212,9 @@ def get_learner_fn(
         )
 
         # CALCULATE ADVANTAGE
-        params, opt_states, key, env_state, last_timestep, updated_hstates = learner_state
+        params, opt_states, key, env_state, last_timestep, updated_hstates, reward_moments = (
+            learner_state
+        )
         key, last_val_key = jax.random.split(key)
         _, _, current_val, _ = sable_action_select_fn(  # type: ignore
             params, last_timestep.observation, updated_hstates, last_val_key
@@ -366,6 +437,7 @@ def get_learner_fn(
             env_state,
             last_timestep,
             updated_hstates,
+            reward_moments,
         )
         metric = traj_batch.info
         return learner_state, (metric, loss_info)
@@ -511,12 +583,16 @@ def learner_setup(
 
     # Duplicate learner for update_batch_size.
     broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
+    broadcast_scalar = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size,))
+    reward_moments = RewardMoments()
     replicate_learner = tree.map(broadcast, replicate_learner)
     init_hstates = tree.map(broadcast, init_hstates)
+    reward_moments = jax.tree_map(broadcast_scalar, reward_moments)
 
     # Duplicate learner across devices.
     replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())
     init_hstates = flax.jax_utils.replicate(init_hstates, devices=jax.devices())
+    reward_moments = flax.jax_utils.replicate(reward_moments, devices=jax.devices())
 
     # Initialise learner state.
     params, opt_state, step_keys = replicate_learner
@@ -528,6 +604,7 @@ def learner_setup(
         env_state=env_states,
         timestep=timesteps,
         hstates=init_hstates,
+        reward_moments=reward_moments,
     )
 
     return learn, apply_fns[0], init_learner_state
