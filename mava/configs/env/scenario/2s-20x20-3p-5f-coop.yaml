@@ -1,0 +1,14 @@
+# The config of the 15x15-4p-5f scenario with the VectorObserver set as default
+name: LevelBasedForaging-v0
+task_name: 2s-20x20-3p-5f-coop
+
+task_config:
+  grid_size: 20
+  fov: 2
+  num_agents: 3
+  num_food: 5
+  max_agent_level: 2
+  force_coop: True
+
+env_kwargs:
+  {}  # there are no scenario specific env_kwargs for this env

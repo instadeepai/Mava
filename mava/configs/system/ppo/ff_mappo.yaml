@@ -23,5 +23,5 @@ max_grad_norm: 10.0 # Maximum norm of the gradients for a weight update.
 decay_learning_rates: False # Whether learning rates should be linearly decayed during training.
 
 # Start of episode token
-add_soe_flag: True
-add_prev_action: True
+add_soe_flag: False
+add_prev_action: False
