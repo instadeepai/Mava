@@ -2,7 +2,7 @@
 total_timesteps: ~ # Set the total environment steps.
 # If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
 num_updates: 1220 # Number of updates
-seed: 42
+seed: 1
 
 # --- Agent observations ---
 add_agent_id: True
@@ -27,5 +27,5 @@ recurrent_chunk_size: ~ # The size of the chunks in which the recurrent sequence
 # If unspecified, the rollout length is used as the chunk size which means that the recurrent sequences are not divided.
 
 # Start of episode token
-add_soe_flag: False
-add_prev_action: False
+add_soe_flag: True
+add_prev_action: True

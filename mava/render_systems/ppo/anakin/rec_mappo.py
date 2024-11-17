@@ -166,7 +166,7 @@ def run_experiment(_config: DictConfig) -> float:
         for _ in range(3):
             states.append(state)
 
-    eval_env.unwrapped.animate(states, interval=80, save_path="rec_mappo_rware.gif")
+    eval_env.unwrapped.animate(states, interval=80, save_path="rec_mappo_lbf.gif")
 
 
 @hydra.main(

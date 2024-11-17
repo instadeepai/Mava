@@ -3,7 +3,7 @@
 total_timesteps: ~ # Set the total environment steps.
 # If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
 num_updates: 1220 # Number of updates
-seed: 42
+seed: 0
 
 # --- Agent observations ---
 add_agent_id: True
@@ -23,5 +23,5 @@ max_grad_norm: 10.0 # Maximum norm of the gradients for a weight update.
 decay_learning_rates: False # Whether learning rates should be linearly decayed during training.
 
 # Start of episode token
-add_soe_flag: False
-add_prev_action: False
+add_soe_flag: True
+add_prev_action: True

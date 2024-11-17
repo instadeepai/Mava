@@ -27,9 +27,13 @@ from rich.pretty import pprint
 
 from mava.networks import SableNetwork
 from mava.networks.utils.sable import get_init_hidden_state
+from mava.systems.sable.types import (
+    HiddenStates,
+)
 from mava.systems.sable.types import RecLearnerState as LearnerState
 from mava.types import LearnerFn, MarlEnv
 from mava.utils import make_env as environments
+from mava.utils.checkpointing import Checkpointer
 from mava.utils.network_utils import get_action_head
 from mava.utils.total_timestep_checker import check_total_timesteps
 
@@ -84,6 +88,20 @@ def learner_setup(
         net_key,
         method="get_actions",
     )
+
+    # Load model from checkpoint if specified.
+    if config.logger.checkpointing.load_model:
+        loaded_checkpoint = Checkpointer(
+            model_name=config.logger.system_name,
+            **config.logger.checkpointing.load_args,  # Other checkpoint args
+        )
+        # Restore the learner state from the checkpoint
+        restored_params, _ = loaded_checkpoint.restore_params(
+            input_params=params, restore_hstates=True, THiddenState=HiddenStates
+        )
+        # Update the params and hidden states
+        params = restored_params
+
     # Pack apply and update functions.
     apply_fns = (
         partial(sable_network.apply, method="get_actions"),  # Execution function
@@ -135,13 +153,19 @@ def run_experiment(_config: DictConfig) -> float:
                 action_key,
             )
 
+            hidden_state = HiddenStates(
+                encoder=hidden_state.encoder,
+                decoder_self_retn=jnp.zeros_like(hidden_state.decoder_self_retn),
+                decoder_cross_retn=jnp.zeros_like(hidden_state.decoder_cross_retn),
+            )
+
             state, timestep = step_fn(state, action.squeeze(axis=0))
             states.append(state)
         # Freeze the terminal frame to pause the GIF.
         for _ in range(3):
             states.append(state)
 
-    eval_env.unwrapped.animate(states, interval=80, save_path="rec_sable_rware.gif")
+    eval_env.unwrapped.animate(states, interval=80, save_path="rec_sable_lbf_reset.gif")
 
 
 @hydra.main(

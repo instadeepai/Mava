@@ -80,8 +80,8 @@ class Checkpointer:
 
         options = orbax.checkpoint.CheckpointManagerOptions(
             create=True,
-            best_fn=lambda x: x["episode_return"],
-            best_mode="max",
+            # best_fn=lambda x: x["episode_return"],
+            # best_mode="max",
             save_interval_steps=save_interval_steps,
             max_to_keep=max_to_keep,
             keep_period=keep_period,

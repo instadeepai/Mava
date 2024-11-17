@@ -4,7 +4,7 @@ base_exp_path: results # Base path for logging.
 use_console: True # Whether to log to stdout.
 use_tb: False # Whether to use tensorboard logging.
 use_json: False # Whether to log marl-eval style to json files.
-use_neptune: True  # Whether to log to neptune.ai.
+use_neptune: False  # Whether to log to neptune.ai.
 
 # --- Other logger kwargs ---
 kwargs:
@@ -25,8 +25,8 @@ checkpointing:
     save_interval_steps: 1 # Number of steps between saving checkpoints.
     max_to_keep: 1 # Maximum number of checkpoints to keep.
     keep_period: ~ # Don't delete any checkpoint where step % keep_period == 0
-    checkpoint_uid: ~ # Unique identifier for checkpoint to save. Defaults to timestamp
+    checkpoint_uid: lbf-aims-render-final # Unique identifier for checkpoint to save. Defaults to timestamp
 
-  load_model: False # Whether to load model checkpoints.
+  load_model: True # Whether to load model checkpoints.
   load_args:
-    checkpoint_uid: rware_aims # Unique identifier for checkpoint to load.
+    checkpoint_uid: lbf-aims-render-final # Unique identifier for checkpoint to load.
