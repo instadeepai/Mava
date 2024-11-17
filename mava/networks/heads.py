@@ -21,6 +21,7 @@ from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
 from mava.networks.distributions import IdentityTransformation, TanhTransformedDistribution
+from mava.utils.centralised_controller import compute_joint_action_mask, get_all_action_combinations
 
 
 class DiscreteActionHead(nn.Module):
@@ -54,6 +55,58 @@ class DiscreteActionHead(nn.Module):
 
         masked_logits = jnp.where(
             action_mask,
+            actor_logits,
+            jnp.finfo(jnp.float32).min,
+        )
+
+        #  We transform this distribution with the `Identity()` transformation to
+        # keep the API identical to the ContinuousActionHead.
+        return IdentityTransformation(distribution=tfd.Categorical(logits=masked_logits))
+
+
+class CentralControllerDiscreteActionHead(nn.Module):
+    """Discrete Action Head"""
+
+    action_dim: int
+    num_agents: int
+    num_indiv_actions: int
+
+    @nn.compact
+    def __call__(
+        self,
+        obs_embedding: chex.Array,
+        action_mask: chex.Array,
+    ) -> tfd.TransformedDistribution:
+        """Action selection for distrete action space environments.
+
+        Args:
+        ----
+            obs_embedding: Observation embedding from network torso.
+            observation: Observation object containing `agents_view`, `action_mask` and
+                `step_count`.
+
+        Returns:
+        -------
+            A transformed tfd.categorical distribution on the action space for action sampling.
+
+        NOTE: We pass both the observation embedding and the observation object to the action head
+        since the observation object contains the action mask and other potentially useful
+        information.
+
+        """
+        actor_logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))(obs_embedding)
+
+        if self.num_agents is None or self.num_indiv_actions is None:
+            raise ValueError(
+                "Number of agents and actions must be provided for central controller."
+            )
+
+        action_combinations = get_all_action_combinations(self.num_agents, self.num_indiv_actions)
+        joint_action_mask = compute_joint_action_mask(action_mask, action_combinations)
+        joint_action_mask = joint_action_mask.squeeze(axis=-1)
+
+        masked_logits = jnp.where(
+            joint_action_mask,
             actor_logits,
             jnp.finfo(jnp.float32).min,
         )

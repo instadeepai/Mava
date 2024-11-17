@@ -38,6 +38,7 @@ from mava.wrappers import (
     AddStartFlagAndPrevAction,
     AgentIDWrapper,
     AutoResetWrapper,
+    CentralControllerWrapper,
     CleanerWrapper,
     ConnectorWrapper,
     GigastepWrapper,
@@ -74,6 +75,12 @@ def add_extra_wrappers(
     # Disable the AgentID wrapper if the environment has implicit agent IDs.
     config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
+    # Central controller should never get agent IDs or SOE flags.
+    if config.system.is_central_controller:
+        config.system.add_agent_id = False
+        config.system.add_soe_flag = False
+        config.system.add_prev_action = False
+
     if config.system.add_agent_id:
         train_env = AgentIDWrapper(train_env)
         eval_env = AgentIDWrapper(eval_env)
@@ -81,6 +88,10 @@ def add_extra_wrappers(
     if config.system.add_soe_flag:
         train_env = AddStartFlagAndPrevAction(train_env, config.system.add_prev_action)
         eval_env = AddStartFlagAndPrevAction(eval_env, config.system.add_prev_action)
+
+    if config.system.is_central_controller:
+        train_env = CentralControllerWrapper(train_env)
+        eval_env = CentralControllerWrapper(eval_env)
 
     train_env = AutoResetWrapper(train_env)
     train_env = RecordEpisodeMetrics(train_env)
