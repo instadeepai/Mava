@@ -70,13 +70,17 @@ _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 
 def add_extra_wrappers(
-    train_env: MarlEnv, eval_env: MarlEnv, config: DictConfig, render: bool = False
+    train_env: MarlEnv,
+    eval_env: MarlEnv,
+    config: DictConfig,
+    render: bool = False,
+    is_central_controller: bool = False,
 ) -> Tuple[MarlEnv, MarlEnv]:
     # Disable the AgentID wrapper if the environment has implicit agent IDs.
     config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
     # Central controller should never get agent IDs or SOE flags.
-    if config.system.is_central_controller:
+    if is_central_controller:
         config.system.add_agent_id = False
         config.system.add_soe_flag = False
         config.system.add_prev_action = False
@@ -89,7 +93,7 @@ def add_extra_wrappers(
         train_env = AddStartFlagAndPrevAction(train_env, config.system.add_prev_action)
         eval_env = AddStartFlagAndPrevAction(eval_env, config.system.add_prev_action)
 
-    if config.system.is_central_controller:
+    if is_central_controller:
         train_env = CentralControllerWrapper(train_env)
         eval_env = CentralControllerWrapper(eval_env)
 
@@ -102,7 +106,10 @@ def add_extra_wrappers(
 
 
 def make_jumanji_env(
-    config: DictConfig, add_global_state: bool = False, render: bool = False
+    config: DictConfig,
+    add_global_state: bool = False,
+    render: bool = False,
+    is_central_controller: bool = False,
 ) -> Tuple[MarlEnv, MarlEnv]:
     """
     Create a Jumanji environments for training and evaluation.
@@ -130,7 +137,9 @@ def make_jumanji_env(
     train_env = wrapper(train_env, add_global_state=add_global_state)
     eval_env = wrapper(eval_env, add_global_state=add_global_state)
 
-    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config, render)
+    train_env, eval_env = add_extra_wrappers(
+        train_env, eval_env, config, render, is_central_controller
+    )
     return train_env, eval_env
 
 
@@ -227,7 +236,10 @@ def make_gigastep_env(
 
 
 def make(
-    config: DictConfig, add_global_state: bool = False, render: bool = False
+    config: DictConfig,
+    add_global_state: bool = False,
+    render: bool = False,
+    is_central_controller: bool = False,
 ) -> Tuple[MarlEnv, MarlEnv]:
     """
     Create environments for training and evaluation.
@@ -245,7 +257,7 @@ def make(
     env_name = config.env.env_name
 
     if env_name in _jumanji_registry:
-        return make_jumanji_env(config, add_global_state, render)
+        return make_jumanji_env(config, add_global_state, render, is_central_controller)
     elif env_name in _jaxmarl_registry:
         return make_jaxmarl_env(config, add_global_state)
     elif env_name in _matrax_registry:

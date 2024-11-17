@@ -453,7 +453,7 @@ def run_experiment(_config: DictConfig) -> float:
     n_devices = len(jax.devices())
 
     # Create the enviroments for train and eval.
-    env, eval_env = environments.make(config)
+    env, eval_env = environments.make(config=config, is_central_controller=True)
 
     # PRNG keys.
     key, key_e, actor_net_key, critic_net_key = jax.random.split(
