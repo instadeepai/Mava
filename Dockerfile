@@ -1,23 +1,45 @@
-# Stage 1: Build environment
-FROM python:3.12-slim AS core
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
 
-# Add git
-RUN apt-get update && apt-get install -y git build-essential pkg-config libhdf5-dev
+# Ensure no installs try to launch interactive screen
+ARG DEBIAN_FRONTEND=noninteractive
 
-# Add uv and use the system python (no need to make venv)
-USER root
-COPY --from=ghcr.io/astral-sh/uv:0.4.20 /uv /bin/uv
-ENV UV_SYSTEM_PYTHON=1
+# Update packages and install python3.9 and other dependencies
+RUN apt-get update -y && \
+    apt-get install -y software-properties-common git && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get install -y python3.12 python3.12-dev python3-pip python3.12-venv && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.12 10 && \
+    python -m venv mava && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-WORKDIR /home/app/mava
+# Setup virtual env and path
+ENV VIRTUAL_ENV /mava
+ENV PATH /mava/bin:$PATH
 
-COPY . .
+# Location of mava folder
+ARG folder=/home/app/mava
 
-RUN uv pip install -e .
+# Set working directory
+WORKDIR ${folder}
 
-ARG USE_CUDA=false
+# Copy all code needed to install dependencies
+COPY ./requirements ./requirements
+COPY setup.py .
+COPY README.md .
+COPY mava/version.py mava/version.py
+
+RUN echo "Installing requirements..."
+RUN pip install --quiet --upgrade pip setuptools wheel &&  \
+    pip install -e .
+
+# Need to use specific cuda versions for jax
+ARG USE_CUDA=true
 RUN if [ "$USE_CUDA" = true ] ; \
-    then uv pip install jax[cuda12]==0.4.30 ; \
+    then pip install "jax[cuda12]==0.4.30" ; \
     fi
+
+# Copy all code
+COPY . .
 
 EXPOSE 6006

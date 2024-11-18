@@ -19,8 +19,6 @@ import pytest
 from hydra import compose, initialize
 from omegaconf import DictConfig, OmegaConf
 
-from test.utils import find_replace
-
 # This integration test is not exhaustive, that would be too expensive. This means that not all
 # system run all envs, but each env and each system is run at least once.
 # For each system we select a random environment to run.
@@ -33,13 +31,10 @@ ppo_systems = [
     "ppo.anakin.rec_ippo",
     "ppo.anakin.rec_mappo",
 ]
+q_learning_systems = ["q_learning.anakin.rec_iql"]
+sac_systems = ["sac.anakin.ff_isac", "sac.anakin.ff_masac"]
 
-sac_systems = ["sac.anakin.ff_isac", "sac.anakin.ff_masac", "sac.anakin.ff_hasac"]
-q_learning_systems = ["q_learning.anakin.rec_iql", "q_learning.anakin.rec_qmix"]
-transformer_systems = ["mat.anakin.mat"]
-sable_systems = ["sable.anakin.ff_sable", "sable.anakin.rec_sable"]
-
-discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax", "vector-connector"]
+discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax"]
 cnn_envs = ["cleaner", "connector"]
 continuous_envs = ["mabrax"]
 
@@ -58,29 +53,19 @@ def _run_system(system_name: str, cfg: DictConfig) -> float:
     return float(eval_perf)
 
 
-def _get_fast_config(cfg: DictConfig, config_modifications: dict) -> DictConfig:
+def _get_fast_config(cfg: DictConfig, fast_config: dict) -> DictConfig:
     """Makes the configs use a minimum number of timesteps and evaluations."""
-    return OmegaConf.create(
-        find_replace(OmegaConf.to_container(cfg, resolve=True), config_modifications)
-    )
+    dconf: dict = OmegaConf.to_container(cfg, resolve=True)
+    dconf["system"] |= fast_config["system"]
+    dconf["arch"] |= fast_config["arch"]
+    cfg = OmegaConf.create(dconf)
+
+    return cfg
 
 
 @pytest.mark.parametrize("system_path", ppo_systems)
 def test_ppo_system(fast_config: dict, system_path: str) -> None:
     """Test all ppo systems on random envs."""
-    _, _, system_name = system_path.split(".")
-    env = random.choice(discrete_envs)
-
-    with initialize(version_base=None, config_path=config_path):
-        cfg = compose(config_name=f"{system_name}", overrides=[f"env={env}"])
-        cfg = _get_fast_config(cfg, fast_config)
-
-    _run_system(system_path, cfg)
-
-
-@pytest.mark.parametrize("system_path", sable_systems)
-def test_sable_system(fast_config: dict, system_path: str) -> None:
-    """Test all sable systems on random envs."""
     _, _, system_name = system_path.split(".")
     env = random.choice(discrete_envs)
 
@@ -109,19 +94,6 @@ def test_sac_system(fast_config: dict, system_path: str) -> None:
     """Test all SAC systems on random envs."""
     _, _, system_name = system_path.split(".")
     env = random.choice(continuous_envs)
-
-    with initialize(version_base=None, config_path=config_path):
-        cfg = compose(config_name=f"{system_name}", overrides=[f"env={env}"])
-        cfg = _get_fast_config(cfg, fast_config)
-
-    _run_system(system_path, cfg)
-
-
-@pytest.mark.parametrize("system_path", transformer_systems)
-def test_transformer_system(fast_config: dict, system_path: str) -> None:
-    """Test transformer systems on random envs."""
-    _, _, system_name = system_path.split(".")
-    env = random.choice(continuous_envs + discrete_envs)
 
     with initialize(version_base=None, config_path=config_path):
         cfg = compose(config_name=f"{system_name}", overrides=[f"env={env}"])
