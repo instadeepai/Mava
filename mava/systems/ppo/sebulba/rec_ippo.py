@@ -571,7 +571,7 @@ def learner_setup(
 
     action_head, _ = get_action_head(action_space)
     actor_action_head = hydra.utils.instantiate(action_head, action_dim=config.system.num_actions)
-    
+
     critic_pre_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
     critic_post_torso = hydra.utils.instantiate(config.network.critic_network.post_torso)
 
