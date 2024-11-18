@@ -32,8 +32,7 @@ from flax.core.frozen_dict import FrozenDict
 from jax import tree
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
-from jax.sharding import Mesh, NamedSharding, Sharding
-from jax.sharding import PartitionSpec
+from jax.sharding import Mesh, NamedSharding, PartitionSpec, Sharding
 from numpy.typing import NDArray
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
@@ -716,9 +715,7 @@ def run_experiment(_config: DictConfig) -> float:
     check_sebulba_config(config)
 
     steps_per_rollout = (
-        config.system.rollout_length
-        * config.arch.num_envs
-        * config.system.num_updates_per_eval
+        config.system.rollout_length * config.arch.num_envs * config.system.num_updates_per_eval
     )
 
     # Logger setup

@@ -58,7 +58,6 @@ def check_total_timesteps(config: DictConfig) -> DictConfig:
             * config.system.rollout_length
             * update_batch_size
             * config.arch.num_envs
-
         )
     else:
         config.system.total_timesteps = int(config.system.total_timesteps)
@@ -68,7 +67,6 @@ def check_total_timesteps(config: DictConfig) -> DictConfig:
             // update_batch_size
             // config.arch.num_envs
             // n_devices
-
         )
         print(
             f"{Fore.RED}{Style.BRIGHT} Changing the number of updates "

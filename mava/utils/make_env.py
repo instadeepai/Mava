@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple, Type
+from typing import Tuple
 
 import gymnasium
 import gymnasium as gym
@@ -56,10 +56,8 @@ from mava.wrappers import (
     SmacWrapper,
     SmaxWrapper,
     UoeWrapper,
-    VectorConnectorWrapper,
     async_multiagent_worker,
 )
-from mava.wrappers.jaxmarl import JaxMarlWrapper
 
 # Registry mapping environment names to their generator and wrapper classes.
 _jumanji_registry = {
