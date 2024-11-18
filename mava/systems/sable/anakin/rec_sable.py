@@ -44,10 +44,10 @@ from mava.systems.sable.types import RecLearnerState as LearnerState
 from mava.types import Action, ExperimentOutput, LearnerFn, MarlEnv
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
+from mava.utils.config import check_total_timesteps
 from mava.utils.jax_utils import concat_time_and_agents, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.network_utils import get_action_head
-from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
@@ -192,7 +192,7 @@ def get_learner_fn(
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
                 # UNPACK TRAIN STATE AND BATCH INFO
-                params, opt_state = train_state
+                params, opt_state, key = train_state
                 traj_batch, advantages, targets, prev_hstates = batch_info
 
                 def _loss_fn(
@@ -201,6 +201,7 @@ def get_learner_fn(
                     gae: chex.Array,
                     value_targets: chex.Array,
                     prev_hstates: HiddenStates,
+                    rng_key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate Sable loss."""
                     # RERUN NETWORK
@@ -210,6 +211,7 @@ def get_learner_fn(
                         traj_batch.action,
                         prev_hstates,
                         traj_batch.done,
+                        rng_key,
                     )
 
                     # CALCULATE ACTOR LOSS
@@ -247,6 +249,7 @@ def get_learner_fn(
                     return total_loss, (loss_actor, entropy, value_loss)
 
                 # CALCULATE ACTOR LOSS
+                key, entropy_key = jax.random.split(key)
                 grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
                 loss_info, grads = grad_fn(
                     params,
@@ -254,6 +257,7 @@ def get_learner_fn(
                     advantages,
                     targets,
                     prev_hstates,
+                    entropy_key,
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
@@ -280,7 +284,7 @@ def get_learner_fn(
                     "entropy": entropy,
                 }
 
-                return (new_params, new_opt_state), loss_info
+                return (new_params, new_opt_state, key), loss_info
 
             (
                 params,
@@ -293,7 +297,7 @@ def get_learner_fn(
             ) = update_state
 
             # SHUFFLE MINIBATCHES
-            key, batch_shuffle_key, agent_shuffle_key = jax.random.split(key, 3)
+            key, batch_shuffle_key, agent_shuffle_key, entropy_key = jax.random.split(key, 4)
 
             # Shuffle batch
             batch_size = config.arch.num_envs
@@ -322,9 +326,9 @@ def get_learner_fn(
             )
 
             # UPDATE MINIBATCHES
-            (params, opt_states), loss_info = jax.lax.scan(
+            (params, opt_states, entropy_key), loss_info = jax.lax.scan(
                 _update_minibatch,
-                (params, opt_states),
+                (params, opt_states, entropy_key),
                 (*minibatches, prev_hs_minibatch),
             )
 
@@ -412,7 +416,7 @@ def learner_setup(
     key, net_key = keys
 
     # Get number of agents and actions.
-    action_dim = int(env.action_spec().num_values[0])
+    action_dim = env.action_dim
     n_agents = env.action_spec().shape[0]
     config.system.num_agents = n_agents
     config.system.num_actions = action_dim
@@ -425,7 +429,7 @@ def learner_setup(
     else:
         config.network.memory_config.chunk_size = config.system.rollout_length * n_agents
 
-    _, action_space_type = get_action_head(env)
+    _, action_space_type = get_action_head(env.action_spec())
 
     # Define network.
     sable_network = SableNetwork(

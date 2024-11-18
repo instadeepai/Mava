@@ -3,7 +3,7 @@ defaults:
   - arch: anakin
   - system: sable/ff_sable
   - network: ff_retention
-  - env: rware  # [cleaner, connector, gigastep, lbf, rware, smax]
+  - env: rware  # [cleaner, connector, gigastep, lbf, rware, smax, mpe]
   - _self_
 
 hydra:

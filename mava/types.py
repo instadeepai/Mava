@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Generic, Protocol, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, Optional, Protocol, Tuple, TypeVar, Union
 
 import chex
 import jumanji.specs as specs
@@ -117,7 +117,7 @@ class Observation(NamedTuple):
 
     agents_view: chex.Array  # (num_agents, num_obs_features)
     action_mask: chex.Array  # (num_agents, num_actions)
-    step_count: chex.Array  # (num_agents, )
+    step_count: Optional[chex.Array] = None  # (num_agents, )
 
 
 class ObservationGlobalState(NamedTuple):
@@ -130,7 +130,7 @@ class ObservationGlobalState(NamedTuple):
     agents_view: chex.Array  # (num_agents, num_obs_features)
     action_mask: chex.Array  # (num_agents, num_actions)
     global_state: chex.Array  # (num_agents, num_agents * num_obs_features)
-    step_count: chex.Array  # (num_agents, )
+    step_count: Optional[chex.Array] = None  # (num_agents, )
 
 
 RNNObservation: TypeAlias = Tuple[Observation, Done]
@@ -140,6 +140,7 @@ MavaObservation: TypeAlias = Union[Observation, ObservationGlobalState]
 # `MavaState` is the main type passed around in our systems. It is often used as a scan carry.
 # Types like: `LearnerState` (mava/systems/<system_name>/types.py) are `MavaState`s.
 MavaState = TypeVar("MavaState")
+MavaTransition = TypeVar("MavaTransition")
 
 
 class ExperimentOutput(NamedTuple, Generic[MavaState]):
@@ -151,6 +152,7 @@ class ExperimentOutput(NamedTuple, Generic[MavaState]):
 
 
 LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]
+SebulbaLearnerFn = Callable[[MavaState, MavaTransition], ExperimentOutput[MavaState]]
 ActorApply = Callable[[FrozenDict, Observation], Distribution]
 CriticApply = Callable[[FrozenDict, Observation], Value]
 RecActorApply = Callable[

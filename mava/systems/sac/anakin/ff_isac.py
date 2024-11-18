@@ -49,10 +49,10 @@ from mava.systems.sac.types import (
 from mava.types import MarlEnv, Observation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
+from mava.utils.config import check_total_timesteps
 from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.network_utils import get_action_head
-from mava.utils.total_timestep_checker import check_total_timesteps
 from mava.wrappers import episode_metrics
 
 
@@ -111,7 +111,7 @@ def init(
 
     # Making actor network
     actor_torso = hydra.utils.instantiate(cfg.network.actor_network.pre_torso)
-    action_head, _ = get_action_head(env)
+    action_head, _ = get_action_head(env.action_spec())
     actor_action_head = hydra.utils.instantiate(
         action_head, action_dim=env.action_dim, independent_std=False
     )

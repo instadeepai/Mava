@@ -1,0 +1,25 @@
+# ---Environment Configs---
+defaults:
+  - _self_
+
+env_name: SMACLite  # Used for logging purposes.
+scenario:
+  name: smaclite
+  task_name: smaclite/2s3z-v0  # smaclite/ + ['10m_vs_11m-v0', '27m_vs_30m-v0', '3s5z_vs_3s6z-v0', '2s3z-v0', '3s5z-v0', '2c_vs_64zg-v0', '2s_vs_1sc-v0', '3s_vs_5z-v0']
+
+# Defines the metric that will be used to evaluate the performance of the agent.
+# This metric is returned at the end of an experiment and can be used for hyperparameter tuning.
+eval_metric: episode_return
+
+# Whether the environment observations encode implicit agent IDs. If True, the AgentID wrapper is not used.
+# This should not be changed.
+implicit_agent_id: False
+# Whether or not to log the winrate of this environment. This should not be changed as not all
+# environments have a winrate metric.
+log_win_rate: True
+
+# Weather or not to sum the returned rewards over all of the agents.
+use_shared_rewards: True
+
+kwargs:
+  max_episode_steps: 500

@@ -18,7 +18,10 @@ import chex
 import distrax
 import jax
 import jax.numpy as jnp
+import tensorflow_probability.substrates.jax.distributions as tfd
 from flax import linen as nn
+
+from mava.networks.distributions import TanhTransformedDistribution
 
 # General shapes legend:
 # B: batch size
@@ -26,8 +29,11 @@ from flax import linen as nn
 # A: number of actions
 # N: number of agents
 
+# Constant to avoid numerical instability
+_MIN_SCALE = 1e-3
 
-def train_decoder_fn(
+
+def discrete_train_decoder_fn(
     decoder: nn.Module,
     obs_rep: chex.Array,
     action: chex.Array,
@@ -43,7 +49,7 @@ def train_decoder_fn(
     # Delete `rng_key` since it is not used in discrete action space
     del rng_key
 
-    shifted_actions = get_shifted_actions(action, legal_actions, n_agents=n_agents)
+    shifted_actions = get_shifted_discrete_actions(action, legal_actions, n_agents=n_agents)
     logit = jnp.zeros_like(legal_actions, dtype=jnp.float32)
 
     # Apply the decoder per chunk
@@ -73,14 +79,14 @@ def train_decoder_fn(
 
     distribution = distrax.Categorical(logits=masked_logits)
     action_log_prob = distribution.log_prob(action)
-    action_log_prob = jnp.expand_dims(action_log_prob, axis=-1)
-    entropy = jnp.expand_dims(distribution.entropy(), axis=-1)
 
-    return action_log_prob, entropy
+    return action_log_prob, distribution.entropy()
 
 
-def get_shifted_actions(action: chex.Array, legal_actions: chex.Array, n_agents: int) -> chex.Array:
-    """Get the shifted action sequence for predicting the next action."""
+def get_shifted_discrete_actions(
+    action: chex.Array, legal_actions: chex.Array, n_agents: int
+) -> chex.Array:
+    """Get the shifted discrete action sequence for predicting the next action."""
     B, S, A = legal_actions.shape
 
     # Create a shifted action sequence for predicting the next action
@@ -102,7 +108,7 @@ def get_shifted_actions(action: chex.Array, legal_actions: chex.Array, n_agents:
     return shifted_actions
 
 
-def autoregressive_act(
+def discrete_autoregressive_act(
     decoder: nn.Module,
     obs_rep: chex.Array,
     hstates: chex.Array,
@@ -141,5 +147,122 @@ def autoregressive_act(
         shifted_actions = shifted_actions.at[:, i + 1, 1:].set(
             jax.nn.one_hot(action[:, 0], A), mode="drop"
         )
+    output_actions = output_action.astype(jnp.int32)
+    output_actions = jnp.squeeze(output_actions, axis=-1)
+    output_action_log = jnp.squeeze(output_action_log, axis=-1)
+    return output_actions, output_action_log, hstates
 
-    return output_action.astype(jnp.int32), output_action_log, hstates
+
+def continuous_train_decoder_fn(
+    decoder: nn.Module,
+    obs_rep: chex.Array,
+    action: chex.Array,
+    legal_actions: chex.Array,
+    hstates: chex.Array,
+    dones: chex.Array,
+    step_count: chex.Array,
+    n_agents: int,
+    chunk_size: int,
+    action_dim: int,
+    rng_key: Optional[chex.PRNGKey] = None,
+) -> Tuple[chex.Array, chex.Array]:
+    """Parallel action sampling for discrete action spaces."""
+    # Delete `legal_actions` since it is not used in continuous action space
+    del legal_actions
+
+    B, S, _ = action.shape
+    shifted_actions = get_shifted_continuous_actions(action, action_dim, n_agents=n_agents)
+    act_mean = jnp.zeros((B, S, action_dim), dtype=jnp.float32)
+
+    # Apply the decoder per chunk
+    num_chunks = shifted_actions.shape[1] // chunk_size
+    for chunk_id in range(0, num_chunks):
+        start_idx = chunk_id * chunk_size
+        end_idx = (chunk_id + 1) * chunk_size
+        # Chunk obs_rep, shifted_actions, dones, and step_count
+        chunked_obs_rep = obs_rep[:, start_idx:end_idx]
+        chunk_shifted_actions = shifted_actions[:, start_idx:end_idx]
+        chunk_dones = dones[:, start_idx:end_idx]
+        chunk_step_count = step_count[:, start_idx:end_idx]
+        chunked_act_mean, hstates = decoder(
+            action=chunk_shifted_actions,
+            obs_rep=chunked_obs_rep,
+            hstates=hstates,
+            dones=chunk_dones,
+            step_count=chunk_step_count,
+        )
+        act_mean = act_mean.at[:, start_idx:end_idx].set(chunked_act_mean)
+
+    action_std = jax.nn.softplus(decoder.log_std) + _MIN_SCALE
+
+    base_distribution = tfd.Normal(loc=act_mean, scale=action_std)
+    distribution = tfd.Independent(
+        TanhTransformedDistribution(base_distribution),
+        reinterpreted_batch_ndims=1,
+    )
+
+    action_log_prob = distribution.log_prob(action)
+    entropy = distribution.entropy(seed=rng_key)
+
+    return action_log_prob, entropy
+
+
+def get_shifted_continuous_actions(
+    action: chex.Array, action_dim: int, n_agents: int
+) -> chex.Array:
+    """Get the shifted continuous action sequence for predicting the next action."""
+    B, S, _ = action.shape
+
+    shifted_actions = jnp.zeros((B, S, action_dim))
+    start_timestep_token = jnp.zeros(action_dim)
+    shifted_actions = shifted_actions.at[:, 1:, :].set(action[:, :-1, :])
+    shifted_actions = shifted_actions.at[:, ::n_agents, :].set(start_timestep_token)
+
+    return shifted_actions
+
+
+def continuous_autoregressive_act(
+    decoder: nn.Module,
+    obs_rep: chex.Array,
+    hstates: chex.Array,
+    legal_actions: chex.Array,
+    step_count: chex.Array,
+    action_dim: int,
+    key: chex.PRNGKey,
+) -> Tuple[chex.Array, chex.Array, chex.Array]:
+    # Delete `legal_actions` since it is not used in continuous action space
+    del legal_actions
+
+    B, N = step_count.shape
+    shifted_actions = jnp.zeros((B, N, action_dim))
+    output_action = jnp.zeros((B, N, action_dim))
+    output_action_log = jnp.zeros((B, N))
+
+    # Apply the decoder autoregressively
+    for i in range(N):
+        act_mean, hstates = decoder.recurrent(
+            action=shifted_actions[:, i : i + 1, :],
+            obs_rep=obs_rep[:, i : i + 1, :],
+            hstates=hstates,
+            step_count=step_count[:, i : i + 1],
+        )
+        action_std = jax.nn.softplus(decoder.log_std) + _MIN_SCALE
+
+        key, sample_key = jax.random.split(key)
+
+        base_distribution = tfd.Normal(loc=act_mean, scale=action_std)
+        distribution = tfd.Independent(
+            TanhTransformedDistribution(base_distribution),
+            reinterpreted_batch_ndims=1,
+        )
+
+        # the action and raw action are now just identical.
+        action = distribution.sample(seed=sample_key)
+        action_log = distribution.log_prob(action)
+
+        output_action = output_action.at[:, i, :].set(action[:, i, :])
+        output_action_log = output_action_log.at[:, i].set(action_log[:, i])
+        # Adds all except the last action to shifted_actions, as it is out of range
+        shifted_actions = shifted_actions.at[:, i + 1, :].set(action[:, i, :], mode="drop")
+
+    return output_action, output_action_log, hstates

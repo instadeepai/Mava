@@ -1,0 +1,25 @@
+# --- Sebulba config ---
+architecture_name: sebulba
+
+# --- Training ---
+num_envs: 32  # number of environments per thread.
+
+# --- Evaluation ---
+evaluation_greedy: False # Evaluate the policy greedily. If True the policy will select
+  # an action which corresponds to the greatest logit. If false, the policy will sample
+  # from the logits.
+num_eval_episodes: 32 # Number of episodes to evaluate per evaluation.
+num_evaluation: 100 # Number of evenly spaced evaluations to perform during training.
+num_absolute_metric_eval_episodes: 320  # Number of episodes to evaluate the absolute metric (the final evaluation).
+absolute_metric: True # Whether the absolute metric should be computed. For more details
+# on the absolute metric please see: https://arxiv.org/abs/2209.10485
+
+# --- Sebulba devices config ---
+n_threads_per_executor: 2  # num of different threads/env batches per actor
+actor_device_ids: [0] # ids of actor devices
+learner_device_ids: [0] # ids of learner devices
+rollout_queue_size : 5
+# The size of the pipeline queue determines the extent of off-policy training allowed. A larger value permits more off-policy training.
+# Too large of a value with too many actors will lead to all of the updates getting wasted in old episodes
+# Too small of a value and the utility of having multiple actors is lost.
+# A value of 1 with a single actor leads to almost strictly on-policy training.

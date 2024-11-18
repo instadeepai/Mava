@@ -41,7 +41,7 @@ sable_systems = ["sable.anakin.ff_sable", "sable.anakin.rec_sable"]
 
 discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax", "vector-connector"]
 cnn_envs = ["cleaner", "connector"]
-continuous_envs = ["mabrax"]
+continuous_envs = ["mabrax", "mpe"]
 
 
 def _run_system(system_name: str, cfg: DictConfig) -> float:
@@ -82,7 +82,7 @@ def test_ppo_system(fast_config: dict, system_path: str) -> None:
 def test_sable_system(fast_config: dict, system_path: str) -> None:
     """Test all sable systems on random envs."""
     _, _, system_name = system_path.split(".")
-    env = random.choice(discrete_envs)
+    env = random.choice(continuous_envs + discrete_envs)
 
     with initialize(version_base=None, config_path=config_path):
         cfg = compose(config_name=f"{system_name}", overrides=[f"env={env}"])
@@ -159,15 +159,13 @@ def test_discrete_cnn_env(fast_config: dict, env_name: str) -> None:
     _run_system(system_path, cfg)
 
 
-# leaving this here for the future if we have some new continuous envs
-@pytest.mark.skip(reason="MaBrax is the only continuous env and already tested in test_mava_system")
 @pytest.mark.parametrize("env_name", continuous_envs)
 def test_continuous_env(fast_config: dict, env_name: str) -> None:
     """Test all continuous envs on random systems."""
     system_path = random.choice(ppo_systems + sac_systems)
     _, _, system_name = system_path.split(".")
-
     overrides = [f"env={env_name}"]
+
     with initialize(version_base=None, config_path=config_path):
         cfg = compose(config_name=f"{system_name}", overrides=overrides)
         cfg = _get_fast_config(cfg, fast_config)

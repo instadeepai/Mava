@@ -4,7 +4,7 @@ defaults:
   - arch: anakin
   - system: sac/ff_hasac
   - network: mlp  # [mlp, cnn]
-  - env: mabrax  # [mabrax]
+  - env: mabrax  # [mabrax, mpe]
 
 hydra:
   searchpath:
