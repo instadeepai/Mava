@@ -25,9 +25,7 @@ import hydra
 import jax
 import jax.debug
 import jax.numpy as jnp
-from mava.networks.base import ScannedRNN
 import numpy as np
-from numpy.typing import NDArray
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
@@ -35,27 +33,34 @@ from jax import tree
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.sharding import Mesh, NamedSharding, Sharding
-from jax.sharding import PartitionSpec as P
+from jax.sharding import PartitionSpec
+from numpy.typing import NDArray
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
 from mava.evaluator import get_num_eval_envs, make_rec_eval_act_fn
-
+from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
 from mava.networks import RecurrentActor as Actor
 from mava.networks import RecurrentValueNet as Critic
-from mava.systems.ppo.types import HiddenStates, RNNLearnerState, OptStates, Params, RNNPPOTransition
+from mava.networks.base import ScannedRNN
+from mava.systems.ppo.types import (
+    HiddenStates,
+    OptStates,
+    Params,
+    RNNLearnerState,
+    RNNPPOTransition,
+)
 from mava.types import (
-    RecActorApply,
-    RecCriticApply,
     ExperimentOutput,
     Observation,
+    RecActorApply,
+    RecCriticApply,
     SebulbaLearnerFn,
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_sebulba_config, check_total_timesteps
-from mava.utils.jax_utils import merge_leading_dims, switch_leading_axes
+from mava.utils.jax_utils import switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
 from mava.utils.training import make_learning_rate
@@ -69,7 +74,7 @@ def rollout(
     config: DictConfig,
     rollout_queue: Pipeline,
     params_source: ParamsSource,
-    apply_fns: Tuple[RecActorApply,RecCriticApply],
+    apply_fns: Tuple[RecActorApply, RecCriticApply],
     actor_device: int,
     seeds: List[int],
     thread_lifetime: ThreadLifetime,
@@ -102,7 +107,7 @@ def rollout(
         key: chex.PRNGKey,
     ) -> Tuple:
         """Get action and value."""
-        #actor_policy = actor_apply_fn(params.actor_params, observation)
+        # actor_policy = actor_apply_fn(params.actor_params, observation)
 
         # simon
         batched_observation = tree.map(lambda x: x[jnp.newaxis, :], observation)
@@ -121,13 +126,13 @@ def rollout(
         log_prob = actor_policy.log_prob(action)
         # It may be faster to calculate the values in the learner as
         # then we won't need to pass critic params to actors.
-        #value = critic_apply_fn(params.critic_params, observation).squeeze()
+        # value = critic_apply_fn(params.critic_params, observation).squeeze()
         hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
         return action, log_prob, value, hstates
 
     timestep = env.reset(seed=seeds)
     dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
-    
+
     # simon
     # Initialise hidden states.
     init_policy_hstate = ScannedRNN.initialize_carry(
@@ -155,13 +160,19 @@ def rollout(
                 # Sample action from the policy and squeeze out the batch dimension.
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
-                    action, log_prob, value, hstates_tpu = act_fn(params, obs_tpu, last_dones, hstates_tpu, act_key)
-                    value, action, log_prob = value.squeeze(0), action.squeeze(0), log_prob.squeeze(0)
+                    action, log_prob, value, hstates_tpu = act_fn(
+                        params, obs_tpu, last_dones, hstates_tpu, act_key
+                    )
+                    value, action, log_prob = (
+                        value.squeeze(0),
+                        action.squeeze(0),
+                        log_prob.squeeze(0),
+                    )
                     cpu_action = jax.device_get(action)
 
                 # Step environment
                 with RecordTimeTo(actor_timings["env_step_time"]):
-                    timestep = env.step(cpu_action.swapaxes(0, 1))
+                    timestep = env.step(cpu_action)
 
                 dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
@@ -175,7 +186,7 @@ def rollout(
                         log_prob,
                         obs_tpu,
                         hstates_tpu,
-                        timestep.extras,
+                        timestep.extras["episode_metrics"],
                     )
                 )
 
@@ -198,7 +209,7 @@ def get_learner_step_fn(
 ) -> SebulbaLearnerFn[RNNLearnerState, RNNPPOTransition]:
     """Get the learner function."""
 
-    num_agents, num_envs = config.system.num_agents, config.arch.num_envs
+    num_envs = config.arch.num_envs
     num_learner_envs = int(num_envs // len(config.arch.learner_device_ids))
 
     # Get apply and update functions for actor and critic networks.
@@ -222,8 +233,8 @@ def get_learner_step_fn(
         def _calculate_gae(
             traj_batch: RNNPPOTransition, last_val: chex.Array, last_done: chex.Array
         ) -> Tuple[chex.Array, chex.Array]:
-            
             gamma, gae_lambda = config.system.gamma, config.system.gae_lambda
+
             def _get_advantages(
                 carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
             ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
@@ -252,7 +263,7 @@ def get_learner_step_fn(
             last_done,
             hstates,
         ) = learner_state
-        
+
         batched_last_observation = tree.map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
         ac_in = (
             batched_last_observation,
@@ -386,10 +397,14 @@ def get_learner_step_fn(
                 return (new_params, new_opt_state, key), loss_info
 
             params, opt_states, traj_batch, advantages, targets, key = update_state
+
+            key = jnp.squeeze(key, axis=0)  # Remove the learner_devices axis
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
+            key = jnp.expand_dims(key, axis=0)  # add the learner_devices axis for shape consitency
+
             # Shuffle minibatches
-            #batch_size = config.system.rollout_length * num_learner_envs
-            #permutation = jax.random.permutation(shuffle_key, batch_size)
+            # batch_size = config.system.rollout_length * num_learner_envs
+            # permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
 
             # simon
@@ -431,7 +446,7 @@ def get_learner_step_fn(
         )
 
         params, opt_states, traj_batch, advantages, targets, key = update_state
-        #learner_state = LearnerState(params, opt_states, key, None, learner_state.timestep)
+        # learner_state = LearnerState(params, opt_states, key, None, learner_state.timestep)
         learner_state = RNNLearnerState(
             params,
             opt_states,
@@ -488,40 +503,26 @@ def learner_thread(
     for _ in range(config.arch.num_evaluation):
         # Create the lists to store metrics and timings for this learning iteration.
         metrics: List[Tuple[Dict, Dict]] = []
-        rollout_times: List[Dict] = []
+        rollout_times_array: List[Dict] = []
         learn_times: Dict[str, List[float]] = defaultdict(list)
 
         with RecordTimeTo(learn_times["learner_time_per_eval"]):
             for _ in range(config.system.num_updates_per_eval):
-                # Accumulate the batches, timesteps, and rollout times
-                accumulated_traj_batches = []
-                accumulated_timesteps = []
-
-                # Possibly get many rollouts for 1 learn step - allows learning with large batches
-                for _ in range(config.arch.n_learner_accumulate):
-                    # Get the trajectory batch from the pipeline
-                    # This is blocking so it will wait until the pipeline has data.
-                    with RecordTimeTo(learn_times["rollout_get_time"]):
-                        traj_batch, timestep, rollout_time = pipeline.get(block=True)
-
-                    # Store the retrieved data
-                    accumulated_traj_batches.append(traj_batch)
-                    accumulated_timesteps.append(timestep)
-                    rollout_times.append(rollout_time)
-
-                # Concatenate the accumulated timesteps and trajectory batches on the num_envs axis
-                traj_batches = tree.map(lambda *x: jnp.concat(x, axis=0), *accumulated_traj_batches)
-                timesteps = tree.map(lambda *x: jnp.concat(x, axis=0), *accumulated_timesteps)
+                # Get the trajectory batch from the pipeline
+                # This is blocking so it will wait until the pipeline has data.
+                with RecordTimeTo(learn_times["rollout_get_time"]):
+                    traj_batch, timestep, rollout_time = pipeline.get(block=True)
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
                 # an additional timestep which it can use to bootstrap.
-                learner_state = learner_state._replace(timestep=timesteps)
+                learner_state = learner_state._replace(timestep=timestep)
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
-                    learner_state, ep_metrics, train_metrics = learn_fn(learner_state, traj_batches)
+                    learner_state, ep_metrics, train_metrics = learn_fn(learner_state, traj_batch)
 
                 metrics.append((ep_metrics, train_metrics))
+                rollout_times_array.append(rollout_time)
 
                 # Update all the params sources so all actors can get the latest params
                 params = jax.block_until_ready(learner_state.params)
@@ -556,8 +557,8 @@ def learner_setup(
 
     devices = mesh_utils.create_device_mesh((len(learner_devices),), devices=learner_devices)
     mesh = Mesh(devices, axis_names=("learner_devices",))
-    model_spec = P()
-    data_spec = P("learner_devices")
+    model_spec = PartitionSpec()
+    data_spec = PartitionSpec("learner_devices")
     learner_sharding = NamedSharding(mesh, model_spec)
 
     # PRNG keys.
@@ -629,7 +630,9 @@ def learner_setup(
     update_fns = (actor_optim.update, critic_optim.update)
 
     # defines how the learner state is sharded: params, opt and key = replicated, timestep = sharded
-    learn_state_spec = RNNLearnerState(model_spec, model_spec, model_spec, None, data_spec, data_spec, data_spec)
+    learn_state_spec = RNNLearnerState(
+        model_spec, model_spec, data_spec, None, data_spec, data_spec, data_spec
+    )
 
     learn = get_learner_step_fn(apply_fns, update_fns, config)
     learn = jax.jit(
@@ -653,7 +656,9 @@ def learner_setup(
         params = restored_params
 
     # Define params to be replicated across devices and batches.
-    key, step_keys = jax.random.split(key)
+    key, *step_keys = jax.random.split(key, len(learner_devices) + 1)
+    step_keys = jnp.stack(step_keys, 0)
+
     opt_states = OptStates(actor_opt_state, critic_opt_state)
     dones = jnp.zeros(
         (config.arch.num_envs, config.system.num_agents),
@@ -714,7 +719,6 @@ def run_experiment(_config: DictConfig) -> float:
         config.system.rollout_length
         * config.arch.num_envs
         * config.system.num_updates_per_eval
-        * config.arch.n_learner_accumulate
     )
 
     # Logger setup
@@ -784,8 +788,8 @@ def run_experiment(_config: DictConfig) -> float:
                 name=f"Actor-{actor_device}-{thread_id}",
             )
             actor_threads.append(actor)
-            
-    # Start the actors simultaneously 
+
+    # Start the actors simultaneously
     for actor in actor_threads:
         actor.start()
 
@@ -823,7 +827,9 @@ def run_experiment(_config: DictConfig) -> float:
 
         learner_state_cpu = jax.device_get(learner_state)
         key, eval_key = jax.random.split(key, 2)
-        eval_metrics = evaluator(learner_state_cpu.params.actor_params, eval_key, {"hidden_state": eval_hs})
+        eval_metrics = evaluator(
+            learner_state_cpu.params.actor_params, eval_key, {"hidden_state": eval_hs}
+        )
         logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
 
         episode_return = np.mean(eval_metrics["episode_return"])
@@ -837,7 +843,7 @@ def run_experiment(_config: DictConfig) -> float:
 
         if config.arch.absolute_metric and max_episode_return <= episode_return:
             best_params_cpu = copy.deepcopy(learner_state_cpu.params.actor_params)
-            max_episode_return = episode_return
+            max_episode_return = float(episode_return)
 
     evaluator_envs.close()
     eval_performance = float(np.mean(eval_metrics[config.env.eval_metric]))

@@ -19,7 +19,7 @@ from dataclasses import field
 from enum import IntEnum
 from multiprocessing import Queue
 from multiprocessing.connection import Connection
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 import gymnasium
 import gymnasium.vector.async_vector_env
@@ -29,7 +29,7 @@ from gymnasium.spaces.utils import is_space_dtype_shape_equiv
 from gymnasium.vector.utils import write_to_shared_memory
 from numpy.typing import NDArray
 
-from mava.types import MarlEnv, Observation, ObservationGlobalState
+from mava.types import Observation, ObservationGlobalState
 
 if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
     from dataclasses import dataclass
@@ -42,7 +42,7 @@ warnings.filterwarnings("ignore", module="gymnasium.utils.passive_env_checker")
 
 # needed to avoid host -> device transfers when calling TimeStep.last()
 class StepType(IntEnum):
-    """Coppy of Jumanji's step type but with numpy arrays"""
+    """Copy of Jumanji's step type but without jax arrays"""
 
     FIRST = 0
     MID = 1
@@ -57,19 +57,19 @@ class TimeStep:
     observation: Union[Observation, ObservationGlobalState]
     extras: Dict = field(default_factory=dict)
 
-    def first(self) -> bool:
+    def first(self) -> NDArray:
         return self.step_type == StepType.FIRST
 
-    def mid(self) -> bool:
+    def mid(self) -> NDArray:
         return self.step_type == StepType.MID
 
-    def last(self) -> bool:
+    def last(self) -> NDArray:
         return self.step_type == StepType.LAST
 
 
-class GymWrapper(gymnasium.Wrapper):
-    """Base wrapper for multi-agent gym environments.
-    This wrapper works out of the box for RobotWarehouse and level based foraging.
+class UoeWrapper(gymnasium.Wrapper):
+    """A base wrapper for multi-agent environments developed by the University of Edinburgh.
+    This wrapper is compatible with the RobotWarehouse and Level-Based Foraging environments.
     """
 
     def __init__(
@@ -92,6 +92,16 @@ class GymWrapper(gymnasium.Wrapper):
         self.num_agents = len(self._env.action_space)
         self.num_actions = self._env.action_space[0].n
 
+        # Tuple(Box(...) * N) --> Box(N, ...)
+        single_obs = self.observation_space[0]  # type: ignore
+        shape = (self.num_agents, *single_obs.shape)
+        low = np.tile(single_obs.low, (self.num_agents, 1))
+        high = np.tile(single_obs.high, (self.num_agents, 1))
+        self.observation_space = spaces.Box(low=low, high=high, shape=shape, dtype=single_obs.dtype)
+
+        # Tuple(Discrete(...) * N) --> MultiDiscrete(... * N)
+        self.action_space = spaces.MultiDiscrete([self.num_actions] * self.num_agents)
+
     def reset(
         self, seed: Optional[int] = None, options: Optional[dict] = None
     ) -> Tuple[NDArray, Dict]:
@@ -100,16 +110,16 @@ class GymWrapper(gymnasium.Wrapper):
 
         agents_view, info = self._env.reset()
 
-        info = {"actions_mask": self.get_actions_mask(info)}
+        info["action_mask"] = self.get_action_mask(info)
         if self.add_global_state:
             info["global_obs"] = self.get_global_obs(agents_view)
 
         return np.array(agents_view), info
 
-    def step(self, actions: NDArray) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
+    def step(self, actions: List) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
         agents_view, reward, terminated, truncated, info = self._env.step(actions)
 
-        info = {"actions_mask": self.get_actions_mask(info)}
+        info["action_mask"] = self.get_action_mask(info)
         if self.add_global_state:
             info["global_obs"] = self.get_global_obs(agents_view)
 
@@ -120,7 +130,7 @@ class GymWrapper(gymnasium.Wrapper):
 
         return agents_view, reward, terminated, truncated, info
 
-    def get_actions_mask(self, info: Dict) -> NDArray:
+    def get_action_mask(self, info: Dict) -> NDArray:
         if "action_mask" in info:
             return np.array(info["action_mask"])
         return np.ones((self.num_agents, self.num_actions), dtype=np.float32)
@@ -128,6 +138,29 @@ class GymWrapper(gymnasium.Wrapper):
     def get_global_obs(self, obs: NDArray) -> NDArray:
         global_obs = np.concatenate(obs, axis=0)
         return np.tile(global_obs, (self.num_agents, 1))
+
+
+class SmacWrapper(UoeWrapper):
+    """A wrapper that converts actions step to integers."""
+
+    def reset(
+        self, seed: Optional[int] = None, options: Optional[dict] = None
+    ) -> Tuple[NDArray, Dict]:
+        agents_view, info = super().reset()
+        info["won_episode"] = info["battle_won"]
+        return agents_view, info
+
+    def step(self, actions: List) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
+        # Convert actions to integers before passing them to the environment
+        actions = [int(action) for action in actions]
+
+        agents_view, reward, terminated, truncated, info = super().step(actions)
+        info["won_episode"] = info["battle_won"]
+
+        return agents_view, reward, terminated, truncated, info
+
+    def get_action_mask(self, info: Dict) -> NDArray:
+        return np.array(self._env.unwrapped.get_avail_actions())
 
 
 class GymRecordEpisodeMetrics(gymnasium.Wrapper):
@@ -144,19 +177,16 @@ class GymRecordEpisodeMetrics(gymnasium.Wrapper):
     ) -> Tuple[NDArray, Dict]:
         agents_view, info = self._env.reset(seed, options)
 
+        # Reset the metrics
+        self.running_count_episode_return = 0.0
+        self.running_count_episode_length = 0.0
+
         # Create the metrics dict
         metrics = {
             "episode_return": self.running_count_episode_return,
             "episode_length": self.running_count_episode_length,
-            "is_terminal_step": True,
+            "is_terminal_step": False,
         }
-
-        # Reset the metrics
-        self.running_count_episode_return = 0.0
-        self.running_count_episode_length = 0
-
-        if "won_episode" in info:
-            metrics["won_episode"] = info["won_episode"]
 
         info["metrics"] = metrics
 
@@ -171,10 +201,8 @@ class GymRecordEpisodeMetrics(gymnasium.Wrapper):
         metrics = {
             "episode_return": self.running_count_episode_return,
             "episode_length": self.running_count_episode_length,
-            "is_terminal_step": False,
+            "is_terminal_step": np.logical_or(terminated, truncated).all().item(),
         }
-        if "won_episode" in info:
-            metrics["won_episode"] = info["won_episode"]
 
         info["metrics"] = metrics
 
@@ -206,10 +234,10 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
 
     def modify_space(self, space: spaces.Space) -> spaces.Space:
         if isinstance(space, spaces.Box):
-            new_shape = (space.shape[0] + len(self.agent_ids),)
-            return spaces.Box(
-                low=space.low[0], high=space.high[0], shape=new_shape, dtype=space.dtype
-            )
+            new_shape = (space.shape[0], space.shape[1] + self.env.num_agents)
+            high = np.concatenate((space.high, np.ones_like(self.agent_ids)), axis=1)
+            low = np.concatenate((space.low, np.zeros_like(self.agent_ids)), axis=1)
+            return spaces.Box(low=low, high=high, shape=new_shape, dtype=space.dtype)
         elif isinstance(space, spaces.Tuple):
             return spaces.Tuple(self.modify_space(s) for s in space)
         else:
@@ -217,7 +245,7 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
 
 
 class GymToJumanji:
-    """Converts from the Gym API to the dm_env API."""
+    """Converts from the Gym API to the Jumanji API."""
 
     def __init__(self, env: gymnasium.vector.VectorEnv):
         self.env = env
@@ -230,11 +258,11 @@ class GymToJumanji:
         num_agents = len(self.env.single_action_space)  # type: ignore
         num_envs = self.env.num_envs
 
-        ep_done = np.zeros(num_envs, dtype=float)
+        step_type = np.full(num_envs, StepType.FIRST)
         rewards = np.zeros((num_envs, num_agents), dtype=float)
         teminated = np.zeros(num_envs, dtype=float)
 
-        timestep = self._create_timestep(obs, ep_done, teminated, rewards, info)
+        timestep = self._create_timestep(obs, step_type, teminated, rewards, info)
 
         return timestep
 
@@ -242,8 +270,9 @@ class GymToJumanji:
         obs, rewards, terminated, truncated, info = self.env.step(action)
 
         ep_done = np.logical_or(terminated, truncated)
+        step_type = np.where(ep_done, StepType.LAST, StepType.MID)
 
-        timestep = self._create_timestep(obs, ep_done, terminated, rewards, info)
+        timestep = self._create_timestep(obs, step_type, terminated, rewards, info)
 
         return timestep
 
@@ -252,25 +281,27 @@ class GymToJumanji:
     ) -> Union[Observation, ObservationGlobalState]:
         """Create an observation from the raw observation and environment state."""
 
-        # (num_agents, num_envs, ...) -> (num_envs, num_agents, ...)
-        obs = np.array(obs).swapaxes(0, 1)
-        action_mask = np.stack(info["actions_mask"])
+        action_mask = np.stack(info["action_mask"])
         obs_data = {"agents_view": obs, "action_mask": action_mask}
 
         if "global_obs" in info:
-            global_obs = np.array(info["global_obs"]).swapaxes(0, 1)
+            global_obs = np.array(info["global_obs"])
             obs_data["global_state"] = global_obs
             return ObservationGlobalState(**obs_data)
         else:
             return Observation(**obs_data)
 
     def _create_timestep(
-        self, obs: NDArray, ep_done: NDArray, terminated: NDArray, rewards: NDArray, info: Dict
+        self, obs: NDArray, step_type: NDArray, terminated: NDArray, rewards: NDArray, info: Dict
     ) -> TimeStep:
         observation = self._format_observation(obs, info)
         # Filter out the masks and auxiliary data
-        extras = {key: value for key, value in info["metrics"].items() if key[0] != "_"}
-        step_type = np.where(ep_done, StepType.LAST, StepType.MID)
+        extras = {}
+        extras["episode_metrics"] = {
+            key: value for key, value in info["metrics"].items() if key[0] != "_"
+        }
+        if "won_episode" in info:
+            extras["won_episode"] = info["won_episode"]
 
         return TimeStep(
             step_type=step_type,  # type: ignore
@@ -286,6 +317,8 @@ class GymToJumanji:
 
 # Copied form Gymnasium/blob/main/gymnasium/vector/async_vector_env.py
 # Modified to work with multiple agents
+# Note: The worker handles auto-resetting the environments.
+# Each environment resets when all of its agents have either terminated or been truncated.
 def async_multiagent_worker(  # CCR001
     index: int,
     env_fn: Callable,
@@ -320,7 +353,8 @@ def async_multiagent_worker(  # CCR001
                     info,
                 ) = env.step(data)
                 if np.logical_or(terminated, truncated).all():
-                    observation, info = env.reset()
+                    observation, new_info = env.reset()
+                    info["action_mask"] = new_info["action_mask"]
 
                 if shared_memory:
                     write_to_shared_memory(observation_space, index, observation, shared_memory)

@@ -47,13 +47,16 @@ from mava.wrappers import (
     GymAgentIDWrapper,
     GymRecordEpisodeMetrics,
     GymToJumanji,
-    GymWrapper,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
+    MPEWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
+    SmacWrapper,
     SmaxWrapper,
+    UoeWrapper,
+    VectorConnectorWrapper,
     async_multiagent_worker,
 )
 from mava.wrappers.jaxmarl import JaxMarlWrapper
@@ -71,12 +74,13 @@ _jumanji_registry = {
 
 # Registry mapping environment names directly to the corresponding wrapper classes.
 _matrax_registry = {"Matrax": MatraxWrapper}
-_jaxmarl_registry: Dict[str, Type[JaxMarlWrapper]] = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper}
+_jaxmarl_registry = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper, "MPE": MPEWrapper}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
 
 _gym_registry = {
-    "RobotWarehouse": GymWrapper,
-    "LevelBasedForaging": GymWrapper,
+    "RobotWarehouse": UoeWrapper,
+    "LevelBasedForaging": UoeWrapper,
+    "SMACLite": SmacWrapper,
 }
 
 
@@ -150,6 +154,8 @@ def make_jaxmarl_env(
     kwargs = dict(config.env.kwargs)
     if "smax" in env_name.lower():
         kwargs["scenario"] = map_name_to_scenario(config.env.scenario.task_name)
+    elif "mpe" in config.env.env_name.lower():
+        kwargs.update(config.env.scenario.task_config)
 
     # Create jaxmarl envs.
     train_env = _jaxmarl_registry[config.env.env_name](
@@ -247,7 +253,7 @@ def make_gym_env(
 
     def create_gym_env(config: DictConfig, add_global_state: bool = False) -> gymnasium.Env:
         registered_name = f"{config.env.scenario.name}:{config.env.scenario.task_name}"
-        env = gym.make(registered_name, disable_env_checker=False)
+        env = gym.make(registered_name, disable_env_checker=True, **config.env.kwargs)
         wrapped_env = wrapper(env, config.env.use_shared_rewards, add_global_state)
         if config.system.add_agent_id:
             wrapped_env = GymAgentIDWrapper(wrapped_env)

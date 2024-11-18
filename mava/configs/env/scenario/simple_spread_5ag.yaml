@@ -1,0 +1,8 @@
+# The config of the simple_spread_5ag scenario.
+name: MPE_simple_spread_v3
+task_name: simple_spread_5ag
+
+task_config:
+  num_agents: 5
+  num_landmarks: 5
+  local_ratio: 0.5

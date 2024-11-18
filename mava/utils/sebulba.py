@@ -179,6 +179,8 @@ class ParamsSource(threading.Thread):
 
 
 class RecordTimeTo:
+    """Context manager to record the runtime in a `with` block"""
+
     def __init__(self, to: Any):
         self.to = to
 

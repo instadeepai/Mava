@@ -20,10 +20,11 @@ from mava.wrappers.gym import (
     GymAgentIDWrapper,
     GymRecordEpisodeMetrics,
     GymToJumanji,
-    GymWrapper,
+    SmacWrapper,
+    UoeWrapper,
     async_multiagent_worker,
 )
-from mava.wrappers.jaxmarl import MabraxWrapper, SmaxWrapper
+from mava.wrappers.jaxmarl import MabraxWrapper, MPEWrapper, SmaxWrapper
 from mava.wrappers.jumanji import (
     CleanerWrapper,
     ConnectorWrapper,

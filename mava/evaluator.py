@@ -37,6 +37,7 @@ from mava.types import (
     RecActorApply,
     State,
 )
+from mava.wrappers.gym import GymToJumanji
 
 # Optional extras that are passed out of the actor and then into the actor in the next step
 ActorState: TypeAlias = Dict[str, Any]
@@ -211,7 +212,7 @@ def make_rec_eval_act_fn(actor_apply_fn: RecActorApply, config: DictConfig) -> E
 
 
 def get_sebulba_eval_fn(
-    env_maker: Callable,
+    env_maker: Callable[[int, int], GymToJumanji],
     act_fn: EvalActFn,
     config: DictConfig,
     np_rng: np.random.Generator,
@@ -221,11 +222,12 @@ def get_sebulba_eval_fn(
 
     Args:
     ----
-        env: an environment that conforms to the mava environment spec.
-        act_fn: a function that takes in params, timestep, key and optionally a state
+        env_maker: A function to create the environment instances.
+        act_fn: A function that takes in params, timestep, key and optionally a state
                 and returns actions and optionally a state (see `EvalActFn`).
-        config: the system config.
-        absolute_metric: whether or not this evaluator calculates the absolute_metric.
+        config: The system config.
+        np_rng: Random number generator for seeding environment.
+        absolute_metric: Whether or not this evaluator calculates the absolute_metric.
                 This determines how many evaluation episodes it does.
     """
     n_devices = jax.device_count()
@@ -239,7 +241,9 @@ def get_sebulba_eval_fn(
     episode_loops = math.ceil(eval_episodes / n_parallel_envs)
     env = env_maker(config, n_parallel_envs)
 
-    act_fn = jax.jit(act_fn, device=jax.devices('cpu')[0])  # cpu so that we don't block actors/learners
+    act_fn = jax.jit(
+        act_fn, device=jax.local_devices()[config.arch.actor_device_ids[0]]
+    )  # Evaluate using the first actor device
 
     # Warnings if num eval episodes is not divisible by num parallel envs.
     if eval_episodes % n_parallel_envs != 0:
@@ -262,10 +266,11 @@ def get_sebulba_eval_fn(
         def _episode(key: PRNGKey) -> Tuple[PRNGKey, Metrics]:
             """Simulates `num_envs` episodes."""
 
+            # Generate a list of random seeds within the 32-bit integer range, using a seeded RNG.
             seeds = np_rng.integers(np.iinfo(np.int32).max, size=n_parallel_envs).tolist()
             ts = env.reset(seed=seeds)
 
-            timesteps = [ts]
+            timesteps_array = [ts]
 
             actor_state = init_act_state
             finished_eps = ts.last()
@@ -273,15 +278,15 @@ def get_sebulba_eval_fn(
             while not finished_eps.all():
                 key, act_key = jax.random.split(key)
                 action, actor_state = act_fn(params, ts, act_key, actor_state)
-                cpu_action = jax.device_get(action).swapaxes(0, 1)
+                cpu_action = jax.device_get(action)
                 ts = env.step(cpu_action)
-                timesteps.append(ts)
+                timesteps_array.append(ts)
 
                 finished_eps = np.logical_or(finished_eps, ts.last())
 
-            timesteps = jax.tree.map(lambda *x: np.stack(x), *timesteps)
+            timesteps = jax.tree.map(lambda *x: np.stack(x), *timesteps_array)
 
-            metrics = timesteps.extras
+            metrics = timesteps.extras["episode_metrics"]
             if config.env.log_win_rate:
                 metrics["won_episode"] = timesteps.extras["won_episode"]
 
@@ -296,14 +301,13 @@ def get_sebulba_eval_fn(
         # This loop is important because we don't want too many parallel envs.
         # So in evaluation we have num_envs parallel envs and loop enough times
         # so that we do at least `eval_episodes` number of episodes.
-        metrics = []
+        metrics_array = []
         for _ in range(episode_loops):
             key, metric = _episode(key)
-            metrics.append(metric)
+            metrics_array.append(metric)
 
-        metrics: Metrics = jax.tree_map(
-            lambda *x: np.array(x).reshape(-1), *metrics
-        )  # flatten metrics
+        # flatten metrics
+        metrics: Metrics = jax.tree_map(lambda *x: np.array(x).reshape(-1), *metrics_array)
         return metrics
 
     def timed_eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:
