@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import copy
-from typing import Any, Dict, Tuple
+from typing import Dict, Tuple
 
 import chex
 import hydra
@@ -24,53 +24,48 @@ from jax import tree
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
-from mava.networks.mat_network import MultiAgentTransformer
-from mava.systems.mat.types import LearnerState
-from mava.types import (
-    LearnerFn,
-    MarlEnv,
-)
+from mava.networks import FeedForwardActor as Actor
+from mava.networks import FeedForwardValueNet as Critic
+from mava.networks.heads import CentralControllerDiscreteActionHead
+from mava.systems.ppo.types import LearnerState, Params
+from mava.types import LearnerFn, MarlEnv
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.network_utils import get_action_head
 from mava.utils.total_timestep_checker import check_total_timesteps
 
 
 def learner_setup(
     env: MarlEnv, keys: chex.Array, config: DictConfig
-) -> Tuple[LearnerFn[LearnerState], Any, LearnerState]:
+) -> Tuple[LearnerFn[LearnerState], Actor, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
-    # Get number of agents.
-    config.system.num_agents = env.num_agents
 
     # PRNG keys.
-    _, actor_net_key = keys
+    _, actor_net_key, critic_net_key = keys
 
-    # Initialise observation: Obs for all agents.
-    init_x = env.observation_spec().generate_value()
-    init_x = tree.map(lambda x: x[None, ...], init_x)
-
-    _, action_space_type = get_action_head(env)
-
-    if action_space_type == "discrete":
-        init_action = jnp.zeros((1, config.system.num_agents), dtype=jnp.int32)
-    elif action_space_type == "continuous":
-        init_action = jnp.zeros((1, config.system.num_agents, env.action_dim), dtype=jnp.float32)
-    else:
-        raise ValueError("Invalid action space type")
+    num_actions = int(env.action_spec().num_values)
 
     # Define network and optimiser.
-    actor_network = MultiAgentTransformer(
-        action_dim=env.action_dim,
-        n_agent=config.system.num_agents,
-        net_config=config.network,
-        action_space_type=action_space_type,
+    actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
+    actor_action_head = CentralControllerDiscreteActionHead(
+        action_dim=num_actions, num_agents=env.num_agents, num_indiv_actions=env.action_dim
     )
+    critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
+
+    actor_network = Actor(torso=actor_torso, action_head=actor_action_head)
+    critic_network = Critic(torso=critic_torso)
+
+    # Initialise observation with obs of all agents.
+    obs = env.observation_spec().generate_value()
+    init_x = tree.map(lambda x: x[jnp.newaxis, ...], obs)
 
     # Initialise actor params and optimiser state.
-    # `PRNGKey(0)` is just a dummy key we pass through the network since it needs a key for
-    # computing the network entropy at train time.
-    params = actor_network.init(actor_net_key, init_x, init_action, jax.random.PRNGKey(0))
+    actor_params = actor_network.init(actor_net_key, init_x)
+
+    # Initialise critic params and optimiser state.
+    critic_params = critic_network.init(critic_net_key, init_x)
+
+    # Pack params.
+    params = Params(actor_params, critic_params)
 
     # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
@@ -89,25 +84,24 @@ def learner_setup(
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
     config = copy.deepcopy(_config)
+    config.system.is_central_controller = True
 
     # Create the enviroments for train and eval.
-    env, eval_env = environments.make(config, render=True)
+    env, eval_env = environments.make(config=config, is_central_controller=True, render=True)
 
     # PRNG keys.
-    key, actor_net_key = jax.random.split(jax.random.PRNGKey(config.system.seed))
+    key, key_e, actor_net_key, critic_net_key = jax.random.split(
+        jax.random.PRNGKey(config.system.seed), num=4
+    )
 
     # Setup learner.
-    params, actor_network = learner_setup(env, (key, actor_net_key), config)
+    params, actor_network = learner_setup(env, (key, actor_net_key, critic_net_key), config)
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
     assert (
         config.system.num_updates > config.arch.num_evaluation
     ), "Number of updates per evaluation must be less than total number of updates."
-
-    assert (
-        config.arch.num_envs % config.system.num_minibatches == 0
-    ), "Number of envs must be divisibile by number of minibatches."
 
     cfg: Dict = OmegaConf.to_container(config, resolve=True)
     cfg["arch"]["devices"] = jax.devices()
@@ -126,14 +120,8 @@ def run_experiment(_config: DictConfig) -> float:
             ep_step_counter += 1
             key, action_key = jax.random.split(key)
             observation = jax.tree_util.tree_map(lambda x: x[None], timestep.observation)
-
-            action, _, _ = actor_network.apply(  # type: ignore
-                params,
-                observation,
-                action_key,
-                method="get_actions",
-            )
-
+            pi = actor_network.apply(params.actor_params, observation)
+            action = pi.mode() if config.arch.evaluation_greedy else pi.sample(seed=action_key)
             state, timestep = step_fn(state, action.squeeze(axis=0))
             states.append(state)
             done = timestep.last() or ep_step_counter >= 495
@@ -141,23 +129,23 @@ def run_experiment(_config: DictConfig) -> float:
         for _ in range(3):
             states.append(state)
 
-    eval_env.unwrapped.animate(states, interval=80, save_path="mat_rware.gif")
+    eval_env.unwrapped.animate(states, interval=80, save_path="ff_cent_ppo_rware.gif")
 
 
 @hydra.main(
     config_path="../../../configs/default",
-    config_name="mat.yaml",
+    config_name="ff_cent_ppo.yaml",
     version_base="1.2",
 )
 def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-    cfg.logger.system_name = "mat"
+    cfg.logger.system_name = "ff_cent_ppo"
 
+    # Run experiment.
     eval_performance = run_experiment(cfg)
-    jax.block_until_ready(eval_performance)
-    print(f"{Fore.CYAN}{Style.BRIGHT}MAT experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}Central PPO experiment completed{Style.RESET_ALL}")
     return eval_performance
 
 

@@ -137,12 +137,15 @@ def run_experiment(_config: DictConfig) -> float:
     reset_fn = jax.jit(eval_env.reset)
     step_fn = jax.jit(eval_env.step)
     states = []
-    for _ in range(3):
+    for _ in range(2):
         key, reset_key = jax.random.split(key)
         state, timestep = reset_fn(reset_key)
         states.append(state)
         hidden_state = get_init_hidden_state(config.network.net_config, 1)
-        while not timestep.last():
+        ep_step_counter = 0
+        done = False
+        while not done:
+            ep_step_counter += 1
             key, action_key = jax.random.split(key)
             observation = jax.tree_util.tree_map(lambda x: x[None], timestep.observation)
 
@@ -153,19 +156,22 @@ def run_experiment(_config: DictConfig) -> float:
                 action_key,
             )
 
-            hidden_state = HiddenStates(
-                encoder=hidden_state.encoder,
-                decoder_self_retn=jnp.zeros_like(hidden_state.decoder_self_retn),
-                decoder_cross_retn=jnp.zeros_like(hidden_state.decoder_cross_retn),
-            )
+            # hidden_state = HiddenStates(
+            #     encoder=hidden_state.encoder,
+            #     decoder_self_retn=jnp.zeros_like(hidden_state.decoder_self_retn),
+            #     decoder_cross_retn=jnp.zeros_like(hidden_state.decoder_cross_retn),
+            # )
 
             state, timestep = step_fn(state, action.squeeze(axis=0))
             states.append(state)
+
+            done = timestep.last() or ep_step_counter >= 495
+
         # Freeze the terminal frame to pause the GIF.
         for _ in range(3):
             states.append(state)
 
-    eval_env.unwrapped.animate(states, interval=80, save_path="rec_sable_lbf_reset.gif")
+    eval_env.unwrapped.animate(states, interval=80, save_path="rec_sable_rware.gif")
 
 
 @hydra.main(

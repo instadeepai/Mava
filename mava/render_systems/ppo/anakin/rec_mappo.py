@@ -149,12 +149,15 @@ def run_experiment(_config: DictConfig) -> float:
     reset_fn = jax.jit(eval_env.reset)
     step_fn = jax.jit(eval_env.step)
     states = []
-    for _ in range(3):
+    for _ in range(2):
         key, reset_key = jax.random.split(key)
         state, timestep = reset_fn(reset_key)
         policy_hs = jnp.zeros_like(hstates.policy_hidden_state[0][None])
         states.append(state)
-        while not timestep.last():
+        ep_step_counter = 0
+        done = False
+        while not done:
+            ep_step_counter += 1
             key, action_key = jax.random.split(key)
             observation = jax.tree_util.tree_map(lambda x: x[None, None], timestep.observation)
             done = timestep.last()[None, None, None].repeat(num_agents, axis=-1)
@@ -162,11 +165,14 @@ def run_experiment(_config: DictConfig) -> float:
             action = pi.mode() if config.arch.evaluation_greedy else pi.sample(seed=action_key)
             state, timestep = step_fn(state, action.squeeze(axis=(0, 1)))
             states.append(state)
+
+            done = timestep.last() or ep_step_counter >= 495
+
         # Freeze the terminal frame to pause the GIF.
         for _ in range(3):
             states.append(state)
 
-    eval_env.unwrapped.animate(states, interval=80, save_path="rec_mappo_lbf.gif")
+    eval_env.unwrapped.animate(states, interval=80, save_path="rec_mappo_rware.gif")
 
 
 @hydra.main(

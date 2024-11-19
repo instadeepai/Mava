@@ -1,5 +1,5 @@
 # --- Network params ---
-n_block: 3 # Transformer blocks
+n_block: 2 # Transformer blocks
 embed_dim: 128 # Transformer embedding dimension
 n_head: 1 # Transformer heads
 use_rmsnorm: False # Whether to use RMSNorm instead of LayerNorm

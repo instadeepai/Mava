@@ -111,17 +111,21 @@ def run_experiment(_config: DictConfig) -> float:
     reset_fn = jax.jit(eval_env.reset)
     step_fn = jax.jit(eval_env.step)
     states = []
-    for _ in range(3):
+    for _ in range(2):
         key, reset_key = jax.random.split(key)
         state, timestep = reset_fn(reset_key)
         states.append(state)
-        while not timestep.last():
+        ep_step_counter = 0
+        done = False
+        while not done:
+            ep_step_counter += 1
             key, action_key = jax.random.split(key)
             observation = jax.tree_util.tree_map(lambda x: x[None], timestep.observation)
             pi = actor_network.apply(params.actor_params, observation)
             action = pi.mode() if config.arch.evaluation_greedy else pi.sample(seed=action_key)
             state, timestep = step_fn(state, action.squeeze(axis=0))
             states.append(state)
+            done = timestep.last() or ep_step_counter >= 495
         # Freeze the terminal frame to pause the GIF.
         for _ in range(3):
             states.append(state)
