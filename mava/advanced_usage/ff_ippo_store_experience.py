@@ -451,6 +451,7 @@ def learner_setup(
 
 def run_experiment(_config: DictConfig) -> None:
     """Runs experiment."""
+    _config.logger.system_name = "ff_ippo"
     # Logger setup
     config = copy.deepcopy(_config)
     logger = MavaLogger(config)
@@ -674,7 +675,6 @@ def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-    cfg.logger.system_name = "ff_ippo"
 
     # Run experiment.
     run_experiment(cfg)

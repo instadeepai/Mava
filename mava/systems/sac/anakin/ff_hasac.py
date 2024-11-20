@@ -594,6 +594,7 @@ def make_update_fns(
 
 def run_experiment(cfg: DictConfig) -> float:
     # Add runtime variables to config
+    cfg.logger.system_name = "ff_hasac"
     cfg.arch.n_devices = len(jax.devices())
     cfg = check_total_timesteps(cfg)
 
@@ -715,7 +716,6 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-    cfg.logger.system_name = "ff_hasac"
 
     # Run experiment.
     final_return = run_experiment(cfg)
