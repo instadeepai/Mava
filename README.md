@@ -74,8 +74,7 @@ python mava/systems/ff_ippo.py env=rware env/scenario=tiny-4ag
 
 Additionally, we also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-agent system.
 
-<details>
-    <summary><h2>Algorithms</h2></summary>
+<h2>Algorithms</h2>
 
 | Algorithm  | Variants       | Continuous | Discrete | Anakin | Sebulba |
 |------------|----------------|------------|----------|--------|---------|
@@ -91,10 +90,8 @@ Additionally, we also have a [Quickstart notebook][quickstart] that can be used 
 | MAT        | [`mat.py`]()       | ✅         | ✅       | ✅     |         |
 | Sable      | [`ff_sable.py`]()  | ✅         | ✅       | ✅     |         |
 |            | [`rec_sable.py`]() | ✅         | ✅       | ✅     |         |
-</details>
-<details>
-    <summary><h2>Environments</h2></summary>
-        These are the environments which Mava supports _out of the box_, to add your own environments use the existing wrappers as an example. The framework indicates compatible agorithms, where Anakin algorithms work with JAX environments and Sebulba algorithms work with Numpy environments.
+<h2>Environments</h2>
+These are the environments which Mava supports _out of the box_, to add your own environments use the existing wrappers as an example. The framework indicates compatible agorithms, where Anakin algorithms work with JAX environments and Sebulba algorithms work with Numpy environments.
 
 | Environment                     | Action space        | JAX | Numpy |
 |---------------------------------|---------------------|-----|-------|
@@ -104,7 +101,6 @@ Additionally, we also have a [Quickstart notebook][quickstart] that can be used 
 | MaBrax                          | Continuous          | ✅   |       |
 | Matrax                          | Discrete            | ✅   |       |
 | Multi-Particle-Envs             | Discrete/Continuous | ✅   |       |
-</details>
 
 ## Performance and Speed 🚀
 We have performed a rigorus benchmark across 45 different scenarios and 6 different environment suites to validate the performance of Mava's algorithm implementations. For more detailed results please see the [Sable paper][sable].
@@ -135,7 +131,9 @@ We have performed a rigorus benchmark across 45 different scenarios and 6 differ
     <div style="text-align:center; margin-top: 10px;"> Mava's algorithm performance, each algorithm was tuned for 40 trials with the TPE optimizer and benchmarked over 10 seeds for each scenario. Environments from top left Robot Warehouse (aggregated over 15 scenarios) Level Based Foraging (aggregated over 7 scenarios) SMAX (aggregated over 11 scenarios) Connector (aggregated over 4 scenarios) MaBrax (aggregated over 5 scenarios) Multi-Particle Env (aggregated over 3 scenarios)</div>
 </p>
 
-todo: speed plot - 1 bar plot: torch based vs anakin vs sebulba
+<a href="docs/images/speed_results/speed.png">
+    <img src="docs/images/speed_results/speed.png" alt="Speed comparison between Mava's Anankin, Sebulba and a torch based alternative" width="30%" style="display:inline-block; margin-right: 10px;"/>
+</a>
 
 ## Code Philosophy 🧘
 
