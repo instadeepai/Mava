@@ -9,17 +9,16 @@
 </h2>
 
 <div align="center">
-<a href="https://www.python.org/doc/versions/">
-      <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12-blue" alt="Python Versions">
-</a>
-<a  href="https://github.com/instadeepai/Mava/blob/main/LICENSE">
-    <img src="https://img.shields.io/badge/License-Apache%202.0-orange.svg" alt="License" />
-</a>
-<a href="https://arxiv.org/pdf/2107.01460.pdf">
-    <img src="https://img.shields.io/badge/PrePrint-ArXiv-red" alt="ArXiv">
-</a>
-<a href="https://colab.research.google.com/github/instadeepai/Mava/blob/develop/examples/Quickstart.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
+![Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Finstadeepai%2FMava%2Fdevelop%2Fpyproject.toml)
+[![Tests](https://github.com/instadeepai/Mava/actions/workflows/tests_linters.yaml/badge.svg)](https://github.com/instadeepai/Mava/actions/workflows/tests_linters.yaml)
+[![License](https://img.shields.io/badge/License-Apache%202.0-orange.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![MyPy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
+[![ArXiv](https://img.shields.io/badge/ArXiv-2410.01706-b31b1b.svg)](https://arxiv.org/abs/2410.01706)
+[![Collab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/Mava/blob/develop/examples/Quickstart.ipynb)
 </div>
+
 
 ## Welcome to Mava! 🦁
 
