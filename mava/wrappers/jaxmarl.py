@@ -27,6 +27,7 @@ from gymnax.environments import spaces as gymnax_spaces
 from jaxmarl.environments import SMAX
 from jaxmarl.environments import spaces as jaxmarl_spaces
 from jaxmarl.environments.mabrax import MABraxEnv
+from jaxmarl.environments.mpe.simple_spread import SimpleSpreadMPE
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
@@ -139,13 +140,13 @@ def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
         )
     elif _is_dict(space):
         # Jumanji needs something to hold the specs
-        contructor = namedtuple("SubSpace", list(space.spaces.keys()))  # type: ignore
+        constructor = namedtuple("SubSpace", list(space.spaces.keys()))  # type: ignore
         # Recursively convert spaces to specs
         sub_specs = {
             sub_space_name: jaxmarl_space_to_jumanji_spec(sub_space)
             for sub_space_name, sub_space in space.spaces.items()
         }
-        return specs.Spec(constructor=contructor, name="", **sub_specs)
+        return specs.Spec(constructor=constructor, name="", **sub_specs)
     elif _is_tuple(space):
         # Jumanji needs something to hold the specs
         field_names = [f"sub_space_{i}" for i in range(len(space.spaces))]
@@ -406,3 +407,37 @@ class MabraxWrapper(JaxMarlWrapper):
         """Get global state from observation and copy it for each agent."""
         # Use the global state of brax.
         return jnp.tile(wrapped_env_state.obs, (self.num_agents, 1))
+
+
+class MPEWrapper(JaxMarlWrapper):
+    """Wrapper for the MPE environment."""
+
+    def __init__(
+        self,
+        env: SimpleSpreadMPE,
+        has_global_state: bool = False,
+    ):
+        super().__init__(env, has_global_state, env.max_steps)
+        self._env: SimpleSpreadMPE
+
+    @cached_property
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
+        # Adjusted automatically based on the action_type specified in the kwargs.
+        if _is_discrete(self._env.action_space(self.agents[0])):
+            return self._env.action_space(self.agents[0]).n
+        return self._env.action_space(self.agents[0]).shape[0]
+
+    @cached_property
+    def state_size(self) -> chex.Array:
+        "Get the state size of the global observation"
+        return self._env.observation_space(self.agents[0]).shape[0] * self.num_agents
+
+    def action_mask(self, wrapped_env_state: Any) -> Array:
+        """Get action mask for each agent."""
+        return jnp.ones((self.num_agents, self.action_dim), dtype=bool)
+
+    def get_global_state(self, wrapped_env_state: Any, obs: Dict[str, Array]) -> Array:
+        """Get global state from observation and copy it for each agent."""
+        global_state = jnp.concatenate([obs[agent_id] for agent_id in obs])
+        return jnp.tile(global_state, (self.num_agents, 1))
