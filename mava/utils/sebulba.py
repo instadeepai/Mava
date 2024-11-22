@@ -20,7 +20,11 @@ from typing import Any, Dict, List, Sequence, Tuple, Union, Optional
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 from colorama import Fore, Style
+from flashbax import make_trajectory_buffer
+from mava.systems.q_learning.types import Transition
+
 from jax import tree
 from jax.sharding import Sharding
 from jumanji.types import TimeStep
@@ -199,132 +203,6 @@ class RecordTimeTo:
         self.to.append(end - self.start)
 
 
-
-# Modified from https://github.com/instadeepai/sebulba/blob/main/sebulba/core.py
-class OfflinePipeline(threading.Thread): #todo why dosen't sotix keep the latest metrics?
-    """
-    The `Pipeline` shards trajectories into learner devices,
-    ensuring trajectories are consumed in the right order to avoid being off-policy
-    and limit the max number of samples in device memory at one time to avoid OOM issues.
-    """
-
-    def __init__(self, max_size: int, learner_sharding: Sharding, lifetime: ThreadLifetime,buffer_add, buffer_sample, buffer_state, key, rate_limiter):
-        """
-        Initializes the pipeline with a maximum size and the devices to shard trajectories across.
-
-        Args:
-            max_size: The maximum number of trajectories to keep in the pipeline.
-            learner_sharding: The sharding used for the learner's update function.
-            lifetime: A `ThreadLifetime` which is used to stop this thread.
-        """
-        super().__init__(name="Pipeline")
-        self.cpu = jax.devices("cpu")[0]
-        
-        self.sharding = learner_sharding
-        self.tickets_queue: queue.Queue = queue.Queue()
-        self._queue: queue.Queue = queue.Queue()
-        self.lifetime = lifetime
-        self.last_actor_metrics = None
-        
-        #buffer util
-        self.move_to_device = lambda tree: jax.tree.map(lambda x: jax.device_put(x, self.cpu), tree)
-        self.buffer_state =  buffer_state
-        self.buffer_add = jax.jit(buffer_add, device=self.cpu)
-        self.buffer_sample = jax.jit(buffer_sample, device=self.cpu)
-        self.key  = key
-
-        #rate limiter
-        self.rate_limiter = rate_limiter
-
-        
-    def run(self) -> None:
-        """This function ensures that trajectories on the queue are consumed in the right order. The
-        start_condition and end_condition are used to ensure that only 1 thread is processing an
-        item from the queue at one time, ensuring predictable memory usage.
-        """
-        while not self.lifetime.should_stop():
-            try:
-                start_condition, end_condition = self.tickets_queue.get(timeout=1)
-                with end_condition:
-                    with start_condition:
-                        start_condition.notify()
-                    end_condition.wait()
-            except queue.Empty:
-                continue
-
-    def put(self, traj: Sequence[PPOTransition], metrics: Tuple) -> None:
-        """Put a trajectory on the queue to be consumed by the learner."""
-        start_condition, end_condition = (threading.Condition(), threading.Condition())
-        with start_condition:
-            self.tickets_queue.put((start_condition, end_condition))
-            start_condition.wait()  # wait to be allowed to start      
-        
-        try:    #todo look at this blocking from old and stoix
-            self.rate_limiter.await_can_insert(timeout=60) 
-        except TimeoutError:
-            print(
-                f"{Fore.RED}{Style.BRIGHT}Actor has timed out on insertion, "
-                f"this should not happen. A deadlock might be occurring{Style.RESET_ALL}"
-            )
-        if self.buffer_state.is_full:
-                self.rate_limiter.delete()
-
-        # [Transition(num_envs)] * rollout_len -> Transition[done=(num_envs, rollout_len, ...)]
-        traj = _stack_trajectory(traj)
-        traj = jax.device_put(traj, device=self.sharding)
-
-        time_dict, episode_metrics = metrics
-        # [{'metric1' : value1, ...} * rollout_len -> {'metric1' : [value1, value2, ...], ...}
-        episode_metrics = _stack_trajectory(episode_metrics)
-
-
-        self.buffer_state = self.buffer_add(self.buffer_state, traj)
-        self.rate_limiter.insert()
-        self._queue.put((time_dict, episode_metrics))
-    
-        with end_condition:
-            end_condition.notify()  # notify that we have finished
-
-        
-
-    def qsize(self) -> int:
-        """Returns the number of trajectories in the pipeline."""
-        return self._queue.qsize()
-
-    def get(
-        self, block: bool = True, timeout: Union[float, None] = None
-    ) -> Tuple[PPOTransition, TimeStep, Dict]:
-        """Get a trajectory from the pipeline."""
-        self.key, sample_key = jax.random.split(self.key)
-
-        # wait until we can sample the data
-        try:
-            self.rate_limiter.await_can_sample(timeout=timeout)
-        except TimeoutError:
-            print(
-                f"{Fore.RED}{Style.BRIGHT}Learner has timed out on sampling, "
-                f"this should not happen. A deadlock might be occurring{Style.RESET_ALL}"
-            )
-
-        # sample the data
-        sampled_batch = self.buffer_sample(self.buffer_state, sample_key).experience
-        self.rate_limiter.sample()
-        sampled_batch = jax.device_put(sampled_batch, device=self.sharding)
-        if not self._queue.empty():
-            self.last_actor_metrics = self._queue.get()
-
-        return sampled_batch, self.last_actor_metrics
-
-    def clear(self) -> None:
-        """Clear the pipeline."""
-        while not self._queue.empty():
-            try:
-                self._queue.get(block=False)
-            except queue.Empty:
-                break
-
-
-
 # from https://github.com/EdanToledo/Stoix/blob/feat/sebulba-dqn/stoix/utils/rate_limiters.py
 class RateLimiter:
     def __init__(
@@ -420,28 +298,7 @@ class RateLimiter:
             f"min_size_to_sample={self.min_size_to_sample}, "
             f"min_diff={self.min_diff}, max_diff={self.max_diff})"
         )
-
-
-class MinSize(RateLimiter):
-    """Block sample calls unless replay contains `min_size_to_sample`.
-
-    This limiter blocks all sample calls when the replay contains less than
-    `min_size_to_sample` items, and accepts all sample calls otherwise.
-    """
-
-    def __init__(self, min_size_to_sample: int):
-        if min_size_to_sample < 1:
-            raise ValueError(
-                f"min_size_to_sample ({min_size_to_sample}) must be a positive integer"
-            )
-
-        super().__init__(
-            samples_per_insert=1.0,
-            min_size_to_sample=min_size_to_sample,
-            min_diff=-sys.float_info.max,
-            max_diff=sys.float_info.max,
-        )
-
+    
 
 class SampleToInsertRatio(RateLimiter):
     """Maintains a specified ratio between samples and inserts.
@@ -546,3 +403,122 @@ class SampleToInsertRatio(RateLimiter):
             min_diff=min_diff,
             max_diff=max_diff,
         )
+
+
+# Modified from https://github.com/instadeepai/sebulba/blob/main/sebulba/core.py
+class OffPolicyPipeline: 
+    """
+    The `Pipeline` shards trajectories into learner devices,
+    ensuring trajectories are consumed in the right order to avoid being off-policy
+    and limit the max number of samples in device memory at one time to avoid OOM issues.
+    """
+
+    def __init__(self,config : dict, learner_sharding: Sharding, key : jax.random.PRNGKey, rate_limiter : RateLimiter, init_transition : Transition):
+        """
+        Initializes the pipeline with a maximum size and the devices to shard trajectories across.
+
+        Args:
+            max_size: The maximum number of trajectories to keep in the pipeline.
+            learner_sharding: The sharding used for the learner's update function.
+            lifetime: A `ThreadLifetime` which is used to stop this thread.
+        """
+        self.cpu = jax.devices("cpu")[0]
+
+        self._queue: queue.Queue = queue.Queue()
+
+        self.num_buffers = len(config.arch.actor_device_ids) * config.arch.n_threads_per_executor
+        
+        self.sharding = learner_sharding
+        self.last_actor_metrics = None
+        self.move_to_device = lambda tree: jax.tree.map(lambda x: jax.device_put(x, self.cpu), tree)
+        
+        # Setup Buffer
+        rb = make_trajectory_buffer(
+                sample_sequence_length=config.system.sample_sequence_length + 1,
+                period=1,  # sample any unique trajectory
+                add_batch_size=config.arch.num_envs,
+                sample_batch_size=config.system.sample_batch_size // self.num_buffers, #todo add an assert ?
+                max_length_time_axis=config.system.buffer_size,
+                min_length_time_axis=config.system.min_buffer_size,
+            )
+        self.buffer_states =  [rb.init(init_transition) for _ in range(self.num_buffers)]
+        self.buffer_adds_count = [0] * self.num_buffers
+        
+        self.buffer_add = jax.jit(rb.add, device=self.cpu)
+        self.buffer_sample = jax.jit(rb.sample, device=self.cpu)
+        
+        # How many times we inserted to all of the buffers
+        self.complete_adds_count = 0
+    
+        self.key  = key
+
+        #rate limiter
+        self.rate_limiter = rate_limiter
+
+    def put(self, traj: Sequence[Transition], metrics: Tuple, actor_id : int) -> None:
+        try:  
+            self.rate_limiter.await_can_insert(timeout=QUEUE_PUT_TIMEOUT) 
+        except TimeoutError:
+            print(
+                f"{Fore.RED}{Style.BRIGHT}Actor has timed out on insertion, "
+                f"this should not happen. A deadlock might be occurring{Style.RESET_ALL}"
+            )
+        if self.buffer_states[actor_id].is_full:
+                self.rate_limiter.delete()
+
+        # [Transition(num_envs)] * rollout_len -> Transition[done=(num_envs, rollout_len, ...)]
+        traj = _stack_trajectory(traj)
+        traj = jax.device_put(traj, device=self.sharding)
+
+        time_dict, episode_metrics = metrics
+        # [{'metric1' : value1, ...} * rollout_len -> {'metric1' : [value1, value2, ...], ...}
+        episode_metrics = _stack_trajectory(episode_metrics)
+
+
+        self.buffer_states[actor_id] = self.buffer_add(self.buffer_states[actor_id], traj)
+        self.buffer_adds_count[actor_id] += 1
+
+        self._queue.put((time_dict, episode_metrics))
+
+        # check if all buffers have beed added to
+        if all(count > self.complete_adds_count  for count in self.buffer_adds_count):    
+            self.complete_adds_count += 1
+            self.rate_limiter.insert()
+
+    def get(
+        self, block: bool = True, timeout: Union[float, None] = None
+    ) -> Tuple[PPOTransition, TimeStep, Dict]:
+        """Get a trajectory from the pipeline."""
+        self.key, sample_key = jax.random.split(self.key)
+
+        # wait until we can sample the data
+        try:
+            self.rate_limiter.await_can_sample(timeout=timeout)
+        except TimeoutError:
+            print(
+                f"{Fore.RED}{Style.BRIGHT}Learner has timed out on sampling, "
+                f"this should not happen. A deadlock might be occurring{Style.RESET_ALL}"
+            )
+
+        # sample the data
+        sampled_batch = [self.buffer_sample(state, sample_key).experience for state in self.buffer_states]
+        sampled_batch = jax.tree_map(lambda *x : np.concatenate(x), *sampled_batch) #np not jnp
+        sampled_batch = jax.device_put(sampled_batch, device=self.sharding)
+
+        self.rate_limiter.sample()
+
+        if not self._queue.empty():
+            self.last_actor_metrics = self._queue.get()
+
+        return sampled_batch, self.last_actor_metrics
+
+    def clear(self) -> None:
+        """Clear the pipeline."""
+        while not self._queue.empty():
+            try:
+                self._queue.get(block=False)
+            except queue.Empty:
+                break
+    def qsize(self) -> int:
+        """Returns the number of trajectories in the pipeline."""
+        return self._queue.qsize()

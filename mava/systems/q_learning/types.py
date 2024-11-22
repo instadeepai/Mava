@@ -108,3 +108,9 @@ class TrainState(NamedTuple, Generic[QLearningParams]):
     opt_state: optax.OptState
     train_steps: Array
     key: PRNGKey
+
+class SebulbaLearnerState(NamedTuple):
+    """State of the learner for the Sebulba architecture."""
+    params : QNetParams
+    opt_states : optax.OptState
+    step_counter : int

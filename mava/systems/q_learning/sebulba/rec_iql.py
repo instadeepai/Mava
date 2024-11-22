@@ -30,17 +30,15 @@ import jax.lax as lax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from chex import PRNGKey
 from colorama import Fore, Style
-from flashbax.buffers.flat_buffer import TrajectoryBuffer
+
 from flax.core.scope import FrozenVariableDict
 from flax.linen import FrozenDict
 from jax import Array, tree
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.sharding import Mesh, NamedSharding, PartitionSpec, Sharding
-from jumanji.env import Environment
-from jumanji.types import TimeStep
+
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
@@ -48,25 +46,19 @@ from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
 from mava.evaluator import make_rec_eval_act_fn
 
 from mava.networks import RecQNetwork, ScannedRNN
-from mava.utils.sebulba import ParamsSource, OfflinePipeline as Pipeline, RecordTimeTo, ThreadLifetime, SampleToInsertRatio
+from mava.utils.sebulba import ParamsSource, OffPolicyPipeline as Pipeline, RecordTimeTo, ThreadLifetime, SampleToInsertRatio
 from mava.systems.q_learning.types import (
     ActionSelectionState,
-    ActionState,
     Metrics,
     QNetParams,
-    TrainState,
     Transition,
+    SebulbaLearnerState as LearnerState
 )
-from mava.systems.ppo.types import LearnerState #todo n0
-from mava.types import Observation, SebulbaLearnerFn, ExperimentOutput 
+from mava.types import Observation, SebulbaLearnerFn 
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps, check_sebulba_config
-from mava.utils.jax_utils import (
-    switch_leading_axes,
-    unreplicate_batch_dim,
-    unreplicate_n_dims,
-)
+from mava.utils.jax_utils import switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.wrappers.episode_metrics import get_final_step_metrics
 from mava.wrappers.gym import GymToJumanji
@@ -82,6 +74,7 @@ def rollout(
     actor_device: int,
     seeds: List[int],
     thread_lifetime: ThreadLifetime,
+    actor_id : int,
 ) -> None:
     """Runs rollouts to collect trajectories from the environment.
 
@@ -103,8 +96,8 @@ def rollout(
 
     @jax.jit
     def select_eps_greedy_action(
-        params , hidden_state, obs: Observation, term_or_trunc: Array, key, t: int
-    ) -> Tuple[ActionSelectionState, Array]: #todo
+        params : FrozenDict , hidden_state, obs: Observation, term_or_trunc: Array, key, t: int
+    ) -> Tuple[ActionSelectionState, Array]: 
         """Select action to take in epsilon-greedy way. Batch and agent dims are included.
 
         Args:
@@ -128,7 +121,7 @@ def rollout(
         term_or_trunc = tree.map(lambda x: x[jnp.newaxis, ...], term_or_trunc)
 
         next_hidden_state, eps_greedy_dist = apply_fn(
-            params.online, hidden_state, (obs, term_or_trunc), eps #todo only pass online params
+            params, hidden_state, (obs, term_or_trunc), eps 
         )
 
         action = eps_greedy_dist.sample(seed=key)
@@ -193,15 +186,13 @@ def rollout(
         # send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
             try:
-                rollout_queue.put(traj, (actor_timings, episode_metrics))
+                rollout_queue.put(traj, (actor_timings, episode_metrics), actor_id)
             except queue.Full:
                 err = "Waited too long to add to the rollout queue, killing the actor thread"
                 warnings.warn(err, stacklevel=2)
                 break
 
     env.close()
-
-#todo trainerState is elearner state in ppo, why did we switch up?
 
 def get_learner_step_fn(
     apply_fn ,
@@ -211,7 +202,7 @@ def get_learner_step_fn(
     """Get the learner function."""
 
     def _update_step(
-        learner_state: TrainState,
+        learner_state: LearnerState,
         traj_batch: Transition,
     ) -> Tuple[LearnerState, Metrics]:
         """A single update of the network.
@@ -278,7 +269,7 @@ def get_learner_step_fn(
 
                 return q_loss, loss_info
             
-            params, opt_states, traj_batch, t_train = update_state
+            params, opt_states, t_train, traj_batch = update_state
 
  
             # Get data aligned with current/next timestep
@@ -300,7 +291,7 @@ def get_learner_step_fn(
             next_terminal = data_next.terminal
 
             # Scan over each sample
-            hidden_state, next_obs_term_or_trunc = prep_inputs_to_scannedrnn( #todo how/why are we re_init the hidden state each step? shoudn't be stored?
+            hidden_state, next_obs_term_or_trunc = prep_inputs_to_scannedrnn( 
                 next_obs, next_term_or_trunc
             )
 
@@ -348,20 +339,17 @@ def get_learner_step_fn(
             next_params = QNetParams(next_online_params, next_target_params)
             
             # Repack.
-            next_state = (next_params, next_opt_state, traj_batch, t_train + 1)
+            next_state = (next_params, next_opt_state, t_train + 1, traj_batch)
   
             return next_state, q_loss_info
-
         
-        #TODO this should be included in the learner state and inc by 1 each time we update )
-        update_state = (learner_state.params, learner_state.opt_states, traj_batch, 0)
-        # Update epochs #TODO BRODCsAT THE TRAJ_BATCH 
+        update_state = (*learner_state , traj_batch)
         update_state, loss_info = jax.lax.scan(
             _update_epoch, update_state, None, config.system.epochs
         )
 
-        params, opt_states, traj_batch, train_step = update_state
-        learner_state = LearnerState(params, opt_states, None, None, learner_state.timestep)
+        params, opt_states, train_step, _ = update_state
+        learner_state = LearnerState(params, opt_states, train_step)
         return learner_state, loss_info
 
 
@@ -421,7 +409,7 @@ def learner_thread(
                 # Update all the params sources so all actors can get the latest params
                 params = jax.block_until_ready(learner_state.params)
                 for source in params_sources:
-                    source.update(params)
+                    source.update(params.online)
 
         # Pass all the metrics and  params to the main thread (evaluator) for logging and evaluation
         ep_metrics, train_metrics = tree.map(lambda *x: np.asarray(x), *metrics)
@@ -470,7 +458,7 @@ def learner_setup(
     init_x = (init_obs_batched, dones)  # pack the RNN dummy inputs
     # (B, A, ...)
     init_hidden_state = ScannedRNN.initialize_carry(
-        (config.arch.num_envs, config.system.num_agents), config.network.hidden_state_dim
+        (config.system.sample_batch_size, config.system.num_agents), config.network.hidden_state_dim
     )
 
     # Making recurrent Q network.shao
@@ -495,7 +483,7 @@ def learner_setup(
     )
     opt_state = opt.init(params.online)
 
-    # Create dummy transition
+    # Create dummy transition Used to initialiwe the pipeline's Buffer
     init_acts = env.single_action_space.sample()  # (A,)
     init_transition = Transition(
         obs=init_obs,  # (A, ...)
@@ -505,20 +493,8 @@ def learner_setup(
         term_or_trunc=jnp.zeros((1,), dtype=bool),
         next_obs=init_obs
     )
-
-    # Initialise trajectory buffer
-    rb = fbx.make_trajectory_buffer(
-        # n transitions gives n-1 full data points
-        sample_sequence_length=config.system.sample_sequence_length + 1,
-        period=1,  # sample any unique trajectory
-        add_batch_size=config.arch.num_envs,
-        sample_batch_size=config.system.sample_batch_size,
-        max_length_time_axis=config.system.buffer_size,
-        min_length_time_axis=config.system.min_buffer_size,
-    )
-    buffer_state = rb.init(init_transition)
     
-    learn_state_spec = LearnerState(model_spec, model_spec, data_spec, None, data_spec)
+    learn_state_spec = LearnerState(model_spec, model_spec, model_spec)
     learn = get_learner_step_fn(q_net.apply, opt.update, config)
     learn = jax.jit(
         shard_map(
@@ -539,23 +515,19 @@ def learner_setup(
         restored_params, _ = loaded_checkpoint.restore_params(input_params=params)
         # Update the params
         params = restored_params
-        
-    # Define params to be replicated across devices and batches.
-    key, *step_keys = jax.random.split(key, len(learner_devices) + 1)
-    step_keys = jnp.stack(step_keys, 0)
     
     # Duplicate learner across Learner devices.
-    params, opt_state, step_keys = jax.device_put(
-        (params, opt_state, step_keys), learner_sharding
+    params, opt_state = jax.device_put(
+        (params, opt_state), learner_sharding
     )
     
     # Initial learner state.
     init_learner_state = LearnerState(
-        params, opt_state, step_keys, None, None
+        params, opt_state, 0
     )
     
     env.close()
-    return learn, q_net.apply, init_learner_state, learner_sharding , rb.add, rb.sample, buffer_state
+    return learn, q_net.apply, init_learner_state, learner_sharding , init_transition
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -574,7 +546,7 @@ def run_experiment(_config: DictConfig) -> float:
     np_rng = np.random.default_rng(config.system.seed)
 
     # Setup learner.
-    learn, apply_fn, learner_state, learner_sharding, buffer_add, buffer_sample, buffer_state = learner_setup(key, config, learner_devices)
+    learn, apply_fn, learner_state, learner_sharding, init_transition = learner_setup(key, config, learner_devices)
 
     # Setup evaluator.
     # One key per device for evaluation.
@@ -593,7 +565,7 @@ def run_experiment(_config: DictConfig) -> float:
         * config.system.num_updates_per_eval
     )
 
-    # Logger setup
+    # Setup logger 
     logger = MavaLogger(config)
     print_cfg: Dict = OmegaConf.to_container(config, resolve=True)
     print_cfg["arch"]["devices"] = jax.devices()
@@ -611,23 +583,14 @@ def run_experiment(_config: DictConfig) -> float:
     # Executor setup and launch.
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
-    # the rollout queue/ the pipe between actor and learner
-    pipe_lifetime = ThreadLifetime()
+    # The rollout queue/ the pipe between actor and learner
     
-    # Calculate the replay ratio todo: refactor the configs
-    steps_per_insert = config.arch.num_envs * config.system.rollout_length
-    samples_per_inserted_batched_rollout = config.system.epochs
-    replay_ratio = samples_per_inserted_batched_rollout / steps_per_insert
-    config.system.replay_ratio = replay_ratio
-    # Set up the rate limiter that controls how actors and learners interact with the pipeline
-    samples_per_insert_tolerance_rate = 0.1  # This allows for 10% tolerance
-    samples_per_insert_tolerance = samples_per_insert_tolerance_rate * config.system.epochs
-    error_buffer = config.system.sample_batch_size * samples_per_insert_tolerance
-    min_inserts = max(config.system.sample_batch_size // steps_per_insert, 1)
-    rate_limiter = SampleToInsertRatio(config.system.epochs, min_inserts, error_buffer)
-    
-    pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding, pipe_lifetime, buffer_add, buffer_sample, buffer_state , key, rate_limiter)#todo chek key
-    pipe.start()
+    # Setup RateLimiter | todo  WE COLLECT  BATCH8SIZE8PER8INSER PER STEMP BUT WE SAMPLE SAMPLE8BTACH8SUZE PER SAMPLE 
+    batch_size_per_insert = config.arch.num_envs * config.system.rollout_length 
+    min_num_inserts = max(config.system.min_buffer_size // batch_size_per_insert, 1) #todo min buffer size here?
+    rate_limiter = SampleToInsertRatio(config.system.samples_per_insert, min_num_inserts, config.system.sample_per_inser_tolerance)
+
+    pipe = Pipeline(config, learner_sharding, key, rate_limiter, init_transition)#todo chek key
 
     params_sources: List[ParamsSource] = []
     actor_threads: List[threading.Thread] = []
@@ -636,9 +599,9 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Create the actor threads
     print(f"{Fore.BLUE}{Style.BRIGHT}Starting up actor threads...{Style.RESET_ALL}")
-    for actor_device in actor_devices:
+    for device_idx, actor_device in enumerate(actor_devices):
         # Create 1 params source per device
-        params_source = ParamsSource(inital_params, actor_device, params_sources_lifetime)
+        params_source = ParamsSource(inital_params.online, actor_device, params_sources_lifetime)
         params_source.start()
         params_sources.append(params_source)
         # Create multiple rollout threads per actor device
@@ -646,6 +609,7 @@ def run_experiment(_config: DictConfig) -> float:
             key, act_key = jax.random.split(key)
             seeds = np_rng.integers(np.iinfo(np.int32).max, size=config.arch.num_envs).tolist()
             act_key = jax.device_put(key, actor_device)
+            actor_id = device_idx * config.arch.n_threads_per_executor + thread_id
 
             actor = threading.Thread(
                 target=rollout,
@@ -660,6 +624,7 @@ def run_experiment(_config: DictConfig) -> float:
                     actor_device,
                     seeds,
                     actor_lifetime,
+                    actor_id
                 ),
                 name=f"Actor-{actor_device}-{thread_id}",
             )

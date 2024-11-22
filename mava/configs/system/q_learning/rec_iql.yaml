@@ -17,7 +17,7 @@ epochs: 2 # Number of learn epochs per training data batch.
 # sizes
 buffer_size: 5000 # size of the replay buffer. Note: total size is this * num_devices
 sample_batch_size: 32  # size of training data batch sampled from the buffer
-sample_sequence_length: 20 # 20 transitions are sampled, giving 19 complete data points
+sample_sequence_length: 20 # N transitions are sampled, giving N - 1 complete data points
 
 # learning rates
 q_lr: 3e-4  # the learning rate of the Q network network optimizer
@@ -32,4 +32,6 @@ gamma: 0.99  # discount factor
 eps_min: 0.05
 eps_decay: 1e5
 
-num_minibatches: 1
+# --- Sebulba parameters ---
+samples_per_insert : 2 # The average number of times the learner should sample each item in the replay buffer.
+sample_per_inser_tolerance : 6  # Maximum size of the "error" before calls should be blocked.
