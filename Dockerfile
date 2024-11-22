@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y git build-essential pkg-config libhdf5-
 
 # Add uv and use the system python (no need to make venv)
 USER root
-COPY --from=ghcr.io/astral-sh/uv:0.4.20 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.5.4 /uv /bin/uv
 ENV UV_SYSTEM_PYTHON=1
 
 WORKDIR /home/app/mava
