@@ -545,6 +545,7 @@ def make_update_fns(
 
 
 def run_experiment(cfg: DictConfig) -> float:
+    cfg.logger.system_name = "rec_qmix"
     cfg.arch.n_devices = len(jax.devices())
     cfg = check_total_timesteps(cfg)
 
@@ -676,7 +677,6 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-    cfg.logger.system_name = "rec_qmix"
     # Run experiment.
     eval_performance = run_experiment(cfg)
 
