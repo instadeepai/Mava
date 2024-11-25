@@ -27,7 +27,7 @@ def calculate_gae(
     last_done: chex.Array,
     gamma: float,
     gae_lambda: float,
-    unroll: int = 16
+    unroll: int = 16,
 ) -> Tuple[chex.Array, chex.Array]:
     """Computes truncated generalized advantage estimates.
 
@@ -36,7 +36,7 @@ def calculate_gae(
     where δₜ = rₜ₊₁ + γₜ₊₁ * v(sₜ₊₁) - v(sₜ).
     See Proximal Policy Optimization Algorithms, Schulman et al.:
     https://arxiv.org/abs/1707.06347
-    
+
     Args:
         traj_batch (B, T, N, ...): a batch of trajectories.
         last_val  (B, N): value of the final timestep.
@@ -44,16 +44,16 @@ def calculate_gae(
         gamma (float): discount factor.
         gae_lambda (float): GAE mixing parameter.
         unroll (int): how much XLA should unroll the scan used to calculate GAE.
-    
+
     Returns Tuple[(B, T, N), (B, T, N)]: advantages and target values.
     """
-    
+
     def _get_advantages(
         carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
     ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
         gae, next_value, next_done = carry
         done, value, reward = transition.done, transition.value, transition.reward
-        
+
         delta = reward + gamma * next_value * (1 - next_done) - value
         gae = delta + gamma * gae_lambda * (1 - next_done) * gae
         return (gae, value, done), gae

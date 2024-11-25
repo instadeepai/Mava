@@ -55,6 +55,16 @@ class LearnerState(NamedTuple):
     dones: Done
 
 
+class SebulbaLearnerState(NamedTuple):
+    """State of the learner."""
+
+    params: Params
+    opt_states: OptStates
+    key: chex.PRNGKey
+    env_state: State
+    timestep: TimeStep
+
+
 class RNNLearnerState(NamedTuple):
     """State of the `Learner` for recurrent architectures."""
 
