@@ -12,14 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Tuple, Union
+from typing import Callable, Union
 
-import chex
-import jax
-import jax.numpy as jnp
 from omegaconf import DictConfig
-
-from mava.systems.ppo.types import PPOTransition, RNNPPOTransition
 
 
 def make_learning_rate_schedule(init_lr: float, config: DictConfig) -> Callable:
@@ -67,32 +62,3 @@ def make_learning_rate(init_lr: float, config: DictConfig) -> Union[float, Calla
         return make_learning_rate_schedule(init_lr, config)
     else:
         return init_lr
-
-
-def _calculate_gae(
-    traj_batch: PPOTransition,
-    last_val: chex.Array,
-    last_done: chex.Array,
-    recurrent: bool,
-    config: DictConfig,
-) -> Tuple[chex.Array, chex.Array]:
-    def _get_advantages(
-        carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
-    ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
-        gae, next_value, next_done = carry
-        done, value, reward = transition.done, transition.value, transition.reward
-        gamma = config.system.gamma
-        if not recurrent:
-            next_done = done
-        delta = reward + gamma * next_value * (1 - next_done) - value
-        gae = delta + gamma * config.system.gae_lambda * (1 - next_done) * gae
-        return (gae, value, done), gae
-
-    _, advantages = jax.lax.scan(
-        _get_advantages,
-        (jnp.zeros_like(last_val), last_val, last_done),
-        traj_batch,
-        reverse=True,
-        unroll=16,
-    )
-    return advantages, advantages + traj_batch.value
