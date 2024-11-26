@@ -580,17 +580,21 @@ def run_experiment(_config: DictConfig) -> float:
             **config.logger.checkpointing.save_args,  # Checkpoint args
         )
 
+
     # Executor setup and launch.
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
     # The rollout queue/ the pipe between actor and learner
     
-    # Setup RateLimiter | todo  WE COLLECT  BATCH8SIZE8PER8INSER PER STEMP BUT WE SAMPLE SAMPLE8BTACH8SUZE PER SAMPLE 
-    batch_size_per_insert = config.arch.num_envs * config.system.rollout_length 
-    min_num_inserts = max(config.system.min_buffer_size // batch_size_per_insert, 1) #todo min buffer size here?
+    # Setup RateLimiter | todo  we can convert all of this calucations to use the batch size but idk how helpful that would be 
+    batch_size_per_insert = config.arch.num_envs * config.system.rollout_length * config.arch.n_threads_per_executor * len(actor_devices)
+    min_num_inserts = max((config.system.min_buffer_size *  config.system.sample_sequence_length) // batch_size_per_insert, 1) 
     rate_limiter = SampleToInsertRatio(config.system.samples_per_insert, min_num_inserts, config.system.sample_per_inser_tolerance)
-
-    pipe = Pipeline(config, learner_sharding, key, rate_limiter, init_transition)#todo chek key
+    
+    # Setup Pipeline
+    pipe_lifetime = ThreadLifetime()
+    pipe = Pipeline(config, learner_sharding, key, rate_limiter, init_transition, pipe_lifetime)#todo chek key
+    pipe.start()
 
     params_sources: List[ParamsSource] = []
     actor_threads: List[threading.Thread] = []
