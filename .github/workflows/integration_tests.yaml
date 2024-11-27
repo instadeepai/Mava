@@ -11,6 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.11"]
+
     steps:
       - name: Checkout mava
         uses: actions/checkout@v4
