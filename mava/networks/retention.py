@@ -242,7 +242,7 @@ class MultiScaleRetention(nn.Module):
         self.w_o = self.param(
             "w_o",
             nn.initializers.normal(stddev=1 / self.embed_dim),
-            (self.head_size, self.embed_dim),
+            (self.embed_dim, self.embed_dim),
         )
         self.group_norm = nn.GroupNorm(num_groups=self.n_head)
 
