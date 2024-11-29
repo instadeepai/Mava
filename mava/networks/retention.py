@@ -237,7 +237,7 @@ class MultiScaleRetention(nn.Module):
         self.w_g = self.param(
             "w_g",
             nn.initializers.normal(stddev=1 / self.embed_dim),
-            (self.embed_dim, self.head_size),
+            (self.embed_dim, self.embed_dim),
         )
         self.w_o = self.param(
             "w_o",
