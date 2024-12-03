@@ -104,7 +104,7 @@ def get_learner_fn(
             _env_step, learner_state, None, config.system.rollout_length
         )
 
-        # CALCULATE ADVANTAGE
+        # Calculate advantage
         params, opt_states, key, env_state, last_timestep, last_done = learner_state
         last_val = critic_apply_fn(params.critic_params, last_timestep.observation)
 
