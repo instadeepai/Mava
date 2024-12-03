@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict
 
 import chex
 from flax.core.frozen_dict import FrozenDict
@@ -86,7 +85,6 @@ class PPOTransition(NamedTuple):
     reward: chex.Array
     log_prob: chex.Array
     obs: Observation
-    info: Dict
 
 
 class RNNPPOTransition(NamedTuple):
@@ -99,4 +97,3 @@ class RNNPPOTransition(NamedTuple):
     log_prob: chex.Array
     obs: chex.Array
     hstates: HiddenStates
-    info: Dict

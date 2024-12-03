@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Dict, Tuple
+from typing import Callable, Tuple
 
 from chex import Array, PRNGKey
 from flax.core.frozen_dict import FrozenDict
@@ -56,18 +56,6 @@ class FFLearnerState(NamedTuple):
     key: PRNGKey
     env_state: Array
     timestep: TimeStep
-
-
-class Transition(NamedTuple):
-    """Transition tuple."""
-
-    done: Array
-    action: Array
-    value: Array
-    reward: Array
-    log_prob: Array
-    obs: Array
-    info: Dict
 
 
 ActorApply = Callable[
