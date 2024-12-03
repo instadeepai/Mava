@@ -96,7 +96,7 @@ def get_learner_fn(
             transition = PPOTransition(
                 last_done, action, value, timestep.reward, log_prob, last_timestep.observation
             )
-            learner_state = LearnerState(params, opt_states, key, env_state, timestep)
+            learner_state = LearnerState(params, opt_states, key, env_state, timestep, done)
             return learner_state, (transition, timestep.extras["episode_metrics"])
 
         # Step environment for rollout length
