@@ -152,7 +152,7 @@ class ExperimentOutput(NamedTuple, Generic[MavaState]):
 
 
 LearnerFn = Callable[[MavaState], ExperimentOutput[MavaState]]
-SebulbaLearnerFn = Callable[[MavaState, MavaTransition], ExperimentOutput[MavaState]]
+SebulbaLearnerFn = Callable[[MavaState, MavaTransition], Tuple[MavaState, Metrics]]
 ActorApply = Callable[[FrozenDict, Observation], Distribution]
 CriticApply = Callable[[FrozenDict, Observation], Value]
 RecActorApply = Callable[

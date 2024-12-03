@@ -27,6 +27,7 @@ from jumanji.types import TimeStep
 
 # todo: remove the ppo dependencies when we make sebulba for other systems
 from mava.systems.ppo.types import Params, PPOTransition
+from mava.types import Metrics
 
 QUEUE_PUT_TIMEOUT = 100
 
@@ -90,7 +91,9 @@ class Pipeline(threading.Thread):
             except queue.Empty:
                 continue
 
-    def put(self, traj: Sequence[PPOTransition], timestep: TimeStep, time_dict: Dict) -> None:
+    def put(
+        self, traj: Sequence[PPOTransition], timestep: TimeStep, metrics: Tuple[Dict, List[Dict]]
+    ) -> None:
         """Put a trajectory on the queue to be consumed by the learner."""
         start_condition, end_condition = (threading.Condition(), threading.Condition())
         with start_condition:
@@ -101,6 +104,10 @@ class Pipeline(threading.Thread):
         traj = _stack_trajectory(traj)
         traj, timestep = jax.device_put((traj, timestep), device=self.sharding)
 
+        time_dict, episode_metrics = metrics
+        # [{'metric1' : value1, ...} * rollout_len -> {'metric1' : [value1, value2, ...], ...}
+        episode_metrics = _stack_trajectory(episode_metrics)
+
         # We block on the `put` to ensure that actors wait for the learners to catch up.
         # This ensures two things:
         #  The actors don't get too far ahead of the learners, which could lead to off-policy data.
@@ -110,7 +117,7 @@ class Pipeline(threading.Thread):
         # We use a try-finally so the lock is released even if an exception is raised.
         try:
             self._queue.put(
-                (traj, timestep, time_dict),
+                (traj, timestep, time_dict, episode_metrics),
                 block=True,
                 timeout=QUEUE_PUT_TIMEOUT,
             )
@@ -129,7 +136,7 @@ class Pipeline(threading.Thread):
 
     def get(
         self, block: bool = True, timeout: Union[float, None] = None
-    ) -> Tuple[PPOTransition, TimeStep, Dict]:
+    ) -> Tuple[PPOTransition, TimeStep, Dict, Metrics]:
         """Get a trajectory from the pipeline."""
         return self._queue.get(block, timeout)  # type: ignore
 
