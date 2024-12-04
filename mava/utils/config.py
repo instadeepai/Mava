@@ -34,9 +34,9 @@ def check_sebulba_config(config: DictConfig) -> None:
         int(config.arch.num_envs / len(config.arch.learner_device_ids))
         * config.system.rollout_length
     )
-    
+
     # PPO specifique check
-    if  "num_minibatches" in config.system:
+    if "num_minibatches" in config.system:
         assert num_eval_samples % config.system.num_minibatches == 0, (
             f"Number of training samples per evaluator ({num_eval_samples})"
             + f"must be divisible by num_minibatches ({config.system.num_minibatches})."

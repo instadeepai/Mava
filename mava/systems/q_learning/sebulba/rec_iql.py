@@ -13,17 +13,14 @@
 # limitations under the License.
 
 import copy
-import time
+import queue
 import threading
 import warnings
 from collections import defaultdict
-from typing import Any, Callable, Dict, Tuple, List, Sequence
-from numpy.typing import NDArray
-import queue
 from queue import Queue
+from typing import Any, Dict, List, Sequence, Tuple
 
 import chex
-import flashbax as fbx
 import hydra
 import jax
 import jax.lax as lax
@@ -31,35 +28,28 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 from colorama import Fore, Style
-
 from flax.core.scope import FrozenVariableDict
 from flax.linen import FrozenDict
 from jax import Array, tree
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.sharding import Mesh, NamedSharding, PartitionSpec, Sharding
-
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
 from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
 from mava.evaluator import make_rec_eval_act_fn
-
 from mava.networks import RecQNetwork, ScannedRNN
-from mava.utils.sebulba import ParamsSource, OffPolicyPipeline as Pipeline, RecordTimeTo, ThreadLifetime, SampleToInsertRatio
-from mava.systems.q_learning.types import (
-    ActionSelectionState,
-    Metrics,
-    QNetParams,
-    Transition,
-    SebulbaLearnerState as LearnerState
-)
-from mava.types import Observation, SebulbaLearnerFn 
+from mava.systems.q_learning.types import Metrics, QNetParams, Transition
+from mava.systems.q_learning.types import SebulbaLearnerState as LearnerState
+from mava.types import Observation, SebulbaLearnerFn
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.config import check_total_timesteps, check_sebulba_config
+from mava.utils.config import check_sebulba_config, check_total_timesteps
 from mava.utils.jax_utils import switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.sebulba import OffPolicyPipeline as Pipeline
+from mava.utils.sebulba import ParamsSource, RecordTimeTo, SampleToInsertRatio, ThreadLifetime
 from mava.wrappers.episode_metrics import get_final_step_metrics
 from mava.wrappers.gym import GymToJumanji
 
@@ -70,47 +60,52 @@ def rollout(
     config: DictConfig,
     rollout_queue: Pipeline,
     params_source: ParamsSource,
-    apply_fn ,
+    q_net: RecQNetwork,
     actor_device: int,
     seeds: List[int],
     thread_lifetime: ThreadLifetime,
-    actor_id : int,
+    actor_id: int,
 ) -> None:
-    """Runs rollouts to collect trajectories from the environment.
+    """Collects trajectories from the environment by running rollouts.
 
     Args:
-        key (chex.PRNGKey): The PRNGkey.
-        config (DictConfig): Configuration settings for the environment and rollout.
-        rollout_queue (Pipeline): Queue for sending collected rollouts to the learner.
-        params_source (ParamsSource): Source for fetching the latest network parameters
-        from the learner.
-        apply_fns (Tuple): Functions for running the actor and critic networks.
-        actor_device (Device): Actor device to use for rollout.
-        seeds (List[int]): Seeds for initializing the environment.
-        thread_lifetime (ThreadLifetime): Manages the thread's lifecycle.
+        key: The PRNG key for stochasticity.
+        env: The environment to interact with.
+        config: Configuration settings for rollout and environment.
+        rollout_queue: Queue for sending collected trajectories to the learner.
+        params_source: Provides the latest network parameters from the learner.
+        q_net: The Q-network.
+        actor_device: Index of the actor device to use for rollout.
+        seeds: Seeds for environment initialization.
+        thread_lifetime: Controls the thread's lifecycle.
+        actor_id: Unique identifier for the actor.
     """
     name = threading.current_thread().name
     print(f"{Fore.BLUE}{Style.BRIGHT}Thread {name} started{Style.RESET_ALL}")
-    num_agents, num_envs = config.system.num_agents, config.arch.num_envs
+    num_agents = config.system.num_agents
     move_to_device = lambda x: jax.device_put(x, device=actor_device)
 
     @jax.jit
     def select_eps_greedy_action(
-        params : FrozenDict , hidden_state, obs: Observation, term_or_trunc: Array, key, t: int
-    ) -> Tuple[ActionSelectionState, Array]: 
-        """Select action to take in epsilon-greedy way. Batch and agent dims are included.
+        params: FrozenDict,
+        hidden_state: jax.Array,
+        obs: Observation,
+        term_or_trunc: Array,
+        key: chex.PRNGKey,
+        t: int,
+    ) -> Tuple[Array, Array, int]:
+        """Selects an action epsilon-greedily.
 
         Args:
-        ----
-            action_selection_state: Tuple of online parameters, previous hidden state,
-                environment timestep (used to calculate epsilon) and a random key.
-            obs: The observation from the previous timestep.
-            term_or_trunc: The flag timestep.last() from the previous timestep.
+            params: Network parameters.
+            hidden_state: Current RNN hidden state.
+            obs: Observation from the environment.
+            term_or_trunc: Termination or truncation flag.
+            key: PRNG key for sampling.
+            t: Current timestep (used for epsilon decay).
 
         Returns:
-        -------
-            A tuple of the updated action selection state and the chosen action.
-
+            Tuple containing the chosen action, next hidden state, and updated timestep.
         """
 
         eps = jnp.maximum(
@@ -120,25 +115,25 @@ def rollout(
         obs = tree.map(lambda x: x[jnp.newaxis, ...], obs)
         term_or_trunc = tree.map(lambda x: x[jnp.newaxis, ...], term_or_trunc)
 
-        next_hidden_state, eps_greedy_dist = apply_fn(
-            params, hidden_state, (obs, term_or_trunc), eps 
+        next_hidden_state, eps_greedy_dist = q_net.apply(
+            params, hidden_state, (obs, term_or_trunc), eps
         )
 
         action = eps_greedy_dist.sample(seed=key)
         action = action[0, ...]  # (1, B, A) -> (B, A)
-        
-        return action, next_hidden_state, t + config.arch.num_envs 
+
+        return action, next_hidden_state, t + config.arch.num_envs
 
     next_timestep = env.reset(seed=seeds)
     dones = next_timestep.last()[..., jnp.newaxis]
-    
+
     # Initialise hidden states.
     hstate = ScannedRNN.initialize_carry(
         (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
     hstate_tpu = tree.map(move_to_device, hstate)
     step_count = 0
-    
+
     # Loop till the desired num_updates is reached.
     while not thread_lifetime.should_stop():
         # Rollout
@@ -149,35 +144,37 @@ def rollout(
             for _ in range(config.system.rollout_length):
                 with RecordTimeTo(actor_timings["get_params_time"]):
                     params = params_source.get()  # Get the latest parameters from the learner
-                
+
                 timestep = next_timestep
                 obs_tpu = tree.map(move_to_device, timestep.observation)
-                
+
                 last_dones = tree.map(move_to_device, dones)
-                
+
                 # Get action and value
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
-                    action, hstate_tpu, step_count = select_eps_greedy_action(params, hstate_tpu, obs_tpu, last_dones, act_key, step_count)
+                    action, hstate_tpu, step_count = select_eps_greedy_action(
+                        params, hstate_tpu, obs_tpu, last_dones, act_key, step_count
+                    )
                     cpu_action = jax.device_get(action)
 
                 # Step environment
                 with RecordTimeTo(actor_timings["env_step_time"]):
                     next_timestep = env.step(cpu_action)
 
-                #Prepare the transation
+                # Prepare the transation
                 terminal = (1 - timestep.discount[..., 0, jnp.newaxis]).astype(bool)
-                dones = next_timestep.last()[..., jnp.newaxis] 
+                dones = next_timestep.last()[..., jnp.newaxis]
 
                 # Append data to storage
                 traj.append(
                     Transition(
-                    timestep.observation, 
-                    action, 
-                    next_timestep.reward, 
-                    terminal, 
-                    dones, 
-                    next_timestep.extras["real_next_obs"]
+                        timestep.observation,
+                        action,
+                        next_timestep.reward,
+                        terminal,
+                        dones,
+                        next_timestep.extras["real_next_obs"],
                     )
                 )
 
@@ -194,8 +191,9 @@ def rollout(
 
     env.close()
 
+
 def get_learner_step_fn(
-    apply_fn ,
+    q_net: RecQNetwork,
     update_fn: optax.TransformUpdateFn,
     config: DictConfig,
 ) -> SebulbaLearnerFn[LearnerState, Transition]:
@@ -205,38 +203,43 @@ def get_learner_step_fn(
         learner_state: LearnerState,
         traj_batch: Transition,
     ) -> Tuple[LearnerState, Metrics]:
-        """A single update of the network.
+        """Performs a single network update.
 
-        This function calculates advantages and targets based on the trajectories
-        from the actor and updates the actor and critic networks based on the losses.
+        Calculates targets based on the input trajectories and updates the Q-network
+        parameters accordingly.
 
         Args:
-            learner_state (LearnerState): contains all the items needed for learning.
-            traj_batch (PPOTransition): the batch of data to learn with.
+            learner_state: Current learner state.
+            traj_batch: Batch of transitions for training.
         """
-        
-        
-        def prep_inputs_to_scannedrnn(obs: Observation, term_or_trunc: chex.Array) -> chex.Array:
-            """Prepares the inputs to the RNN network for either getting q values or the
-            eps-greedy distribution.
 
-            Mostly swaps leading axes because the replay buffer outputs (B, T, ... )
-            and the RNN takes in (T, B, ...).
+        def prep_inputs_to_scannedrnn(obs: Observation, term_or_trunc: chex.Array) -> chex.Array:
+            """Prepares inputs for the ScannedRNN network.
+
+            Switches leading axes of observations and termination/truncation flags to match the
+            (T, B, ...) format expected by the RNN. The replay buffer outputs data in (B, T, ...)
+            format.
+
+            Args:
+                obs: Observation data.
+                term_or_trunc: Termination/truncation flags.
+
+            Returns:
+                Tuple containing the initial hidden state and the formatted input data.
             """
             hidden_state = ScannedRNN.initialize_carry(
-                (config.system.sample_batch_size, obs.agents_view.shape[2]), config.network.hidden_state_dim
+                (obs.agents_view.shape[0], obs.agents_view.shape[2]),
+                config.network.hidden_state_dim,
             )
             # the rb outputs (B, T, ... ) the RNN takes in (T, B, ...)
             obs = switch_leading_axes(obs)  # (B, T) -> (T, B)
             term_or_trunc = switch_leading_axes(term_or_trunc)  # (B, T) -> (T, B)
             obs_term_or_trunc = (obs, term_or_trunc)
-            
+
             return hidden_state, obs_term_or_trunc
 
-
-        
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
-            """Update the network for a single epoch.""" 
+            """Update the network for a single epoch."""
 
             def q_loss_fn(
                 q_online_params: FrozenVariableDict,
@@ -249,7 +252,7 @@ def get_learner_step_fn(
                 hidden_state, obs_term_or_trunc = prep_inputs_to_scannedrnn(obs, term_or_trunc)
 
                 # get online q values of all actions
-                _, q_online = apply_fn(
+                _, q_online = q_net.apply(
                     q_online_params, hidden_state, obs_term_or_trunc, method="get_q_values"
                 )
                 q_online = switch_leading_axes(q_online)  # (T, B, ...) -> (B, T, ...)
@@ -268,10 +271,9 @@ def get_learner_step_fn(
                 }
 
                 return q_loss, loss_info
-            
+
             params, opt_states, t_train, traj_batch = update_state
 
- 
             # Get data aligned with current/next timestep
             data_first = tree.map(lambda x: x[:, :-1, ...], traj_batch)
             data_next = tree.map(lambda x: x[:, 1:, ...], traj_batch)
@@ -291,16 +293,16 @@ def get_learner_step_fn(
             next_terminal = data_next.terminal
 
             # Scan over each sample
-            hidden_state, next_obs_term_or_trunc = prep_inputs_to_scannedrnn( 
+            hidden_state, next_obs_term_or_trunc = prep_inputs_to_scannedrnn(
                 next_obs, next_term_or_trunc
             )
 
             # eps defaults to 0
-            _, next_online_greedy_dist = apply_fn(
+            _, next_online_greedy_dist = q_net.apply(
                 params.online, hidden_state, next_obs_term_or_trunc
             )
 
-            _, next_q_vals_target = apply_fn(
+            _, next_q_vals_target = q_net.apply(
                 params.target, hidden_state, next_obs_term_or_trunc, method="get_q_values"
             )
 
@@ -309,7 +311,8 @@ def get_learner_step_fn(
 
             # Double q-value selection
             next_q_val = jnp.squeeze(
-                jnp.take_along_axis(next_q_vals_target, next_action[..., jnp.newaxis], axis=-1), axis=-1
+                jnp.take_along_axis(next_q_vals_target, next_action[..., jnp.newaxis], axis=-1),
+                axis=-1,
             )
 
             next_q_val = switch_leading_axes(next_q_val)  # (T, B, ...) -> (B, T, ...)
@@ -319,7 +322,9 @@ def get_learner_step_fn(
 
             # Update Q function.
             q_grad_fn = jax.grad(q_loss_fn, has_aux=True)
-            q_grads, q_loss_info = q_grad_fn(params.online, obs, term_or_trunc, action, target_q_val)
+            q_grads, q_loss_info = q_grad_fn(
+                params.online, obs, term_or_trunc, action, target_q_val
+            )
 
             # Mean over the device and batch dimension.
             q_grads, q_loss_info = lax.pmean((q_grads, q_loss_info), axis_name="learner_devices")
@@ -337,13 +342,13 @@ def get_learner_step_fn(
 
             # Repack params and opt_states.
             next_params = QNetParams(next_online_params, next_target_params)
-            
+
             # Repack.
             next_state = (next_params, next_opt_state, t_train + 1, traj_batch)
-  
+
             return next_state, q_loss_info
-        
-        update_state = (*learner_state , traj_batch)
+
+        update_state = (*learner_state, traj_batch)
         update_state, loss_info = jax.lax.scan(
             _update_epoch, update_state, None, config.system.epochs
         )
@@ -352,7 +357,6 @@ def get_learner_step_fn(
         learner_state = LearnerState(params, opt_states, train_step)
         return learner_state, loss_info
 
-
     def learner_fn(
         learner_state: LearnerState, traj_batch: Transition
     ) -> Tuple[LearnerState, Metrics]:
@@ -360,23 +364,21 @@ def get_learner_step_fn(
 
         This function represents the learner, it updates the network parameters
         by iteratively applying the `_update_step` function for a fixed number of
-        updates. The `_update_step` function is vectorized over a batch of inputs.
+        updates. The `_update_step` function is vectorized across learner devices.
 
         Args:
             learner_state (NamedTuple):
                 - params (Params): The initial model parameters.
                 - opt_states (OptStates): The initial optimizer state.
-                - key (chex.PRNGKey): The random number generator state.
-                - env_state (LogEnvState): The environment state.
-                - timesteps (TimeStep): The last timestep of the rollout.
+                - step_counter int): Number of learning steps.
+            traj_batch (Transition): The collected trainig data.
         """
-        # This function is shard mapped on the batch axis, but `_update_step` needs
-        # the first axis to be time #todo is this comment still relevent ? 
         learner_state, loss_info = _update_step(learner_state, traj_batch)
 
         return learner_state, loss_info
 
     return learner_fn
+
 
 def learner_thread(
     learn_fn: SebulbaLearnerFn[LearnerState, Transition],
@@ -388,7 +390,8 @@ def learner_thread(
 ) -> None:
     for _ in range(config.arch.num_evaluation):
         # Create the lists to store metrics and timings for this learning iteration.
-        metrics: List[Tuple[Dict, Dict]] = []
+        ep_metrics: List[Dict] = []
+        train_metrics: List[Dict] = []
         rollout_times: List[Dict] = []
         learn_times: Dict[str, List[float]] = defaultdict(list)
 
@@ -397,14 +400,15 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, (rollout_time, ep_metrics) = pipeline.get(block=True)
-
+                    traj_batch, (rollout_time, ep_metric) = pipeline.get()
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
-                    learner_state, train_metrics = learn_fn(learner_state, traj_batch)
+                    learner_state, train_metric = learn_fn(learner_state, traj_batch)
 
-                metrics.append((ep_metrics, train_metrics))
-                rollout_times.append(rollout_time)
+                train_metrics.append(train_metric)
+                if ep_metric is not None:
+                    ep_metrics.append(ep_metric)
+                    rollout_times.append(rollout_time)
 
                 # Update all the params sources so all actors can get the latest params
                 params = jax.block_until_ready(learner_state.params)
@@ -412,12 +416,15 @@ def learner_thread(
                     source.update(params.online)
 
         # Pass all the metrics and  params to the main thread (evaluator) for logging and evaluation
-        ep_metrics, train_metrics = tree.map(lambda *x: np.asarray(x), *metrics)
-        rollout_times: Dict[str, NDArray] = tree.map(lambda *x: np.mean(x), *rollout_times)
-        timing_dict = rollout_times | learn_times
+        if ep_metrics:
+            ep_metrics = tree.map(lambda *x: np.asarray(x), *ep_metrics)
+            train_metrics = tree.map(lambda *x: np.asarray(x), *train_metrics)
+
+        timing_dict = tree.map(lambda *x: np.mean(x), *rollout_times) | learn_times
         timing_dict = tree.map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
 
         eval_queue.put((ep_metrics, train_metrics, learner_state, timing_dict))
+
 
 def learner_setup(
     key: chex.PRNGKey, config: DictConfig, learner_devices: List
@@ -426,6 +433,7 @@ def learner_setup(
     RecQNetwork,
     LearnerState,
     Sharding,
+    Transition,
 ]:
     """Initialise learner_fn, network and learner state."""
 
@@ -435,13 +443,12 @@ def learner_setup(
     action_space = env.single_action_space
     config.system.num_agents = len(action_space)
     config.system.num_actions = int(action_space[0].n)
-    
-    devices = mesh_utils.create_device_mesh((len(learner_devices), ), devices=learner_devices)
+
+    devices = mesh_utils.create_device_mesh((len(learner_devices),), devices=learner_devices)
     mesh = Mesh(devices, axis_names=("learner_devices"))
     model_spec = PartitionSpec()
     data_spec = PartitionSpec("learner_devices")
     learner_sharding = NamedSharding(mesh, model_spec)
-
 
     key, q_key = jax.random.split(key, 2)
     # Shape legend:
@@ -449,9 +456,9 @@ def learner_setup(
     # B: Batch (dummy dimension size = 1)
     # A: Agent
     # Make dummy inputs to init recurrent Q network -> need shape (T, B, A, ...)
-    init_agents_view = jnp.array(env.single_observation_space.sample())  
+    init_agents_view = jnp.array(env.single_observation_space.sample())
     init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
-    init_obs = Observation(init_agents_view, init_action_mask) # (A, ...)
+    init_obs = Observation(init_agents_view, init_action_mask)  # (A, ...)
     # (B, T, A, ...)
     init_obs_batched = tree.map(lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs)
     dones = jnp.zeros((1, 1, 1), dtype=bool)  # (T, B, 1)
@@ -491,11 +498,11 @@ def learner_setup(
         reward=jnp.zeros((config.system.num_agents,), dtype=float),
         terminal=jnp.zeros((1,), dtype=bool),  # one flag for all agents
         term_or_trunc=jnp.zeros((1,), dtype=bool),
-        next_obs=init_obs
+        next_obs=init_obs,
     )
-    
+
     learn_state_spec = LearnerState(model_spec, model_spec, model_spec)
-    learn = get_learner_step_fn(q_net.apply, opt.update, config)
+    learn = get_learner_step_fn(q_net, opt.update, config)
     learn = jax.jit(
         shard_map(
             learn,
@@ -515,19 +522,15 @@ def learner_setup(
         restored_params, _ = loaded_checkpoint.restore_params(input_params=params)
         # Update the params
         params = restored_params
-    
+
     # Duplicate learner across Learner devices.
-    params, opt_state = jax.device_put(
-        (params, opt_state), learner_sharding
-    )
-    
+    params, opt_state = jax.device_put((params, opt_state), learner_sharding)
+
     # Initial learner state.
-    init_learner_state = LearnerState(
-        params, opt_state, 0
-    )
-    
+    init_learner_state = LearnerState(params, opt_state, 0)
+
     env.close()
-    return learn, q_net.apply, init_learner_state, learner_sharding , init_transition
+    return learn, q_net, init_learner_state, learner_sharding, init_transition
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -546,11 +549,14 @@ def run_experiment(_config: DictConfig) -> float:
     np_rng = np.random.default_rng(config.system.seed)
 
     # Setup learner.
-    learn, apply_fn, learner_state, learner_sharding, init_transition = learner_setup(key, config, learner_devices)
+    learn, q_net, learner_state, learner_sharding, init_transition = learner_setup(
+        key, config, learner_devices
+    )
 
     # Setup evaluator.
     # One key per device for evaluation.
-    eval_act_fn = make_rec_eval_act_fn(apply_fn, config)
+    eval_act_fn = make_rec_eval_act_fn(q_net.apply, config)
+
     evaluator, evaluator_envs = get_eval_fn(
         environments.make_gym_env, eval_act_fn, config, np_rng, absolute_metric=False
     )
@@ -563,9 +569,30 @@ def run_experiment(_config: DictConfig) -> float:
         config.system.rollout_length
         * config.arch.num_envs
         * config.system.num_updates_per_eval
+        * len(config.arch.actor_device_ids)
+        * config.arch.n_threads_per_executor
     )
 
-    # Setup logger 
+    # Setup RateLimiter
+    insert_to_sample_ratio = (
+        config.system.rollout_length
+        * config.arch.num_envs
+        * len(config.arch.actor_device_ids)
+        * config.arch.n_threads_per_executor
+    ) / (config.system.sample_sequence_length * config.system.sample_batch_size)
+
+    config.sample_per_insert = config.system.data_sample_mean * insert_to_sample_ratio
+    config.tolerance = config.sample_per_insert * config.system.error_tolerance
+
+    min_num_inserts = max(
+        config.system.sample_sequence_length // config.system.rollout_length,
+        config.system.min_buffer_size // config.system.rollout_length,
+        1,
+    )
+
+    rate_limiter = SampleToInsertRatio(config.sample_per_insert, min_num_inserts, config.tolerance)
+
+    # Setup logger
     logger = MavaLogger(config)
     print_cfg: Dict = OmegaConf.to_container(config, resolve=True)
     print_cfg["arch"]["devices"] = jax.devices()
@@ -580,20 +607,12 @@ def run_experiment(_config: DictConfig) -> float:
             **config.logger.checkpointing.save_args,  # Checkpoint args
         )
 
-
     # Executor setup and launch.
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
-    # The rollout queue/ the pipe between actor and learner
-    
-    # Setup RateLimiter | todo  we can convert all of this calucations to use the batch size but idk how helpful that would be 
-    batch_size_per_insert = config.arch.num_envs * config.system.rollout_length * config.arch.n_threads_per_executor * len(actor_devices)
-    min_num_inserts = max((config.system.min_buffer_size *  config.system.sample_sequence_length) // batch_size_per_insert, 1) 
-    rate_limiter = SampleToInsertRatio(config.system.samples_per_insert, min_num_inserts, config.system.sample_per_inser_tolerance)
-    
     # Setup Pipeline
     pipe_lifetime = ThreadLifetime()
-    pipe = Pipeline(config, learner_sharding, key, rate_limiter, init_transition, pipe_lifetime)#todo chek key
+    pipe = Pipeline(config, learner_sharding, key, rate_limiter, init_transition, pipe_lifetime)
     pipe.start()
 
     params_sources: List[ParamsSource] = []
@@ -624,11 +643,11 @@ def run_experiment(_config: DictConfig) -> float:
                     config,
                     pipe,
                     params_source,
-                    apply_fn,
+                    q_net,
                     actor_device,
                     seeds,
                     actor_lifetime,
-                    actor_id
+                    actor_id,
                 ),
                 name=f"Actor-{actor_device}-{thread_id}",
             )
@@ -664,20 +683,23 @@ def run_experiment(_config: DictConfig) -> float:
         time_metrics |= {"timestep": t, "pipline_size": pipe.qsize()}
         logger.log(time_metrics, t, eval_step, LogEvent.MISC)
 
-        episode_metrics, ep_completed = get_final_step_metrics(episode_metrics)
-        episode_metrics["steps_per_second"] = steps_per_rollout / time_metrics["rollout_time"]
-        if ep_completed:
-            logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
+        if episode_metrics:
+            episode_metrics, ep_completed = get_final_step_metrics(episode_metrics)
+            episode_metrics["steps_per_second"] = steps_per_rollout / time_metrics["rollout_time"]
+            if ep_completed:
+                logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
 
-        train_metrics["learner_step"] = (eval_step + 1) * config.system.num_updates_per_eval
-        train_metrics["learner_steps_per_second"] = (
-            config.system.num_updates_per_eval
-        ) / time_metrics["learner_time_per_eval"]
-        logger.log(train_metrics, t, eval_step, LogEvent.TRAIN)
+            train_metrics["learner_step"] = (eval_step + 1) * config.system.num_updates_per_eval
+            train_metrics["learner_steps_per_second"] = (
+                config.system.num_updates_per_eval
+            ) / time_metrics["learner_time_per_eval"]
+            logger.log(train_metrics, t, eval_step, LogEvent.TRAIN)
 
         learner_state_cpu = jax.device_get(learner_state)
         key, eval_key = jax.random.split(key, 2)
-        eval_metrics = evaluator(learner_state_cpu.params.online, eval_key, {"hidden_state" : eval_hs})
+        eval_metrics = evaluator(
+            learner_state_cpu.params.online, eval_key, {"hidden_state": eval_hs}
+        )
         logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
 
         episode_return = np.mean(eval_metrics["episode_return"])
@@ -704,10 +726,13 @@ def run_experiment(_config: DictConfig) -> float:
         )
         key, eval_key = jax.random.split(key, 2)
         eval_hs = ScannedRNN.initialize_carry(
-            (min(config.arch.num_absolute_metric_eval_episodes, config.arch.num_envs), config.system.num_agents),
+            (
+                min(config.arch.num_absolute_metric_eval_episodes, config.arch.num_envs),
+                config.system.num_agents,
+            ),
             config.network.hidden_state_dim,
         )
-        eval_metrics = abs_metric_evaluator(best_params_cpu, eval_key, {"hidden_state" : eval_hs})
+        eval_metrics = abs_metric_evaluator(best_params_cpu, eval_key, {"hidden_state": eval_hs})
 
         t = int(steps_per_rollout * (eval_step + 1))
         logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
@@ -732,7 +757,6 @@ def run_experiment(_config: DictConfig) -> float:
     print(f"{Fore.RED}{Style.BRIGHT}All threads stopped...{Style.RESET_ALL}")
 
     return eval_performance
-
 
 
 @hydra.main(

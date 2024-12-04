@@ -16,20 +16,21 @@
 import queue
 import threading
 import time
-from typing import Any, Dict, List, Sequence, Tuple, Union, Optional
+from math import ceil
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from colorama import Fore, Style
 from flashbax import make_trajectory_buffer
-from mava.systems.q_learning.types import Transition
-
 from jax import tree
 from jax.sharding import Sharding
 from jumanji.types import TimeStep
+from omegaconf import DictConfig
 
 from mava.systems.ppo.types import Params, PPOTransition
+from mava.systems.q_learning.types import Transition
 from mava.types import Metrics
 
 QUEUE_PUT_TIMEOUT = 100
@@ -49,7 +50,9 @@ class ThreadLifetime:
 
 
 @jax.jit
-def _stack_trajectory(trajectory: Union[List[PPOTransition], List[Transition]]) -> Union[PPOTransition, Transition]:
+def _stack_trajectory(
+    trajectory: Union[List[PPOTransition], List[Transition]],
+) -> Union[PPOTransition, Transition]:
     """Stack a list of parallel_env transitions into a single
     transition of shape [rollout_len, num_envs, ...]."""
     return tree.map(lambda *x: jnp.stack(x, axis=0).swapaxes(0, 1), *trajectory)  # type: ignore
@@ -215,14 +218,14 @@ class RateLimiter:
         self.max_diff = max_diff
         self.min_size_to_sample = min_size_to_sample
 
-        self.inserts = 0
+        self.inserts = 0.0
         self.samples = 0
         self.deletes = 0
 
         self.mutex = threading.Lock()
         self.condition = threading.Condition(self.mutex)
 
-    def num_inserts(self) -> int:
+    def num_inserts(self) -> float:
         """Returns the number of inserts."""
         with self.mutex:
             return self.inserts
@@ -237,10 +240,10 @@ class RateLimiter:
         with self.mutex:
             return self.deletes
 
-    def insert(self) -> None:
+    def insert(self, insert_fraction: float = 1) -> None:
         """Increment the number of inserts and notify all waiting threads."""
         with self.mutex:
-            self.inserts += 1
+            self.inserts += insert_fraction
             self.condition.notify_all()  # Notify all waiting threads
 
     def delete(self) -> None:
@@ -260,9 +263,9 @@ class RateLimiter:
         # Assume lock is already held by the caller
         if num_inserts <= 0:
             return False
-        if self.inserts + num_inserts - self.deletes <= self.min_size_to_sample:
+        if ceil(self.inserts) + num_inserts - self.deletes <= self.min_size_to_sample:
             return True
-        diff = (num_inserts + self.inserts) * self.samples_per_insert - self.samples
+        diff = (num_inserts + ceil(self.inserts)) * self.samples_per_insert - self.samples
         return diff <= self.max_diff
 
     def can_sample(self, num_samples: int) -> bool:
@@ -270,9 +273,9 @@ class RateLimiter:
         # Assume lock is already held by the caller
         if num_samples <= 0:
             return False
-        if self.inserts - self.deletes < self.min_size_to_sample:
+        if ceil(self.inserts) - self.deletes < self.min_size_to_sample:
             return False
-        diff = self.inserts * self.samples_per_insert - self.samples - num_samples
+        diff = ceil(self.inserts) * self.samples_per_insert - self.samples - num_samples
         return diff >= self.min_diff
 
     def await_can_insert(self, num_inserts: int = 1, timeout: Optional[float] = None) -> bool:
@@ -297,7 +300,7 @@ class RateLimiter:
             f"min_size_to_sample={self.min_size_to_sample}, "
             f"min_diff={self.min_diff}, max_diff={self.max_diff})"
         )
-    
+
 
 class SampleToInsertRatio(RateLimiter):
     """Maintains a specified ratio between samples and inserts.
@@ -405,20 +408,32 @@ class SampleToInsertRatio(RateLimiter):
 
 
 # Modified from https://github.com/instadeepai/sebulba/blob/main/sebulba/core.py
-class OffPolicyPipeline(threading.Thread): 
+class OffPolicyPipeline(threading.Thread):
     """
     The `Pipeline` shards trajectories into learner devices,
     ensuring trajectories are consumed in the right order to avoid being off-policy
     and limit the max number of samples in device memory at one time to avoid OOM issues.
     """
 
-    def __init__(self,config : dict, learner_sharding: Sharding, key : jax.random.PRNGKey, rate_limiter : RateLimiter, init_transition : Transition, lifetime: ThreadLifetime):
+    def __init__(
+        self,
+        config: DictConfig,
+        learner_sharding: Sharding,
+        key: jax.random.PRNGKey,
+        rate_limiter: RateLimiter,
+        init_transition: Transition,
+        lifetime: ThreadLifetime,
+    ):
         """
         Initializes the pipeline with a maximum size and the devices to shard trajectories across.
 
         Args:
-            max_size: The maximum number of trajectories to keep in the pipeline.
+            config: Configuration settings for buffers.
             learner_sharding: The sharding used for the learner's update function.
+            key: The PRNG key for stochasticity.
+            rate_limiter: A `RateLimiter` Used to manage how often we are allowed to
+            sample from the buffers.
+            init_transition : A sample trasition used to initialize the buffers.
             lifetime: A `ThreadLifetime` which is used to stop this thread.
         """
         super().__init__(name="Pipeline")
@@ -429,31 +444,32 @@ class OffPolicyPipeline(threading.Thread):
         self.lifetime = lifetime
 
         self.num_buffers = len(config.arch.actor_device_ids) * config.arch.n_threads_per_executor
-        
+        self.rate_limiter = rate_limiter
         self.sharding = learner_sharding
-        self.last_actor_metrics = None
-        self.move_to_device = lambda tree: jax.tree.map(lambda x: jax.device_put(x, self.cpu), tree)
-        
-        # Setup Buffer
+        self.key = key
+
+        assert config.system.sample_batch_size % self.num_buffers == 0, (
+            f"The sample batch size ({config.system.sample_batch_size}) must be divisible "
+            f"by the total number of actors ({self.num_buffers})."
+        )
+
+        # Setup Buffers
         rb = make_trajectory_buffer(
-                sample_sequence_length=config.system.sample_sequence_length + 1,
-                period=1,  # sample any unique trajectory
-                add_batch_size=config.arch.num_envs,
-                sample_batch_size=config.system.sample_batch_size // self.num_buffers, #todo add an assert ?
-                max_length_time_axis=config.system.buffer_size,
-                min_length_time_axis=config.system.min_buffer_size,
-            )
-        self.buffer_states =  [rb.init(init_transition) for _ in range(self.num_buffers)]
+            sample_sequence_length=config.system.sample_sequence_length + 1,
+            period=1,
+            add_batch_size=config.arch.num_envs,
+            sample_batch_size=config.system.sample_batch_size // self.num_buffers,
+            max_length_time_axis=config.system.buffer_size,
+            min_length_time_axis=config.system.min_buffer_size,
+        )
+        self.buffer_states = [rb.init(init_transition) for _ in range(self.num_buffers)]
         self.buffer_adds_count = [0] * self.num_buffers
-        
+
+        # Setup functions
         self.buffer_add = jax.jit(rb.add, device=self.cpu)
         self.buffer_sample = jax.jit(rb.sample, device=self.cpu)
-    
-        self.key  = key
+        self.move_to_device = lambda tree: jax.tree.map(lambda x: jax.device_put(x, self.cpu), tree)
 
-        #rate limiter
-        self.rate_limiter = rate_limiter
-    
     def run(self) -> None:
         """This function ensures that trajectories on the queue are consumed in the right order. The
         start_condition and end_condition are used to ensure that only 1 thread is processing an
@@ -469,14 +485,14 @@ class OffPolicyPipeline(threading.Thread):
             except queue.Empty:
                 continue
 
-    def put(self, traj: Sequence[Transition], metrics: Tuple, actor_id : int) -> None:
+    def put(self, traj: Sequence[Transition], metrics: Tuple, actor_id: int) -> None:
         start_condition, end_condition = (threading.Condition(), threading.Condition())
         with start_condition:
             self.tickets_queue.put((start_condition, end_condition))
-            start_condition.wait()  
+            start_condition.wait()
 
-        try:  
-            self.rate_limiter.await_can_insert(timeout=QUEUE_PUT_TIMEOUT) 
+        try:
+            self.rate_limiter.await_can_insert(timeout=QUEUE_PUT_TIMEOUT)
         except TimeoutError:
             print(
                 f"{Fore.RED}{Style.BRIGHT}Actor has timed out on insertion, "
@@ -485,28 +501,23 @@ class OffPolicyPipeline(threading.Thread):
 
         # [Transition(num_envs)] * rollout_len -> Transition[done=(num_envs, rollout_len, ...)]
         traj = _stack_trajectory(traj)
-        traj = jax.device_put(traj, device=self.sharding)
+        traj = jax.device_get(traj)
 
         time_dict, episode_metrics = metrics
         # [{'metric1' : value1, ...} * rollout_len -> {'metric1' : [value1, value2, ...], ...}
         episode_metrics = _stack_trajectory(episode_metrics)
-
 
         self.buffer_states[actor_id] = self.buffer_add(self.buffer_states[actor_id], traj)
         self.buffer_adds_count[actor_id] += 1
 
         self._queue.put((time_dict, episode_metrics))
 
-        # check if any buffer has beed added 
-        if any(count > self.rate_limiter.num_inserts() for count in self.buffer_adds_count):    
-            self.rate_limiter.insert()
+        self.rate_limiter.insert(1 / self.num_buffers)
 
         with end_condition:
             end_condition.notify()  # notify that we have finished
 
-    def get(
-        self, block: bool = True, timeout: Union[float, None] = None
-    ) -> Tuple[PPOTransition, TimeStep, Dict]:
+    def get(self, timeout: Union[float, None] = None) -> Tuple[Transition, Any]:
         """Get a trajectory from the pipeline."""
         self.key, sample_key = jax.random.split(self.key)
 
@@ -520,16 +531,20 @@ class OffPolicyPipeline(threading.Thread):
             )
 
         # Sample the data
-        sampled_batch = [self.buffer_sample(state, sample_key).experience for state in self.buffer_states]
-        sampled_batch = jax.tree_map(lambda *x : np.concatenate(x), *sampled_batch) 
-        sampled_batch = jax.device_put(sampled_batch, device=self.sharding)
+        # Potential deadlock risk here. Although it hasn't occurred during testing.
+        # if an unexplained deadlock happens, it is likely due to this section.
+        sampled_batch: List[Transition] = [
+            self.buffer_sample(state, sample_key).experience for state in self.buffer_states
+        ]
+        transitions: Transition = jax.tree_map(lambda *x: np.concatenate(x), *sampled_batch)
+        transitions = jax.device_put(transitions, device=self.sharding)
 
         self.rate_limiter.sample()
 
         if not self._queue.empty():
-            self.last_actor_metrics = self._queue.get()
+            return transitions, self._queue.get()
 
-        return sampled_batch, self.last_actor_metrics
+        return transitions, (None, None)
 
     def clear(self) -> None:
         """Clear the pipeline."""
@@ -538,6 +553,7 @@ class OffPolicyPipeline(threading.Thread):
                 self._queue.get(block=False)
             except queue.Empty:
                 break
+
     def qsize(self) -> int:
         """Returns the number of trajectories in the pipeline."""
         return self._queue.qsize()

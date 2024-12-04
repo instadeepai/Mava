@@ -44,7 +44,7 @@ from mava.systems.q_learning.types import (
     TrainState,
     Transition,
 )
-from mava.types import MarlEnv, Observation
+from mava.types import MarlEnv, MavaObservation
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
@@ -241,7 +241,7 @@ def make_update_fns(
 ) -> Callable[[LearnerState[QMIXParams]], Tuple[LearnerState[QMIXParams], Tuple[Metrics, Metrics]]]:
     def select_eps_greedy_action(
         action_selection_state: ActionSelectionState,
-        obs: Observation,
+        obs: MavaObservation,
         term_or_trunc: Array,
     ) -> Tuple[ActionSelectionState, Array]:
         """Select action to take in eps-greedy way. Batch and agent dims are included."""
@@ -310,7 +310,7 @@ def make_update_fns(
 
         return new_act_state, next_timestep.extras["episode_metrics"]
 
-    def prep_inputs_to_scannedrnn(obs: Observation, term_or_trunc: chex.Array) -> chex.Array:
+    def prep_inputs_to_scannedrnn(obs: MavaObservation, term_or_trunc: chex.Array) -> chex.Array:
         """Prepares the inputs to the RNN network for either getting q values or the
         eps-greedy distribution.
 
