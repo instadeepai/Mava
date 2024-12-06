@@ -92,7 +92,7 @@ def init(
     # N: Agent
 
     # Make dummy inputs to init recurrent Q network -> need shape (T, B, N, ...)
-    init_obs = env.observation_spec().generate_value()  # (N, ...)
+    init_obs = env.observation_spec.generate_value()  # (N, ...)
     # (B, T, N, ...)
     init_obs_batched = tree.map(lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs)
     init_term_or_trunc = jnp.zeros((1, 1, 1), dtype=bool)  # (T, B, 1)
@@ -130,7 +130,7 @@ def init(
     init_hidden_state = replicate(init_hidden_state)
 
     # Create dummy transition
-    init_acts = env.action_spec().generate_value()  # (N,)
+    init_acts = env.action_spec.generate_value()  # (N,)
     init_transition = Transition(
         obs=init_obs,  # (N, ...)
         action=init_acts,

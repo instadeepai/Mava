@@ -12,7 +12,7 @@ dummy_flashbax_transition = {
     "observation": jnp.zeros(
         (
             config.system.num_agents,
-            env.observation_spec().agents_view.shape[1],
+            env.observation_spec.agents_view.shape[1],
         ),
         dtype=jnp.float32,
     ),

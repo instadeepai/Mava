@@ -1,5 +1,5 @@
 # The config of the 15x15x23a scenario
-name: MaConnector-v2
+name: Connector-v2
 task_name: con-15x15x23a
 
 task_config:

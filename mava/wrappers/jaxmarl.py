@@ -189,11 +189,11 @@ class JaxMarlWrapper(Wrapper, ABC):
         # Making sure the child envs set this correctly.
         assert time_limit > 0, f"Time limit must be greater than 0, got {time_limit}"
 
+        self.has_global_state = has_global_state
+        self.time_limit = time_limit
         super().__init__(env)
         self._env: MultiAgentEnv
         self.agents = self._env.agents
-        self.has_global_state = has_global_state
-        self.time_limit = time_limit
         self.num_agents = self._env.num_agents
 
         # Calling these on init to cache the values in a non-jitted context.
@@ -251,6 +251,7 @@ class JaxMarlWrapper(Wrapper, ABC):
 
         return Observation(**obs_data)
 
+    @cached_property
     def observation_spec(self) -> specs.Spec:
         agents_view = jaxmarl_space_to_jumanji_spec(merge_space(self._env.observation_spaces))
 
@@ -285,12 +286,15 @@ class JaxMarlWrapper(Wrapper, ABC):
             step_count=step_count,
         )
 
+    @cached_property
     def action_spec(self) -> specs.Spec:
         return jaxmarl_space_to_jumanji_spec(merge_space(self._env.action_spaces))
 
+    @cached_property
     def reward_spec(self) -> specs.Array:
         return specs.Array(shape=(self.num_agents,), dtype=float, name="reward")
 
+    @cached_property
     def discount_spec(self) -> specs.BoundedArray:
         return specs.BoundedArray(
             shape=(self.num_agents,),

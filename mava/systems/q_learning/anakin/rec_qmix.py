@@ -94,7 +94,7 @@ def init(
     # N: Agent
 
     # Make dummy inputs to init recurrent Q network -> need shape (T, B, N, ...)
-    init_obs = env.observation_spec().generate_value()  # (N, ...)
+    init_obs = env.observation_spec.generate_value()  # (N, ...)
     # (B, T, N, ...)
     init_obs_batched = tree.map(lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs)
     init_term_or_trunc = jnp.zeros((1, 1, 1), dtype=bool)  # (T, B, 1)
@@ -126,7 +126,7 @@ def init(
         dtype=float,
     )
     global_env_state_shape = (
-        env.observation_spec().generate_value().global_state[0, :].shape
+        env.observation_spec.generate_value().global_state[0, :].shape
     )  # NOTE: Env wrapper currently duplicates env state for each agent
     dummy_global_env_state = jnp.zeros(
         (
@@ -159,7 +159,7 @@ def init(
     opt_state = replicate(opt_state)
     init_hidden_state = replicate(init_hidden_state)
 
-    init_acts = env.action_spec().generate_value()
+    init_acts = env.action_spec.generate_value()
 
     # NOTE: term_or_trunc refers to the the joint done, ie. when all agents are done or when the
     # episode horizon has been reached. We use this exclusively in QMIX.

@@ -319,11 +319,11 @@ def learner_setup(
     # PRNG keys.
     key, actor_net_key = keys
 
-    # Get mock inputs to initialise network.
-    init_x = env.observation_spec().generate_value()
+    # Initialise observation: Obs for all agents.
+    init_x = env.observation_spec.generate_value()
     init_x = tree.map(lambda x: x[None, ...], init_x)
 
-    _, action_space_type = get_action_head(env.action_spec())
+    _, action_space_type = get_action_head(env.action_spec)
 
     if action_space_type == "discrete":
         init_action = jnp.zeros((1, config.system.num_agents), dtype=jnp.int32)

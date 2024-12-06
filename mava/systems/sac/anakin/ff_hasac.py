@@ -144,16 +144,16 @@ def init(
     key, actor_key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 6)
     actor_keys = jax.random.split(actor_key, n_agents)
 
-    acts = env.action_spec().generate_value()  # all agents actions
+    acts = env.action_spec.generate_value()  # all agents actions
     act_single = acts[0]  # single agents action
     concat_acts = jnp.concatenate([act_single for _ in range(n_agents)], axis=0)
     concat_acts_batched = concat_acts[jnp.newaxis, ...]  # batch + concat of all agents actions
-    obs = env.observation_spec().generate_value()
+    obs = env.observation_spec.generate_value()
     obs_single_batched = tree.map(lambda x: x[0][jnp.newaxis, ...], obs)
 
     # Making actor network
     actor_torso = hydra.utils.instantiate(cfg.network.actor_network.pre_torso)
-    action_head, _ = get_action_head(env.action_spec())
+    action_head, _ = get_action_head(env.action_spec)
     actor_action_head = hydra.utils.instantiate(
         action_head, action_dim=env.action_dim, independent_std=False
     )
@@ -285,7 +285,7 @@ def make_update_fns(
     actor_net, q_net = networks
     actor_opt, q_opt, alpha_opt = optims
 
-    full_action_shape = (cfg.arch.num_envs, *env.action_spec().shape)
+    full_action_shape = (cfg.arch.num_envs, *env.action_spec.shape)
 
     # losses:
     def q_loss_fn(
