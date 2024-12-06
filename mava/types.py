@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import cached_property
 from typing import Any, Callable, Dict, Generic, Optional, Protocol, Tuple, TypeVar, Union
 
 import chex
@@ -67,6 +68,7 @@ class MarlEnv(Protocol):
         """
         ...
 
+    @cached_property
     def observation_spec(self) -> specs.Spec:
         """Returns the observation spec.
 
@@ -75,6 +77,7 @@ class MarlEnv(Protocol):
         """
         ...
 
+    @cached_property
     def action_spec(self) -> specs.Spec:
         """Returns the action spec.
 
@@ -83,6 +86,7 @@ class MarlEnv(Protocol):
         """
         ...
 
+    @cached_property
     def reward_spec(self) -> specs.Array:
         """Describes the reward returned by the environment. By default, this is assumed to be a
         single float.
@@ -92,6 +96,7 @@ class MarlEnv(Protocol):
         """
         ...
 
+    @cached_property
     def discount_spec(self) -> specs.BoundedArray:
         """Describes the discount returned by the environment. By default, this is assumed to be a
         single float between 0 and 1.

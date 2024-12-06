@@ -24,8 +24,9 @@ from jumanji import specs
 from jumanji.env import Environment
 from jumanji.environments.routing.cleaner import Cleaner
 from jumanji.environments.routing.cleaner.constants import DIRTY, WALL
-from jumanji.environments.routing.connector import MaConnector
+from jumanji.environments.routing.connector import Connector
 from jumanji.environments.routing.connector.constants import (
+    AGENT_INITIAL_VALUE,
     EMPTY,
     PATH,
     POSITION,
@@ -39,12 +40,18 @@ from jumanji.wrappers import Wrapper
 from mava.types import Observation, ObservationGlobalState, State
 
 
+def aggregate_rewards(reward: chex.Array, num_agents: int) -> chex.Array:
+    """Aggregate individual rewards across agents."""
+    team_reward = jnp.sum(reward)
+    return jnp.repeat(team_reward, num_agents)
+
+
 class JumanjiMarlWrapper(Wrapper, ABC):
     def __init__(self, env: Environment, add_global_state: bool):
+        self.add_global_state = add_global_state
         super().__init__(env)
         self.num_agents = self._env.num_agents
         self.time_limit = self._env.time_limit
-        self.add_global_state = add_global_state
 
     @abstractmethod
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
@@ -91,6 +98,7 @@ class JumanjiMarlWrapper(Wrapper, ABC):
 
         return state, timestep
 
+    @cached_property
     def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
@@ -101,7 +109,7 @@ class JumanjiMarlWrapper(Wrapper, ABC):
             "step_count",
         )
 
-        obs_spec = self._env.observation_spec()
+        obs_spec = self._env.observation_spec
         obs_data = {
             "agents_view": obs_spec.agents_view,
             "action_mask": obs_spec.action_mask,
@@ -123,7 +131,7 @@ class JumanjiMarlWrapper(Wrapper, ABC):
     @cached_property
     def action_dim(self) -> chex.Array:
         """Get the actions dim for each agent."""
-        return int(self._env.action_spec().num_values[0])
+        return int(self._env.action_spec.num_values[0])
 
 
 class RwareWrapper(JumanjiMarlWrapper):
@@ -144,11 +152,12 @@ class RwareWrapper(JumanjiMarlWrapper):
         discount = jnp.repeat(timestep.discount, self.num_agents)
         return timestep.replace(observation=observation, reward=reward, discount=discount)
 
+    @cached_property
     def observation_spec(
         self,
     ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         # need to cast the agents view and global state to floats as we do in modify timestep
-        inner_spec = super().observation_spec()
+        inner_spec = super().observation_spec
         spec = inner_spec.replace(agents_view=inner_spec.agents_view.replace(dtype=float))
         if self.add_global_state:
             spec = spec.replace(global_state=inner_spec.global_state.replace(dtype=float))
@@ -171,21 +180,11 @@ class LbfWrapper(JumanjiMarlWrapper):
         self,
         env: LevelBasedForaging,
         add_global_state: bool = False,
-        use_individual_rewards: bool = False,
+        aggregate_rewards: bool = True,
     ):
         super().__init__(env, add_global_state)
         self._env: LevelBasedForaging
-        self._use_individual_rewards = use_individual_rewards
-
-    def aggregate_rewards(
-        self, timestep: TimeStep, observation: Observation
-    ) -> TimeStep[Observation]:
-        """Aggregate individual rewards across agents."""
-        team_reward = jnp.sum(timestep.reward)
-
-        # Repeat the aggregated reward for each agent.
-        reward = jnp.repeat(team_reward, self.num_agents)
-        return timestep.replace(observation=observation, reward=reward)
+        self._aggregate_rewards = aggregate_rewards
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for Level-Based Foraging environment and update
@@ -197,23 +196,45 @@ class LbfWrapper(JumanjiMarlWrapper):
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, self.num_agents),
         )
-        if self._use_individual_rewards:
-            # The environment returns a list of individual rewards and these are used as is.
-            return timestep.replace(observation=modified_observation)
+        # Whether or not aggregate the list of individual rewards.
+        reward = timestep.reward
+        if self._aggregate_rewards:
+            reward = aggregate_rewards(reward, self.num_agents)
 
-        # Aggregate the list of individual rewards and use a single team_reward.
-        return self.aggregate_rewards(timestep, modified_observation)
+        return timestep.replace(observation=modified_observation, reward=reward)
 
+    @cached_property
     def observation_spec(
         self,
     ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         # need to cast the agents view and global state to floats as we do in modify timestep
-        inner_spec = super().observation_spec()
+        inner_spec = super().observation_spec
         spec = inner_spec.replace(agents_view=inner_spec.agents_view.replace(dtype=float))
         if self.add_global_state:
             spec = spec.replace(global_state=inner_spec.global_state.replace(dtype=float))
 
         return spec
+
+
+def switch_perspective(grid: chex.Array, agent_id: int, num_agents: int) -> chex.Array:
+    """
+    Encodes the observation with respect to the current agent defined by `agent_id`.
+    Each agent sees its observations as values `1, 2, 3`. Observations of other agents
+    are shifted cyclically based on their relative position. The mapping is designed
+    such that the ordering of observations remains consistent.
+    For example,in a 3-agent game, if we wanted to switch to agent 1's perspective, then:
+    agent 1s values will change from 4,5,6 -> 1,2,3
+    agent 2s values will change from 7,8,9 -> 4,5,6
+    agent 0s values will change from 1,2,3 -> 7,8,9
+    Agent 0 will be passed observations where it is represented by the values 1,2,3. Agent 1
+    will be passed observations where it is represented by the values 1,2,3. However in the
+    state agent 0 will always be 1,2,3 and agent 1 will always be 4,5,6."""
+    new_grid = grid - AGENT_INITIAL_VALUE  # Center agent values around 0
+    new_grid -= 3 * agent_id  # Move the obs
+    new_grid %= 3 * num_agents  # Keep obs in bounds
+    new_grid += AGENT_INITIAL_VALUE  # 'Un-center' agent obs around 0
+    # Take agent values from rotated grid and empty values from old grid
+    return jnp.where((grid >= AGENT_INITIAL_VALUE), new_grid, grid)
 
 
 class ConnectorWrapper(JumanjiMarlWrapper):
@@ -222,15 +243,22 @@ class ConnectorWrapper(JumanjiMarlWrapper):
     Do not use the AgentID wrapper with this env, it has implicit agent IDs.
     """
 
-    def __init__(self, env: MaConnector, add_global_state: bool = False):
+    def __init__(
+        self, env: Connector, add_global_state: bool = False, aggregate_rewards: bool = True
+    ):
         super().__init__(env, add_global_state)
-        self._env: MaConnector
+        self._env: Connector
+        self._aggregate_rewards = aggregate_rewards
+        self.agent_ids = jnp.arange(self.num_agents)
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for the Connector environment."""
 
         # TARGET = 3 = The number of different types of items on the grid.
         def create_agents_view(grid: chex.Array) -> chex.Array:
+            grid = jax.vmap(switch_perspective, in_axes=(None, 0, None))(
+                grid, self.agent_ids, self.num_agents
+            )
             # Mark position and target of each agent with that agent's normalized index.
             positions = (
                 jnp.where(grid % TARGET == POSITION, jnp.ceil(grid / TARGET), 0) / self.num_agents
@@ -247,16 +275,6 @@ class ConnectorWrapper(JumanjiMarlWrapper):
             )
             return agents_view
 
-        def aggregate_rewards(
-            timestep: TimeStep,
-        ) -> TimeStep[Observation]:
-            """Aggregate individual rewards and discounts across agents."""
-            team_reward = jnp.sum(timestep.reward)
-            reward = jnp.repeat(team_reward, self.num_agents)
-            return timestep.replace(reward=reward)
-
-        timestep = aggregate_rewards(timestep)
-
         obs_data = {
             "agents_view": create_agents_view(timestep.observation.grid),
             "action_mask": timestep.observation.action_mask,
@@ -266,7 +284,11 @@ class ConnectorWrapper(JumanjiMarlWrapper):
         # The episode is won if all agents have connected.
         extras = timestep.extras | {"won_episode": timestep.extras["ratio_connections"] == 1.0}
 
-        return timestep.replace(observation=Observation(**obs_data), extras=extras)
+        # Whether or not aggregate the list of individual rewards.
+        reward = timestep.reward
+        if self._aggregate_rewards:
+            reward = aggregate_rewards(reward, self.num_agents)
+        return timestep.replace(observation=Observation(**obs_data), reward=reward, extras=extras)
 
     def get_global_state(self, obs: Observation) -> chex.Array:
         """Constructs the global state from the global information
@@ -274,6 +296,7 @@ class ConnectorWrapper(JumanjiMarlWrapper):
         """
         return jnp.tile(obs.agents_view[..., :3][0], (obs.agents_view.shape[0], 1, 1, 1))
 
+    @cached_property
     def observation_spec(
         self,
     ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
@@ -294,10 +317,9 @@ class ConnectorWrapper(JumanjiMarlWrapper):
         )
         obs_data = {
             "agents_view": agents_view,
-            "action_mask": self._env.observation_spec().action_mask,
+            "action_mask": self._env.observation_spec.action_mask,
             "step_count": step_count,
         }
-
         if self.add_global_state:
             global_state = specs.BoundedArray(
                 shape=(self._env.num_agents, self._env.grid_size, self._env.grid_size, 3),
@@ -335,23 +357,30 @@ def _get_location(grid: chex.Array) -> chex.Array:
 
 
 class VectorConnectorWrapper(JumanjiMarlWrapper):
-    """Multi-agent wrapper for the MaConnector environment.
+    """Multi-agent wrapper for the Connector environment.
 
     This wrapper transforms the grid-based observation to a vector of features. This env should
     have the AgentID wrapper applied to it since there is not longer a channel that can encode
     AgentID information.
     """
 
-    def __init__(self, env: MaConnector, add_global_state: bool = False):
-        super().__init__(env, add_global_state)
-        self._env: MaConnector
+    def __init__(
+        self, env: Connector, add_global_state: bool = False, aggregate_rewards: bool = True
+    ):
         self.fov = 2
+        super().__init__(env, add_global_state)
+        self._env: Connector
+        self._aggregate_rewards = aggregate_rewards
+        self.agent_ids = jnp.arange(self.num_agents)
 
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for the Connector environment."""
 
         # TARGET = 3 = The number of different types of items on the grid.
         def create_agents_view(grid: chex.Array) -> chex.Array:
+            grid = jax.vmap(switch_perspective, in_axes=(None, 0, None))(
+                grid, self.agent_ids, self.num_agents
+            )
             positions = jnp.where(grid % TARGET == POSITION, True, False)
             targets = jnp.where((grid % TARGET == 0) & (grid != EMPTY), True, False)
             paths = jnp.where(grid % TARGET == PATH, True, False)
@@ -407,8 +436,12 @@ class VectorConnectorWrapper(JumanjiMarlWrapper):
         # The episode is won if all agents have connected.
         extras = timestep.extras | {"won_episode": timestep.extras["ratio_connections"] == 1.0}
 
-        return timestep.replace(observation=Observation(**obs_data), extras=extras)
+        reward = timestep.reward
+        if self._aggregate_rewards:
+            reward = aggregate_rewards(reward, self.num_agents)
+        return timestep.replace(observation=Observation(**obs_data), reward=reward, extras=extras)
 
+    @cached_property
     def observation_spec(
         self,
     ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
@@ -420,7 +453,6 @@ class VectorConnectorWrapper(JumanjiMarlWrapper):
             jnp.repeat(self.time_limit, self.num_agents),
             "step_count",
         )
-
         # 2 sets of tiles in fov (blockers and targets) + xy position of agent and target
         tiles_in_fov = (self.fov * 2 + 1) ** 2
         single_agent_obs = 4 + tiles_in_fov * 2
@@ -431,13 +463,11 @@ class VectorConnectorWrapper(JumanjiMarlWrapper):
             minimum=-1.0,
             maximum=1.0,
         )
-
         obs_data = {
             "agents_view": agents_view,
-            "action_mask": self._env.observation_spec().action_mask,
+            "action_mask": self._env.observation_spec.action_mask,
             "step_count": step_count,
         }
-
         if self.add_global_state:
             global_state = specs.BoundedArray(
                 shape=(self.num_agents, self.num_agents * single_agent_obs),
@@ -521,6 +551,7 @@ class CleanerWrapper(JumanjiMarlWrapper):
         """
         return obs.agents_view[..., :3]  # (A, R, C, 3)
 
+    @cached_property
     def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
@@ -539,7 +570,7 @@ class CleanerWrapper(JumanjiMarlWrapper):
         )
         obs_data = {
             "agents_view": agents_view,
-            "action_mask": self._env.observation_spec().action_mask,
+            "action_mask": self._env.observation_spec.action_mask,
             "step_count": step_count,
         }
         if self.add_global_state:
