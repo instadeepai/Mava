@@ -15,6 +15,7 @@
 
 from abc import ABC, abstractmethod
 from functools import cached_property
+import math
 from typing import Tuple, Union
 
 import chex
@@ -32,8 +33,10 @@ from jumanji.environments.routing.connector.constants import (
     POSITION,
     TARGET,
 )
+
 from jumanji.environments.routing.lbf import LevelBasedForaging
 from jumanji.environments.routing.robot_warehouse import RobotWarehouse
+from jumanji.environments.swarms.search_and_rescue import SearchAndRescue
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
@@ -580,6 +583,86 @@ class CleanerWrapper(JumanjiMarlWrapper):
                 name="agents_view",
                 minimum=0,
                 maximum=self.num_agents,
+            )
+            obs_data["global_state"] = global_state
+            return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
+
+        return specs.Spec(Observation, "ObservationSpec", **obs_data)
+
+
+class SearchAndRescueWrapper(JumanjiMarlWrapper):
+    def __init__(self, env: Environment, add_global_state: bool):
+        # todo: this is hacky to make the constructor work - store these in the jumanji env
+        env.num_agents = env.generator.num_searchers
+        env.time_limit = env.max_steps
+        super().__init__(env, add_global_state)
+        self._env: SearchAndRescue
+
+    @cached_property
+    def action_dim(self) -> chex.Array:
+        """Get the actions dim for each agent."""
+        return 2
+
+    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+        # todo: not sure if this falttening makes sense?
+        agent_view = timestep.observation.searcher_views.reshape(self.num_agents, -1)
+        observation = Observation(
+            agents_view=agent_view.astype(float),
+            action_mask=jnp.ones((self.num_agents, self.action_dim)),
+            step_count=jnp.full((self.num_agents,), 0),  # unused for now
+        )
+        reward = timestep.reward
+        discount = jnp.repeat(timestep.discount, self.num_agents)
+        return timestep.replace(observation=observation, reward=reward, discount=discount)
+
+    def get_global_state(self, obs: Observation) -> chex.Array:
+        """Constructs the global state from the global information
+        in the agent observations (dirty tiles, wall tiles and agent positions).
+        """
+        # todo: does this make sense as a global state?
+        global_state = jnp.concatenate(obs.agents_view, axis=0)
+        global_state = jnp.tile(global_state, (self._env.num_agents, 1))
+        return global_state
+
+    @cached_property
+    def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
+        """Specification of the observation of the environment."""
+
+        step_count = specs.BoundedArray(
+            (self.num_agents,),
+            int,
+            jnp.zeros(self.num_agents, dtype=int),
+            jnp.repeat(self.time_limit, self.num_agents),
+            "step_count",
+        )
+        action_mask = specs.BoundedArray(
+            (self.num_agents, self.action_dim), bool, False, True, "action_mask"
+        )
+
+        sar_obs_spec = self._env.observation_spec.searcher_views
+        single_agent_obs_size = math.prod(sar_obs_spec.shape[1:])
+        agents_view = specs.BoundedArray(
+            shape=(self.num_agents, single_agent_obs_size),
+            dtype=float,
+            name="agents_view",
+            minimum=-1,
+            maximum=1,
+        )
+
+        obs_data = {
+            "agents_view": agents_view,
+            "action_mask": action_mask,
+            "step_count": step_count,
+        }
+
+        if self.add_global_state:
+            global_state = specs.BoundedArray(
+                # todo: not checked!
+                shape=(self.num_agents, self.num_agents * single_agent_obs_size),
+                dtype=float,
+                name="agents_view",
+                minimum=sar_obs_spec.minimum,
+                maximum=sar_obs_spec.maximum,
             )
             obs_data["global_state"] = global_state
             return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)

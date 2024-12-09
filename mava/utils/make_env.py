@@ -35,6 +35,9 @@ from jumanji.environments.routing.lbf.generator import (
 from jumanji.environments.routing.robot_warehouse.generator import (
     RandomGenerator as RwareRandomGenerator,
 )
+from jumanji.environments.swarms.search_and_rescue.generator import (
+    RandomGenerator as SarRandomGenerator,
+)
 from omegaconf import DictConfig
 
 from mava.types import MarlEnv
@@ -59,6 +62,7 @@ from mava.wrappers import (
     VectorConnectorWrapper,
     async_multiagent_worker,
 )
+from mava.wrappers.jumanji import SearchAndRescueWrapper
 
 # Registry mapping environment names to their generator and wrapper classes.
 _jumanji_registry = {
@@ -70,6 +74,7 @@ _jumanji_registry = {
         "wrapper": VectorConnectorWrapper,
     },
     "Cleaner": {"generator": CleanerRandomGenerator, "wrapper": CleanerWrapper},
+    "SearchAndRescue": {"generator": SarRandomGenerator, "wrapper": SearchAndRescueWrapper},
 }
 
 # Registry mapping environment names directly to the corresponding wrapper classes.

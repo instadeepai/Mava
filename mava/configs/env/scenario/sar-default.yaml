@@ -1,0 +1,10 @@
+# todo: rename this file!
+name: SearchAndRescue-v0
+task_name: default
+
+task_config:
+  num_searchers: 2
+  num_targets: 2
+
+env_kwargs:
+  {}  # there are no scenario specific env_kwargs for this env
