@@ -11,7 +11,7 @@
 <div align="center">
 
 ![Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Finstadeepai%2FMava%2Fdevelop%2Fpyproject.toml)
-[![Tests](https://github.com/instadeepai/Mava/actions/workflows/tests_linters.yaml/badge.svg)](https://github.com/instadeepai/Mava/actions/workflows/tests_linters.yaml)
+[![Tests](https://github.com/instadeepai/Mava/actions/workflows/ci.yaml/badge.svg)](https://github.com/instadeepai/Mava/actions/workflows/ci.yaml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-orange.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![MyPy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
