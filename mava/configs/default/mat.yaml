@@ -3,7 +3,7 @@ defaults:
   - arch: anakin
   - system: mat/mat
   - network: transformer
-  - env: rware # [gigastep, lbf, mabrax, matrax, rware, smax, mpe]
+  - env: rware # [cleaner, connector, vector-connector, gigastep, lbf, mabrax, matrax, rware, smax, mpe]
   - _self_
 
 hydra:

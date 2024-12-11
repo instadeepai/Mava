@@ -1,3 +1,4 @@
+# type: ignore
 # Copyright 2022 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -225,8 +226,6 @@ def get_learner_fn(
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
-                # This calculation is inspired by the Anakin architecture demo notebook.
-                # available at https://tinyurl.com/26tdzs5x
                 # This pmean could be a regular mean as the batch axis is on the same device.
                 actor_grads, actor_loss_info = jax.lax.pmean(
                     (actor_grads, actor_loss_info), axis_name="batch"
@@ -361,7 +360,7 @@ def learner_setup(
 
     # Define network and optimiser.
     actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
-    action_head, _ = get_action_head(env.action_spec())
+    action_head, _ = get_action_head(env.action_spec)
     actor_action_head = hydra.utils.instantiate(action_head, action_dim=env.action_dim)
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 
@@ -378,7 +377,7 @@ def learner_setup(
     )
 
     # Initialise observation with obs of all agents.
-    obs = env.observation_spec().generate_value()
+    obs = env.observation_spec.generate_value()
     init_x = tree.map(lambda x: x[jnp.newaxis, ...], obs)
 
     # Initialise actor params and optimiser state.
@@ -508,7 +507,7 @@ def run_experiment(_config: DictConfig) -> None:
         "observation": jnp.zeros(
             (
                 config.system.num_agents,
-                env.observation_spec().agents_view.shape[1],
+                env.observation_spec.agents_view.shape[1],
             ),
             dtype=jnp.float32,
         ),
