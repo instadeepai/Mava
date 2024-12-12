@@ -76,6 +76,8 @@ Additionally, we also have a [Quickstart notebook][quickstart] that can be used 
 
 <h2>Algorithms</h2>
 
+Mava has implementations of multiple on- and off-policy multi-agent algorithms that follow the independent learners (IL), centralised training with decentralised execution (CTDE) and heterogeneous agent learing paradigms. Aside from MARL learning paradigms we also include implementations which follow the Anakin and Sebulba architectures to enable scalable training by default. The architecture that is relevant for a given problem depends on whether the environment being used in written in JAX or not. For more information on these paradigms, please see [here][anakin_paper].
+
 | Algorithm  | Variants       | Continuous | Discrete | Anakin | Sebulba |
 |------------|----------------|------------|----------|--------|---------|
 | PPO        | [`ff_ippo.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/ppo/anakin/ff_ippo.py)   | ✅         | ✅       | ✅     | ✅      |
@@ -91,7 +93,9 @@ Additionally, we also have a [Quickstart notebook][quickstart] that can be used 
 | Sable      | [`ff_sable.py`]()  | ✅         | ✅       | ✅     |         |
 |            | [`rec_sable.py`]() | ✅         | ✅       | ✅     |         |
 <h2>Environments</h2>
-These are the environments which Mava supports _out of the box_, to add your own environments use the existing wrappers as an example. The framework indicates compatible agorithms, where Anakin algorithms work with JAX environments and Sebulba algorithms work with Numpy environments.
+
+These are the environments which Mava supports _out of the box_, to add a new environment, please use the existing wrapper implementations as an example. The framework indicates compatible agorithms, where Anakin algorithms work with JAX environments and Sebulba algorithms work with Numpy environments.  
+
 
 | Environment                     | Action space        | JAX | Numpy |
 |---------------------------------|---------------------|-----|-------|
@@ -128,16 +132,12 @@ We have performed a rigorus benchmark across 45 different scenarios and 6 differ
     <a href="docs/images/benchmark_results/legend.jpg">
         <img src="docs/images/benchmark_results/legend.jpg" alt="Legend" width="60%" style="display:inline-block; margin-right: 10px;"/>
     </a>
-    <div style="text-align:center; margin-top: 10px;"> Mava's algorithm performance, each algorithm was tuned for 40 trials with the TPE optimizer and benchmarked over 10 seeds for each scenario. Environments from top left Robot Warehouse (aggregated over 15 scenarios) Level Based Foraging (aggregated over 7 scenarios) SMAX (aggregated over 11 scenarios) Connector (aggregated over 4 scenarios) MaBrax (aggregated over 5 scenarios) Multi-Particle Env (aggregated over 3 scenarios)</div>
+    <div style="text-align:center; margin-top: 10px;"> <strong>Mava's algorithm performance:</strong> Each algorithm was tuned for 40 trials with the TPE optimizer and benchmarked over 10 seeds for each scenario. Environments from top left Robot Warehouse (aggregated over 15 scenarios) Level Based Foraging (aggregated over 7 scenarios) SMAX (aggregated over 11 scenarios) Connector (aggregated over 4 scenarios) MaBrax (aggregated over 5 scenarios) Multi-Particle Env (aggregated over 3 scenarios)</div>
 </p>
-
-<a href="docs/images/speed_results/speed.png">
-    <img src="docs/images/speed_results/speed.png" alt="Speed comparison between Mava's Anankin, Sebulba and a torch based alternative" width="30%" style="display:inline-block; margin-right: 10px;"/>
-</a>
 
 ## Code Philosophy 🧘
 
-The current code in Mava is adapted from [PureJaxRL][purejaxrl] which provides high-quality single-file implementations with research-friendly features. In turn, PureJaxRL is inspired by the code philosophy from [CleanRL][cleanrl]. Along this vein of easy-to-use and understandable RL codebases, Mava is not designed to be a modular library and is not meant to be imported. Our repository focuses on simplicity and clarity in its implementations while utilising the advantages offered by JAX such as `pmap` and `vmap`, making it an excellent resource for researchers and practitioners to build upon. A noteable difference between Mava and CleanRL is that Mava creates small utilities for heavily re-used elements, such as networks and logging, we've found that this, in addition to hydra configs greatly improves the readability of the algorithms.
+The current code in Mava is adapted from [PureJaxRL][purejaxrl] which provides high-quality single-file implementations with research-friendly features. In turn, PureJaxRL is inspired by the code philosophy from [CleanRL][cleanrl]. Along this vein of easy-to-use and understandable RL codebases, Mava is not designed to be a modular library and is not meant to be imported. Our repository focuses on simplicity and clarity in its implementations while utilising the advantages offered by JAX such as `pmap` and `vmap`, making it an excellent resource for researchers and practitioners to build upon. A noteable difference between Mava and CleanRL is that Mava creates small utilities for heavily re-used elements, such as networks and logging, we've found that this, in addition to hydra configs, greatly improves the readability of the algorithms.
 
 ## Contributing 🤝
 

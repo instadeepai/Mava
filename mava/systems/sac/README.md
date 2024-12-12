@@ -1,14 +1,16 @@
-# Soft Actor Critic
+# Soft Actor-Critic
 
-We provide 3 implementations of multi-agent SAC.
-* [ff-ISAC](https://github.com/instadeepai/Mava/blob/feat/develop/mava/systems/sac/anakin/ff_isac.py): feed forward independant SAC
-* [ff-MASAC](https://github.com/instadeepai/Mava/blob/feat/develop/mava/systems/sac/anakin/ff_masac.py): feed forward multi-agent SAC
-* [ff-HASAC](https://github.com/instadeepai/Mava/blob/feat/develop/mava/systems/sac/anakin/ff_hasac.py): recurrent independant SAC
+We provide the following three multi-agent extensions to the Soft Actor-Critic (SAC) algorithm.
 
-Where independant SAC uses independant learners and multi-agent SAC uses a CTDE style of training with a centralized critic and HASAC uses heterogenous style, sequential updates.
-Note: independant SAC is included for completeness, however we find that it does not perform well.
+* [ff-ISAC](https://github.com/instadeepai/Mava/blob/feat/develop/mava/systems/sac/anakin/ff_isac.py)
+* [ff-MASAC](https://github.com/instadeepai/Mava/blob/feat/develop/mava/systems/sac/anakin/ff_masac.py)
+* [ff-HASAC](https://github.com/instadeepai/Mava/blob/feat/develop/mava/systems/sac/anakin/ff_hasac.py)
+
+`ISAC` is an implementation following the independent learners MARL paradigm while `MASAC` is an implementation that follows the centralised training with decentralised execution paradigm by having a centralised critic during training. `HASAC` follows the henterogeneous agent learning paradigm through sequential policy updates. The `ff` prefix to the algorithm names indicate that the algorithms using MLP-based policy networks.
 
 ## Relevant papers
-* [Single agent Soft Actor Critic](https://arxiv.org/pdf/1801.01290)
-* [MADDPG](https://arxiv.org/pdf/1706.02275)
-* [HASAC](https://arxiv.org/pdf/2306.10715)
+* [Soft Actor-Critic: Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor](https://arxiv.org/pdf/1801.01290)
+* [Multi-Agent Actor-Critic for Mixed
+Cooperative-Competitive Environments](https://arxiv.org/pdf/1706.02275)
+* [Robust Multi-Agent Control via Maximum Entropy
+Heterogeneous-Agent Reinforcement Learning](https://arxiv.org/pdf/2306.10715)

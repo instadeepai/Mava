@@ -1,10 +1,14 @@
 # Q Learning
 
-We provide 2 Q-Learning based systems:
-* [rec-IQL](https://github.com/instadeepai/Mava/tree/feat/develop/mava/systems/q_learning/anakin/rec_iql.py): a multi-agent recurrent DQN implementation with double DQN.
-* [rec-QMIX](https://github.com/instadeepai/Mava/tree/feat/develop/mava/systems/q_learning/anakin/rec_qmix.py): an implementation of QMIX.
+We provide two Q-Learning based systems that follow the independent learners and centralised training with decentralised execution paradigms:
+
+* [rec-IQL](https://github.com/instadeepai/Mava/tree/feat/develop/mava/systems/q_learning/anakin/rec_iql.py)
+* [rec-QMIX](https://github.com/instadeepai/Mava/tree/feat/develop/mava/systems/q_learning/anakin/rec_qmix.py)
+
+`rec-IQL` is a multi-agent version of DQN that uses double DQN and has a GRU memory module and `rec-QMIX` is an implementation of QMIX in JAX that uses monontic value function decomposition.
 
 ## Relevant papers:
-* [Single agent DQN](https://arxiv.org/pdf/1312.5602)
+* [Playing Atari with Deep Reinforcement Learning](https://arxiv.org/pdf/1312.5602)
 * [Multiagent Cooperation and Competition with Deep Reinforcement Learning](https://arxiv.org/pdf/1511.08779)
-* [QMIX](https://arxiv.org/pdf/1803.11485)
+* [QMIX: Monotonic Value Function Factorisation for
+Deep Multi-Agent Reinforcement Learning](https://arxiv.org/pdf/1803.11485)
