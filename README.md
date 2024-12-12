@@ -94,7 +94,7 @@ Mava has implementations of multiple on- and off-policy multi-agent algorithms t
 |            | [`rec_sable.py`]() | ✅         | ✅       | ✅     |         |
 <h2>Environments</h2>
 
-These are the environments which Mava supports _out of the box_, to add a new environment, please use the existing wrapper implementations as an example. The framework indicates compatible agorithms, where Anakin algorithms work with JAX environments and Sebulba algorithms work with Numpy environments.  
+These are the environments which Mava supports _out of the box_, to add a new environment, please use the existing wrapper implementations as an example. The framework indicates compatible agorithms, where Anakin algorithms work with JAX environments and Sebulba algorithms work with Numpy environments.
 
 
 | Environment                     | Action space        | JAX | Numpy |
