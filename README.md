@@ -84,8 +84,8 @@ Mava has implementations of multiple on- and off-policy multi-agent algorithms t
 |            | [`ff_mappo.py`](mava/systems/ppo/anakin/ff_mappo.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2103.01955) | [Link](mava/systems/ppo/README.md) |
 |            | [`rec_ippo.py`](mava/systems/ppo/anakin/rec_ippo.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2011.09533) | [Link](mava/systems/ppo/README.md) |
 |            | [`rec_mappo.py`](mava/systems/ppo/anakin/rec_mappo.py) | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2103.01955) | [Link](mava/systems/ppo/README.md) |
-| Q Learning | [`rec_iql.py`](mava/systems/q_learning/anakin/rec_iql.py)   |            | ✅       | ✅     |         | [Link] | [Link](mava/systems/q_learning/README.md) |
-|            | [`rec_qmix.py`](mava/systems/q_learning/anakin/rec_qmix.py)  |            | ✅       | ✅     |         | [Link] | [Link](mava/systems/q_learning/README.md) |
+| Q Learning | [`rec_iql.py`](mava/systems/q_learning/anakin/rec_iql.py)   |            | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/1511.08779) | [Link](mava/systems/q_learning/README.md) |
+|            | [`rec_qmix.py`](mava/systems/q_learning/anakin/rec_qmix.py)  |            | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/1803.11485) | [Link](mava/systems/q_learning/README.md) |
 | SAC        | [`ff_isac.py`](mava/systems/sac/anakin/ff_isac.py)   | ✅         |          | ✅     |         | [Link](https://arxiv.org/pdf/1801.01290) | [Link](mava/systems/sac/README.md) |
 |            | [`ff_masac.py`](mava/systems/sac/anakin/ff_masac.py)  | ✅         |          | ✅     |         | / | [Link](mava/systems/sac/README.md) |
 |            | [`ff_hasac.py`](mava/systems/sac/anakin/ff_hasac.py)  | ✅         |          | ✅     |         | [Link](https://arxiv.org/pdf/2306.10715) | [Link](mava/systems/sac/README.md) |
