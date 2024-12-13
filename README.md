@@ -36,7 +36,7 @@ Mava allows researchers to experiment with multi-agent reinforcement learning (M
 - 🥑 **Implementations of MARL algorithms**: Implementations of current state-of-the-art MARL algorithms that are distributed and effectively make use of available accelerators.
 - 🍬 **Environment Wrappers**: We provide first class support to a few JAX based MARL environment suites through the use of wrappers, however new environments can be easily added by using existing wrappers as a guide.
 - 🧪 **Statistically robust evaluation**: Mava natively supports logging to json files which adhere to the standard suggested by [Gorsane et al. (2022)][toward_standard_eval]. This enables easy downstream experiment plotting and aggregation using the tools found in the [MARL-eval][marl_eval] library.
-- 🖥️ **Multi-agent Sebulba**: We maintain a sebulba versions of some of our algorithms allowing for speed ups even with non-Jax environments.
+- 🖥️ **JAX Distrubution Architectures for Reinforcement Learning**: Mava supports both [Podracer][anakin_paper] architectures for scaling RL systems. The first of these is _Anakin_, which can be used when environments are written in JAX. This enables end-to-end JIT compilation of the full MARL training loop for fast experiment run times on hardware accelerators. The second is _Sebulba_, which can be used when environments are not written in JAX. Sebulba is particularly useful when running RL experiments where a hardware accelerator can interact with many CPU cores at a time.
 - ⚡ **Blazingly fast experiments**: All of the above allow for very quick runtime for our experiments, especially when compared to other non-JAX based MARL libraries.
 
 ## Installation 🎬
@@ -87,7 +87,7 @@ Mava has implementations of multiple on- and off-policy multi-agent algorithms t
 | Q Learning | [`rec_iql.py`](mava/systems/q_learning/anakin/rec_iql.py)   |            | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/1511.08779) | [Link](mava/systems/q_learning/README.md) |
 |            | [`rec_qmix.py`](mava/systems/q_learning/anakin/rec_qmix.py)  |            | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/1803.11485) | [Link](mava/systems/q_learning/README.md) |
 | SAC        | [`ff_isac.py`](mava/systems/sac/anakin/ff_isac.py)   | ✅         |          | ✅     |         | [Link](https://arxiv.org/pdf/1801.01290) | [Link](mava/systems/sac/README.md) |
-|            | [`ff_masac.py`](mava/systems/sac/anakin/ff_masac.py)  | ✅         |          | ✅     |         | / | [Link](mava/systems/sac/README.md) |
+|            | [`ff_masac.py`](mava/systems/sac/anakin/ff_masac.py)  | ✅         |          | ✅     |         |   /   | [Link](mava/systems/sac/README.md) |
 |            | [`ff_hasac.py`](mava/systems/sac/anakin/ff_hasac.py)  | ✅         |          | ✅     |         | [Link](https://arxiv.org/pdf/2306.10715) | [Link](mava/systems/sac/README.md) |
 | MAT        | [`mat.py`](mava/systems/mat/anakin/mat.py)       | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2205.14953) | [Link](mava/systems/mat/README.md) |
 | Sable      | [`ff_sable.py`](mava/systems/sable/anakin/ff_sable.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2410.01706) | [Link](mava/systems/sable/README.md) |
