@@ -52,4 +52,4 @@ If you are having trouble with dependencies we recommend using our docker image 
 
     For example, `make run example=mava/systems/ppo/ff_ippo.py`.
 
-    Alternatively, run bash inside a docker container with mava installed by running `make bash`, and from there systems can be run as follows: `python dir/to/system.py`.
+    Alternatively, run bash inside a docker container with Mava installed by running `make bash`, and from there systems can be run as follows: `python dir/to/system.py`.
