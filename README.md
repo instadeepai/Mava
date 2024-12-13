@@ -107,7 +107,7 @@ These are the environments which Mava supports _out of the box_, to add a new en
 | Multi-Particle-Envs             | Discrete/Continuous | ✅   |       |
 
 ## Performance and Speed 🚀
-We have performed a rigorus benchmark across 45 different scenarios and 6 different environment suites to validate the performance of Mava's algorithm implementations. For more detailed results please see the [Sable paper][sable].
+We have performed a rigorus benchmark across 45 different scenarios and 6 different environment suites to validate the performance of Mava's algorithm implementations. For more detailed results please see our [Sable paper][sable].
 
 <p align="center">
     <a href="docs/images/benchmark_results/rware.png">
