@@ -60,7 +60,7 @@ To get started with training your first Mava system, simply run one of the syste
 python mava/systems/ppo/anakin/ff_ippo.py
 ```
 
-Mava makes use of Hydra for config management. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the LBF environment, the above code can simply be adapted as follows:
+Mava makes use of [Hydra](https://github.com/facebookresearch/hydra) for config management. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the LBF environment, the above code can simply be adapted as follows:
 
 ```bash
 python mava/systems/ppo/anakin/ff_ippo.py env=lbf
@@ -78,26 +78,26 @@ Additionally, we also have a [Quickstart notebook][quickstart] that can be used 
 
 Mava has implementations of multiple on- and off-policy multi-agent algorithms that follow the independent learners (IL), centralised training with decentralised execution (CTDE) and heterogeneous agent learing paradigms. Aside from MARL learning paradigms we also include implementations which follow the Anakin and Sebulba architectures to enable scalable training by default. The architecture that is relevant for a given problem depends on whether the environment being used in written in JAX or not. For more information on these paradigms, please see [here][anakin_paper].
 
-| Algorithm  | Variants       | Continuous | Discrete | Anakin | Sebulba |
-|------------|----------------|------------|----------|--------|---------|
-| PPO        | [`ff_ippo.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/ppo/anakin/ff_ippo.py)   | ✅         | ✅       | ✅     | ✅      |
-|            | [`ff_mappo.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/ppo/anakin/ff_mappo.py)  | ✅         | ✅       | ✅     |         |
-|            | [`rec_ippo.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/ppo/anakin/rec_ippo.py)  | ✅         | ✅       | ✅     |         |
-|            | [`rec_mappo.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/ppo/anakin/rec_mappo.py) | ✅         | ✅       | ✅     |         |
-| Q Learning | [`rec_iql.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/q_learning/anakin/rec_iql.py)   |            | ✅       | ✅     |         |
-|            | [`rec_qmix.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/q_learning/anakin/rec_qmix.py)  |            | ✅       | ✅     |         |
-| SAC        | [`ff_isac.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/sac/anakin/ff_isac.py)   | ✅         |          | ✅     |         |
-|            | [`ff_masac.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/sac/anakin/ff_masac.py)  | ✅         |          | ✅     |         |
-|            | [`ff_hasac.py`](https://github.com/instadeepai/Mava/blob/develop/mava/systems/sac/anakin/ff_hasac.py)  | ✅         |          | ✅     |         |
-| MAT        | [`mat.py`]()       | ✅         | ✅       | ✅     |         |
-| Sable      | [`ff_sable.py`]()  | ✅         | ✅       | ✅     |         |
-|            | [`rec_sable.py`]() | ✅         | ✅       | ✅     |         |
+| Algorithm  | Variants       | Continuous | Discrete | Anakin | Sebulba | Paper | Docs |
+|------------|----------------|------------|----------|--------|---------|-------|------|
+| PPO        | [`ff_ippo.py`](mava/systems/ppo/anakin/ff_ippo.py)   | ✅         | ✅       | ✅     | ✅      | [Link](https://arxiv.org/pdf/2011.09533) | [Link](mava/systems/ppo/README.md) |
+|            | [`ff_mappo.py`](mava/systems/ppo/anakin/ff_mappo.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2103.01955) | [Link](mava/systems/ppo/README.md) |
+|            | [`rec_ippo.py`](mava/systems/ppo/anakin/rec_ippo.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2011.09533) | [Link](mava/systems/ppo/README.md) |
+|            | [`rec_mappo.py`](mava/systems/ppo/anakin/rec_mappo.py) | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2103.01955) | [Link](mava/systems/ppo/README.md) |
+| Q Learning | [`rec_iql.py`](mava/systems/q_learning/anakin/rec_iql.py)   |            | ✅       | ✅     |         | [Link] | [Link](mava/systems/q_learning/README.md) |
+|            | [`rec_qmix.py`](mava/systems/q_learning/anakin/rec_qmix.py)  |            | ✅       | ✅     |         | [Link] | [Link](mava/systems/q_learning/README.md) |
+| SAC        | [`ff_isac.py`](mava/systems/sac/anakin/ff_isac.py)   | ✅         |          | ✅     |         | [Link](https://arxiv.org/pdf/1801.01290) | [Link](mava/systems/sac/README.md) |
+|            | [`ff_masac.py`](mava/systems/sac/anakin/ff_masac.py)  | ✅         |          | ✅     |         | / | [Link](mava/systems/sac/README.md) |
+|            | [`ff_hasac.py`](mava/systems/sac/anakin/ff_hasac.py)  | ✅         |          | ✅     |         | [Link](https://arxiv.org/pdf/2306.10715) | [Link](mava/systems/sac/README.md) |
+| MAT        | [`mat.py`](mava/systems/mat/anakin/mat.py)       | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2205.14953) | [Link](mava/systems/mat/README.md) |
+| Sable      | [`ff_sable.py`](mava/systems/sable/anakin/ff_sable.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2410.01706) | [Link](mava/systems/sable/README.md) |
+|            | [`rec_sable.py`](mava/systems/sable/anakin/rec_sable.py) | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2410.01706) | [Link](mava/systems/sable/README.md) |
 <h2>Environments</h2>
 
 These are the environments which Mava supports _out of the box_, to add a new environment, please use the existing wrapper implementations as an example. The framework indicates compatible agorithms, where Anakin algorithms work with JAX environments and Sebulba algorithms work with Numpy environments.
 
 
-| Environment                     | Action space        | JAX | Numpy |
+| Environment                     | Action space        | JAX | Non-JAX |
 |---------------------------------|---------------------|-----|-------|
 | Robot Warehouse                 | Discrete            | ✅   | ✅     |
 | Level Based Foraging            | Discrete            | ✅   | ✅     |
