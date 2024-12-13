@@ -16,8 +16,8 @@ For an overview of how the algorithm works, please see the diagram below. For a 
     </a>
 </p>
 
-*Sable architecture and execution.* The encoder receives all agent observations $o_t^1,\dots,o_t^N$ from the current timestep $t$ along with a hidden state $h_{t-1}^{\text{enc}}$ representing past timesteps and produces encoded observations $\hat{o}_t^1,\dots,\hat{o}_t^N$, observation-values $v(\hat{o}_t^1),\dots,v(\hat{o}_t^N)$, and a new hidden state $h_t^{\text{enc}}$.
-The decoder performs recurrent retention over the current action $a_t^{m-1}$, followed by cross attention with the encoded observations, producing the next action $a_t^m$. The initial hidden states for recurrence over agents in the decoder at the current timestep are $(h_{t-1}^{\text{dec}_1},h_{t-1}^{\text{dec}_2})$, and by the end of the decoding process, it generates the updated hidden states $(h_t^{\text{dec}_1},h_t^{\text{dec}_2})$.
+*Sable architecture and execution.* The encoder receives all agent observations $o_t^1,\dots,o_t^N$ from the current timestep $t$ along with a hidden state $h\_{t-1}^{\text{enc}}$ representing past timesteps and produces encoded observations $\hat{o}\_t^1,\dots,\hat{o}\_t^N$, observation-values $v \left( \hat{o}\_t^1 \right),\dots,v \left( \hat{o}\_t^N  \right) $, and a new hidden state $h_t^{\text{enc}}$.
+The decoder performs recurrent retention over the current action $a_t^{m-1}$, followed by cross attention with the encoded observations, producing the next action $a_t^m$. The initial hidden states for recurrence over agents in the decoder at the current timestep are $( h\_{t-1}^{\text{dec}\_1},h\_{t-1}^{\text{dec}\_2})$, and by the end of the decoding process, it generates the updated hidden states $(h_t^{\text{dec}_1},h_t^{\text{dec}_2})$.
 
 ## Relevant paper:
 * [Performant, Memory Efficient and Scalable Multi-Agent Reinforcement Learning](https://arxiv.org/pdf/2410.01706)
