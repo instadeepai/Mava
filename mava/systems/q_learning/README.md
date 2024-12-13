@@ -2,8 +2,8 @@
 
 We provide two Q-Learning based systems that follow the independent learners and centralised training with decentralised execution paradigms:
 
-* [rec-IQL](https://github.com/instadeepai/Mava/tree/feat/develop/mava/systems/q_learning/anakin/rec_iql.py)
-* [rec-QMIX](https://github.com/instadeepai/Mava/tree/feat/develop/mava/systems/q_learning/anakin/rec_qmix.py)
+* [rec-IQL](../../systems/q_learning/anakin/rec_iql.py)
+* [rec-QMIX](../../systems/q_learning/anakin/rec_qmix.py)
 
 `rec-IQL` is a multi-agent version of DQN that uses double DQN and has a GRU memory module and `rec-QMIX` is an implementation of QMIX in JAX that uses monontic value function decomposition.
 

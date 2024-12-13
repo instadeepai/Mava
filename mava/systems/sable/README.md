@@ -3,12 +3,12 @@
 Sable is an algorithm that was developed by the research team at InstaDeep. It also casts MARL as a sequence modelling problem and leverages the [advantage decompostion theorem](https://arxiv.org/pdf/2108.08612) through auto-regressive action selection for convergence guarantees and can scale to thousands of agents by leveraging the memory efficiency of Retentive Networks.
 
 We provide two Anakin based implementations of Sable:
-* [ff-sable](https://github.com/instadeepai/Mava/blob/develop/mava/systems/sable/anakin/ff_sable.py)
-* [rec-sable](https://github.com/instadeepai/Mava/blob/develop/mava/systems/sable/anakin/rec_sable.py)
+* [ff-sable](../../systems/sable/anakin/ff_sable.py)
+* [rec-sable](../../systems/sable/anakin/rec_sable.py)
 
-Here `ff` implies that the algorithm retains no memory over time but treats only the agents as the sequence dimension while `rec` implies that the algorithms maintains a memory over both agents and time for long context memory in partially observable environments.
+Here the `ff` suffix implies that the algorithm retains no memory over time but treats only the agents as the sequence dimension while `rec` implies that the algorithms maintains memory over both agents and time for long context memory in partially observable environments.
 
-For an overview of how the algorithm works, please see the diagram below. For a more detailed overview please see the associated [paper](https://arxiv.org/pdf/2410.01706).
+For an overview of how the algorithm works, please see the diagram below. For a more detailed overview please see our associated [paper](https://arxiv.org/pdf/2410.01706).
 
 <p align="center">
     <a href="../../../docs/images/algo_images/sable-arch.png">

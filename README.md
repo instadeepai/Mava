@@ -60,7 +60,7 @@ To get started with training your first Mava system, simply run one of the syste
 python mava/systems/ppo/anakin/ff_ippo.py
 ```
 
-Mava makes use of [Hydra](https://github.com/facebookresearch/hydra) for config management. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the LBF environment, the above code can simply be adapted as follows:
+Mava makes use of [Hydra](https://github.com/facebookresearch/hydra) for config management. In order to see our default system configs please see the `mava/configs/` directory. A benefit of Hydra is that configs can either be set in config yaml files or overwritten from the terminal on the fly. For an example of running a system on the Level-based Foraging environment, the above code can simply be adapted as follows:
 
 ```bash
 python mava/systems/ppo/anakin/ff_ippo.py env=lbf
@@ -72,11 +72,11 @@ Different scenarios can also be run by making the following config updates from 
 python mava/systems/ff_ippo.py env=rware env/scenario=tiny-4ag
 ```
 
-Additionally, we also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-agent system.
+Additionally, we also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first multi-agent system.
 
 <h2>Algorithms</h2>
 
-Mava has implementations of multiple on- and off-policy multi-agent algorithms that follow the independent learners (IL), centralised training with decentralised execution (CTDE) and heterogeneous agent learing paradigms. Aside from MARL learning paradigms we also include implementations which follow the Anakin and Sebulba architectures to enable scalable training by default. The architecture that is relevant for a given problem depends on whether the environment being used in written in JAX or not. For more information on these paradigms, please see [here][anakin_paper].
+Mava has implementations of multiple on- and off-policy multi-agent algorithms that follow the independent learners (IL), centralised training with decentralised execution (CTDE) and heterogeneous agent learning paradigms. Aside from MARL learning paradigms, we also include implementations which follow the Anakin and Sebulba architectures to enable scalable training by default. The architecture that is relevant for a given problem depends on whether the environment being used in written in JAX or not. For more information on these paradigms, please see [here][anakin_paper].
 
 | Algorithm  | Variants       | Continuous | Discrete | Anakin | Sebulba | Paper | Docs |
 |------------|----------------|------------|----------|--------|---------|-------|------|
@@ -99,15 +99,15 @@ These are the environments which Mava supports _out of the box_, to add a new en
 
 | Environment                     | Action space        | JAX | Non-JAX |
 |---------------------------------|---------------------|-----|-------|
-| Robot Warehouse                 | Discrete            | ✅   | ✅     |
-| Level Based Foraging            | Discrete            | ✅   | ✅     |
+| Mulit-Robot Warehouse                 | Discrete            | ✅   | ✅     |
+| Level-based Foraging            | Discrete            | ✅   | ✅     |
 | StarCraft Multi-Agent Challenge | Discrete            | ✅   | ✅     |
-| MaBrax                          | Continuous          | ✅   |       |
+| Multi-Agent Brax                          | Continuous          | ✅   |       |
 | Matrax                          | Discrete            | ✅   |       |
-| Multi-Particle-Envs             | Discrete/Continuous | ✅   |       |
+| Multi Particle Environments            | Discrete/Continuous | ✅   |       |
 
 ## Performance and Speed 🚀
-We have performed a rigorus benchmark across 45 different scenarios and 6 different environment suites to validate the performance of Mava's algorithm implementations. For more detailed results please see our [Sable paper][sable].
+We have performed a rigorous benchmark across 45 different scenarios and 6 different environment suites to validate the performance of Mava's algorithm implementations. For more detailed results please see our [Sable paper][sable] and for all hyperparameters, please see the following [website](https://sites.google.com/view/sable-marl).
 
 <p align="center">
     <a href="docs/images/benchmark_results/rware.png">
@@ -132,7 +132,7 @@ We have performed a rigorus benchmark across 45 different scenarios and 6 differ
     <a href="docs/images/benchmark_results/legend.jpg">
         <img src="docs/images/benchmark_results/legend.jpg" alt="Legend" width="60%" style="display:inline-block; margin-right: 10px;"/>
     </a>
-    <div style="text-align:center; margin-top: 10px;"> <strong>Mava's algorithm performance:</strong> Each algorithm was tuned for 40 trials with the TPE optimizer and benchmarked over 10 seeds for each scenario. Environments from top left Robot Warehouse (aggregated over 15 scenarios) Level Based Foraging (aggregated over 7 scenarios) SMAX (aggregated over 11 scenarios) Connector (aggregated over 4 scenarios) MaBrax (aggregated over 5 scenarios) Multi-Particle Env (aggregated over 3 scenarios)</div>
+    <div style="text-align:center; margin-top: 10px;"> <strong>Mava's algorithm performance:</strong> Each algorithm was tuned for 40 trials with the TPE optimizer and benchmarked over 10 seeds for each scenario. Environments from top left Multi-Robot Warehouse (aggregated over 15 scenarios) Level-based Foraging (aggregated over 7 scenarios) StarCraft Multi-Agent Challenge in JAX (aggregated over 11 scenarios) Connector (aggregated over 4 scenarios) Multi-Agent Brax (aggregated over 5 scenarios) Multi Particle Environments (aggregated over 3 scenarios)</div>
 </p>
 
 ## Code Philosophy 🧘

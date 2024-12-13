@@ -2,11 +2,11 @@
 
 We provide the following three multi-agent extensions to the Soft Actor-Critic (SAC) algorithm.
 
-* [ff-ISAC](https://github.com/instadeepai/Mava/blob/feat/develop/mava/systems/sac/anakin/ff_isac.py)
-* [ff-MASAC](https://github.com/instadeepai/Mava/blob/feat/develop/mava/systems/sac/anakin/ff_masac.py)
-* [ff-HASAC](https://github.com/instadeepai/Mava/blob/feat/develop/mava/systems/sac/anakin/ff_hasac.py)
+* [ff-ISAC](../../systems/sac/anakin/ff_isac.py)
+* [ff-MASAC](../../systems/sac/anakin/ff_masac.py)
+* [ff-HASAC](../../systems/sac/anakin/ff_hasac.py)
 
-`ISAC` is an implementation following the independent learners MARL paradigm while `MASAC` is an implementation that follows the centralised training with decentralised execution paradigm by having a centralised critic during training. `HASAC` follows the henterogeneous agent learning paradigm through sequential policy updates. The `ff` prefix to the algorithm names indicate that the algorithms using MLP-based policy networks.
+`ISAC` is an implementation following the independent learners MARL paradigm while `MASAC` is an implementation that follows the centralised training with decentralised execution paradigm by having a centralised critic during training. `HASAC` follows the heterogeneous agent learning paradigm through sequential policy updates. The `ff` prefix to the algorithm names indicate that the algorithms use MLP-based policy networks.
 
 ## Relevant papers
 * [Soft Actor-Critic: Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor](https://arxiv.org/pdf/1801.01290)
