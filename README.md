@@ -80,31 +80,31 @@ Mava has implementations of multiple on- and off-policy multi-agent algorithms t
 
 | Algorithm  | Variants       | Continuous | Discrete | Anakin | Sebulba | Paper | Docs |
 |------------|----------------|------------|----------|--------|---------|-------|------|
-| PPO        | [`ff_ippo.py`](mava/systems/ppo/anakin/ff_ippo.py)   | ✅         | ✅       | ✅     | ✅      | [Link](https://arxiv.org/pdf/2011.09533) | [Link](mava/systems/ppo/README.md) |
-|            | [`ff_mappo.py`](mava/systems/ppo/anakin/ff_mappo.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2103.01955) | [Link](mava/systems/ppo/README.md) |
-|            | [`rec_ippo.py`](mava/systems/ppo/anakin/rec_ippo.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2011.09533) | [Link](mava/systems/ppo/README.md) |
-|            | [`rec_mappo.py`](mava/systems/ppo/anakin/rec_mappo.py) | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2103.01955) | [Link](mava/systems/ppo/README.md) |
-| Q Learning | [`rec_iql.py`](mava/systems/q_learning/anakin/rec_iql.py)   |            | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/1511.08779) | [Link](mava/systems/q_learning/README.md) |
-|            | [`rec_qmix.py`](mava/systems/q_learning/anakin/rec_qmix.py)  |            | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/1803.11485) | [Link](mava/systems/q_learning/README.md) |
-| SAC        | [`ff_isac.py`](mava/systems/sac/anakin/ff_isac.py)   | ✅         |          | ✅     |         | [Link](https://arxiv.org/pdf/1801.01290) | [Link](mava/systems/sac/README.md) |
-|            | [`ff_masac.py`](mava/systems/sac/anakin/ff_masac.py)  | ✅         |          | ✅     |         |   /   | [Link](mava/systems/sac/README.md) |
-|            | [`ff_hasac.py`](mava/systems/sac/anakin/ff_hasac.py)  | ✅         |          | ✅     |         | [Link](https://arxiv.org/pdf/2306.10715) | [Link](mava/systems/sac/README.md) |
-| MAT        | [`mat.py`](mava/systems/mat/anakin/mat.py)       | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2205.14953) | [Link](mava/systems/mat/README.md) |
-| Sable      | [`ff_sable.py`](mava/systems/sable/anakin/ff_sable.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2410.01706) | [Link](mava/systems/sable/README.md) |
-|            | [`rec_sable.py`](mava/systems/sable/anakin/rec_sable.py) | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/pdf/2410.01706) | [Link](mava/systems/sable/README.md) |
+| PPO        | [`ff_ippo.py`](mava/systems/ppo/anakin/ff_ippo.py)   | ✅         | ✅       | ✅     | ✅      | [Link](https://arxiv.org/abs/2011.09533) | [Link](mava/systems/ppo/README.md) |
+|            | [`ff_mappo.py`](mava/systems/ppo/anakin/ff_mappo.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/abs/2103.01955) | [Link](mava/systems/ppo/README.md) |
+|            | [`rec_ippo.py`](mava/systems/ppo/anakin/rec_ippo.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/abs/2011.09533) | [Link](mava/systems/ppo/README.md) |
+|            | [`rec_mappo.py`](mava/systems/ppo/anakin/rec_mappo.py) | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/abs/2103.01955) | [Link](mava/systems/ppo/README.md) |
+| Q Learning | [`rec_iql.py`](mava/systems/q_learning/anakin/rec_iql.py)   |            | ✅       | ✅     |         | [Link](https://arxiv.org/abs/1511.08779) | [Link](mava/systems/q_learning/README.md) |
+|            | [`rec_qmix.py`](mava/systems/q_learning/anakin/rec_qmix.py)  |            | ✅       | ✅     |         | [Link](https://arxiv.org/abs/1803.11485) | [Link](mava/systems/q_learning/README.md) |
+| SAC        | [`ff_isac.py`](mava/systems/sac/anakin/ff_isac.py)   | ✅         |          | ✅     |         | [Link](https://arxiv.org/abs/1801.01290) | [Link](mava/systems/sac/README.md) |
+|            | [`ff_masac.py`](mava/systems/sac/anakin/ff_masac.py)  | ✅         |          | ✅     |         |     | [Link](mava/systems/sac/README.md) |
+|            | [`ff_hasac.py`](mava/systems/sac/anakin/ff_hasac.py)  | ✅         |          | ✅     |         | [Link](https://arxiv.org/abs/2306.10715) | [Link](mava/systems/sac/README.md) |
+| MAT        | [`mat.py`](mava/systems/mat/anakin/mat.py)       | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/abs/2205.14953) | [Link](mava/systems/mat/README.md) |
+| Sable      | [`ff_sable.py`](mava/systems/sable/anakin/ff_sable.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/abs/2410.01706) | [Link](mava/systems/sable/README.md) |
+|            | [`rec_sable.py`](mava/systems/sable/anakin/rec_sable.py) | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/abs/2410.01706) | [Link](mava/systems/sable/README.md) |
 <h2>Environments</h2>
 
 These are the environments which Mava supports _out of the box_, to add a new environment, please use the [existing wrapper implementations](mava/wrappers/) as an example. We also indicate whether the environment is implemented in JAX or not. JAX-based environments can be used with algorithms that follow the Anakin distribution architecture, while non-JAX environments can be used with algorithms following the Sebulba architecture.
 
 
-| Environment                     | Action space        | JAX | Non-JAX |
-|---------------------------------|---------------------|-----|-------|
-| Mulit-Robot Warehouse                 | Discrete            | ✅   | ✅     |
-| Level-based Foraging            | Discrete            | ✅   | ✅     |
-| StarCraft Multi-Agent Challenge | Discrete            | ✅   | ✅     |
-| Multi-Agent Brax                          | Continuous          | ✅   |       |
-| Matrax                          | Discrete            | ✅   |       |
-| Multi Particle Environments            | Discrete/Continuous | ✅   |       |
+| Environment                     | Action space        | JAX | Non-JAX | Paper | JAX Source | Non-JAX Source |
+|---------------------------------|---------------------|-----|-------|-------|------------|----------------|
+| Mulit-Robot Warehouse                 | Discrete            | ✅   | ✅     | [Link](http://arxiv.org/abs/2006.07869)  |    [Link](https://github.com/instadeepai/jumanji/tree/main/jumanji/environments/routing/robot_warehouse)   |       [Link](https://github.com/semitable/robotic-warehouse)      |
+| Level-based Foraging            | Discrete            | ✅   | ✅     | [Link](https://arxiv.org/abs/2006.07169)  |    [Link](https://github.com/instadeepai/jumanji/tree/main/jumanji/environments/routing/lbf)    |       [Link](https://github.com/semitable/lb-foraging)      |
+| StarCraft Multi-Agent Challenge | Discrete            | ✅   | ✅     | [Link](https://arxiv.org/abs/1902.04043)  |    [Link](https://github.com/FLAIROx/JaxMARL/tree/main/jaxmarl/environments/smax)    |       [Link](https://github.com/uoe-agents/smaclite)      |
+| Multi-Agent Brax                          | Continuous          | ✅   |       | [Link](https://arxiv.org/abs/2003.06709)  |    [Link](https://github.com/FLAIROx/JaxMARL/tree/main/jaxmarl/environments/mabrax)    |             |
+| Matrax                          | Discrete            | ✅   |       | [Link](https://www.cs.toronto.edu/~cebly/Papers/_download_/multirl.pdf)  |    [Link](https://github.com/instadeepai/matrax)    |             |
+| Multi Particle Environments            | Discrete/Continuous | ✅   |       | [Link](https://arxiv.org/abs/1706.02275)  |    [Link](https://github.com/FLAIROx/JaxMARL/tree/main/jaxmarl/environments/mpe)    |            |
 
 ## Performance and Speed 🚀
 We have performed a rigorous benchmark across 45 different scenarios and 6 different environment suites to validate the performance of Mava's algorithm implementations. For more detailed results please see our [Sable paper][sable] and for all hyperparameters, please see the following [website](https://sites.google.com/view/sable-marl).
