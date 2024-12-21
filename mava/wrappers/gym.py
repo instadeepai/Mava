@@ -205,7 +205,9 @@ class GymToJumanji:
         """Create an observation from the raw observation and environment state."""
 
         action_mask = np.stack(info["action_mask"])
-        obs_data = {"agents_view": obs, "action_mask": action_mask}
+        step_count = np.zeros((self.num_envs, self.num_agents), dtype=int)
+
+        obs_data = {"agents_view": obs, "action_mask": action_mask, "step_count" : step_count}
 
         if "global_obs" in info:
             global_obs = np.array(info["global_obs"])
@@ -474,9 +476,9 @@ class PufferToJumanji:
         rewards = np.zeros((self.num_envs, self.num_agents), dtype=float)
         terminated = np.zeros(self.num_envs, dtype=float)
         action_mask = np.ones((self.num_envs, self.num_agents, self.num_actions))
+        step_count = np.zeros((self.num_envs, self.num_agents), dtype=int)
 
-        obs_data = {"agents_view": obs, "action_mask": action_mask}
-        Observation(**obs_data)
+        obs_data = {"agents_view": obs, "action_mask": action_mask, "step_count" : step_count}
 
         return TimeStep(
             step_type=step_type,
@@ -496,8 +498,9 @@ class PufferToJumanji:
         ep_done = np.logical_or(terminated, truncated)
         step_type = np.where(ep_done, StepType.LAST, StepType.MID)
         action_mask = np.ones((self.num_envs, self.num_agents, self.num_actions))
+        step_count = np.zeros((self.num_envs, self.num_agents), dtype=int)
         
-        obs_data = {"agents_view": obs, "action_mask": action_mask}
+        obs_data = {"agents_view": obs, "action_mask": action_mask, "step_count" : step_count}
         
 
         return TimeStep(

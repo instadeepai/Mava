@@ -90,7 +90,7 @@ class Pipeline(threading.Thread):
             except queue.Empty:
                 continue
 
-    def put(self, traj: Sequence[PPOTransition], timestep: TimeStep, time_dict: Dict) -> None:
+    def put(self, traj: Sequence[PPOTransition], timestep: TimeStep, time_dict: Dict, timeout : int = QUEUE_PUT_TIMEOUT) -> None:
         """Put a trajectory on the queue to be consumed by the learner."""
         start_condition, end_condition = (threading.Condition(), threading.Condition())
         with start_condition:

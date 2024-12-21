@@ -70,6 +70,19 @@ class Transition(NamedTuple):
     info: Dict
 
 
+class RecTransition(NamedTuple):
+    """Transition tuple."""
+
+    done: Array
+    action: Array
+    value: Array
+    reward: Array
+    log_prob: Array
+    obs: Array
+    hstates: Array
+    info: Dict
+
+
 ActorApply = Callable[
     [FrozenDict, Array, Array, HiddenStates, PRNGKey],
     Tuple[Array, Array, Array, Array, HiddenStates],
