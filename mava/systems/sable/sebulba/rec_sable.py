@@ -735,7 +735,7 @@ def run_experiment(_config: DictConfig) -> float:
     best_params_cpu = jax.device_get(inital_params)
 
 
-    eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
+    eval_batch_size = get_num_eval_envs(config, absolute_metric=False) #todo this is wrong for serbulba with multiple devices
     eval_hs = get_init_hidden_state(config.network.net_config, eval_batch_size)
 
     # This is the main loop, all it does is evaluation and logging.

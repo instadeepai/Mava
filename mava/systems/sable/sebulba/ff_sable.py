@@ -521,9 +521,10 @@ def learner_setup(
 
     # Create fake hstates
     minibatch_size = (
-        config.arch.num_envs * config.system.rollout_length // config.system.num_minibatches
+        config.arch.num_envs * config.system.rollout_length // (config.system.num_minibatches * len(learner_devices))
     )
-    dummy_actor_hs = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
+    dummy_rollout_hs = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
+    dummy_actor_hs = get_init_hidden_state(config.network.net_config, config.arch.num_envs // len(learner_devices))
     dummy_trainer_hs = get_init_hidden_state(config.network.net_config, minibatch_size)
 
     # Pack apply and update functions.
@@ -535,6 +536,7 @@ def learner_setup(
         partial(sable_network.apply, hstates=dummy_trainer_hs),  # Training function
     )
     eval_apply_fn = partial(sable_network.apply, method="get_actions")
+    rollout_apply_fn = partial(sable_network.apply, method="get_actions", hstates=dummy_rollout_hs)
 
     # defines how the learner state is sharded: params, opt and key = sharded, timestep = sharded
     learn_state_spec = LearnerState(model_spec, model_spec, data_spec, None, data_spec)
@@ -573,7 +575,7 @@ def learner_setup(
     init_learner_state = LearnerState(params, opt_states, step_keys, None, None)  # type: ignore
     env.close()
 
-    return learn, apply_fns[0], eval_apply_fn, init_learner_state, learner_sharding  # type: ignore
+    return learn, rollout_apply_fn, eval_apply_fn, init_learner_state, learner_sharding  # type: ignore
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -720,7 +722,7 @@ def run_experiment(_config: DictConfig) -> float:
 
         learner_state_cpu = jax.device_get(learner_state)
         key, eval_key = jax.random.split(key, 2)
-        eval_metrics = evaluator(learner_state_cpu.params.actor_params, eval_key, {})
+        eval_metrics = evaluator(learner_state_cpu.params, eval_key, {})
         logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
 
         episode_return = np.mean(eval_metrics["episode_return"])
@@ -733,7 +735,7 @@ def run_experiment(_config: DictConfig) -> float:
             )
 
         if config.arch.absolute_metric and max_episode_return <= episode_return:
-            best_params_cpu = copy.deepcopy(learner_state_cpu.params.actor_params)
+            best_params_cpu = copy.deepcopy(learner_state_cpu.params)
             max_episode_return = float(episode_return)
 
     evaluator_envs.close()
