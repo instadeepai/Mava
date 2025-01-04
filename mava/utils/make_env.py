@@ -275,32 +275,44 @@ def make_puffer_env(
     num_env: int,
     add_global_state: bool = False,
 ) -> GymToJumanji:
-    
+    """Create and configure a Puffer environment wrapped for Jumanji."""
+
     env_creator = _puffer_registry[config.env.env_name]
 
-    def create_puffer_env( *env_args, **env_kwargs) -> gymnasium.Env:
-        wrapped_env = PufferAutoResetWrapper(env_creator, *env_args, **env_kwargs)
-        return wrapped_env
-    # todo running with a signle cpu core is much faster for light envs 
-    # the data transfer overhead makes using multiple cores not worth it for rware :thinking:
-    # todo: is using more than 1 actor bad?
-    n_cpu_cores = 1#cpu_count(logical = False)
+    def create_puffer_env(*env_args, **env_kwargs) -> gymnasium.Env:
+        """Wraps the environment with a PufferAutoResetWrapper."""
+        return PufferAutoResetWrapper(env_creator, *env_args, **env_kwargs)
+
+    # Determine the number of CPU cores to use.
+    #todo: should we move this to config? testing showed that running on multiple cores is slower due to the transfer overhead
+    n_cpu_cores = 1  # Using a single CPU core for light environments. 
     if n_cpu_cores >= num_env:
-        num_workers, num_parrallel_envs = num_env, 1
+        num_workers, num_parallel_envs = num_env, 1
     else:
-        assert num_env % n_cpu_cores == 0, f"the numlber of envs({num_env}) must be divisable by the number of cpu cores ({n_cpu_cores})"
-        num_workers, num_parrallel_envs = n_cpu_cores, num_env // n_cpu_cores 
-    
-    
-    envs = pufferlib.vector.make(create_puffer_env,
-    backend=pufferlib.vector.Multiprocessing,
-    num_envs=num_workers, env_kwargs = dict(config['env']['kwargs']) | dict(config['env']['scenario']['task_config']) | {"num_envs" : num_parrallel_envs}
+        assert num_env % n_cpu_cores == 0, (
+            f"The number of environments ({num_env}) must be divisible by the number of CPU cores ({n_cpu_cores})."
+        )
+        num_workers, num_parallel_envs = n_cpu_cores, num_env // n_cpu_cores
+
+    # Create the vectorized environments.
+    env_kwargs = {
+        **config['env']['kwargs'],
+        **config['env']['scenario']['task_config'],
+        "num_envs": num_parallel_envs,
+    }
+    envs = pufferlib.vector.make(
+        create_puffer_env,
+        backend=pufferlib.vector.Multiprocessing,
+        num_envs=num_workers,
+        env_kwargs=env_kwargs,
     )
 
+    # Wrap environments for Jumanji compatibility.
     envs = PufferToJumanji(envs, num_envs=num_env)
     if config.system.add_agent_id:
         envs = GymAgentIDWrapper(envs)
     envs = GymRecordEpisodeMetrics(envs)
+
     return envs
 
 def sebulba_make(

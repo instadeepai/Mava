@@ -531,17 +531,18 @@ class PufferAutoResetWrapper(PufferEnv):
         return self.env.reset(seed = seed)
 
     def step(self, actions: List) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
-
+        # The returned values are ignored when using puffer's vector envs
+        # Intsted the updates have to be directly made in the matricies stored inside env 
+        # Since everything is passed by reference. 
+        
         if self.steps == 0:
             self.env.terminals.fill(False)
         
         self.steps += 1
         observation, reward, terminated, truncated, _ = self.env.step(actions)
-        info = {"real_next_obs" : observation.copy()} #todo i dislike replacing the info
+        info = {"real_next_obs" : observation.copy()} 
 
         if np.logical_or(terminated, truncated).all() or self.steps == self.max_steps:
-            # The returned values are ignored when using puffer's vector envs
-            # Intsted the updates have to be directly made in the env
             self.env.observations[:], _ = self.reset() # change values without changing array refrence
             self.env.terminals.fill(True) 
 
