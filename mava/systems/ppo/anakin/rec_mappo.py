@@ -206,7 +206,9 @@ def get_learner_fn(
                     )
                     log_prob = actor_policy.log_prob(traj_batch.action)
 
+                    # Calculate actor loss
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
+                    # Nomalise advantage at minibatch level
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
                     actor_loss1 = ratio * gae
                     actor_loss2 = (
@@ -237,7 +239,7 @@ def get_learner_fn(
                         critic_params, traj_batch.hstates.critic_hidden_state[0], obs_and_done
                     )
 
-                    # Calculate value loss
+                    # Clipped MSE loss
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
                         -config.system.clip_eps, config.system.clip_eps
                     )
@@ -428,7 +430,7 @@ def learner_setup(
     # Define network and optimiser.
     actor_pre_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
     actor_post_torso = hydra.utils.instantiate(config.network.actor_network.post_torso)
-    action_head, _ = get_action_head(env.action_spec())
+    action_head, _ = get_action_head(env.action_spec)
     actor_action_head = hydra.utils.instantiate(action_head, action_dim=env.action_dim)
     critic_pre_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
     critic_post_torso = hydra.utils.instantiate(config.network.critic_network.post_torso)
@@ -459,7 +461,7 @@ def learner_setup(
     )
 
     # Initialise observation with obs of all agents.
-    init_obs = env.observation_spec().generate_value()
+    init_obs = env.observation_spec.generate_value()
     init_obs = tree.map(
         lambda x: jnp.repeat(x[jnp.newaxis, ...], config.arch.num_envs, axis=0),
         init_obs,
@@ -554,6 +556,7 @@ def learner_setup(
 
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
+    _config.logger.system_name = "rec_mappo"
     config = copy.deepcopy(_config)
 
     n_devices = len(jax.devices())
@@ -704,7 +707,6 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-    cfg.logger.system_name = "rec_mappo"
 
     # Run experiment.
     eval_performance = run_experiment(cfg)

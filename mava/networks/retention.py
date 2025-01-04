@@ -237,12 +237,12 @@ class MultiScaleRetention(nn.Module):
         self.w_g = self.param(
             "w_g",
             nn.initializers.normal(stddev=1 / self.embed_dim),
-            (self.embed_dim, self.head_size),
+            (self.embed_dim, self.embed_dim),
         )
         self.w_o = self.param(
             "w_o",
             nn.initializers.normal(stddev=1 / self.embed_dim),
-            (self.head_size, self.embed_dim),
+            (self.embed_dim, self.embed_dim),
         )
         self.group_norm = nn.GroupNorm(num_groups=self.n_head)
 
@@ -278,7 +278,7 @@ class MultiScaleRetention(nn.Module):
         if self.memory_config.timestep_positional_encoding:
             key, query, value = self.pe(key, query, value, step_count)
 
-        ret_output = jnp.zeros((B, C, self.head_size), dtype=value.dtype)
+        ret_output = jnp.zeros((B, C, self.embed_dim), dtype=value.dtype)
         for head in range(self.n_head):
             y, new_hs = self.retention_heads[head](key, query, value, hstate[:, head], dones)
             ret_output = ret_output.at[
@@ -304,7 +304,7 @@ class MultiScaleRetention(nn.Module):
         if self.memory_config.timestep_positional_encoding:
             key_n, query_n, value_n = self.pe(key_n, query_n, value_n, step_count)
 
-        ret_output = jnp.zeros((B, S, self.head_size), dtype=value_n.dtype)
+        ret_output = jnp.zeros((B, S, self.embed_dim), dtype=value_n.dtype)
         for head in range(self.n_head):
             y, new_hs = self.retention_heads[head].recurrent(
                 key_n, query_n, value_n, hstate[:, head]

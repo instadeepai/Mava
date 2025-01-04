@@ -292,7 +292,7 @@ def get_sebulba_eval_fn(
 
             # Find the first instance of done to get the metrics at that timestep.
             done_idx = np.argmax(timesteps.last(), axis=0)
-            metrics = jax.tree_map(lambda m: m[done_idx, np.arange(n_parallel_envs)], metrics)
+            metrics = tree.map(lambda m: m[done_idx, np.arange(n_parallel_envs)], metrics)
             del metrics["is_terminal_step"]  # uneeded for logging
 
             return key, metrics
@@ -306,7 +306,7 @@ def get_sebulba_eval_fn(
             metrics_array.append(metric)
 
         # flatten metrics
-        metrics: Metrics = jax.tree_map(lambda *x: np.array(x).reshape(-1), *metrics_array)
+        metrics: Metrics = tree.map(lambda *x: np.array(x).reshape(-1), *metrics_array)
         return metrics
 
     def timed_eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:

@@ -3,8 +3,8 @@ defaults:
   - logger: logger
   - arch: anakin
   - system: q_learning/rec_iql
-  - network: rnn  # [rnn, rcnn]
-  - env: smax  # [cleaner, connector, gigastep, lbf, matrax, rware, smax]
+  - network: rnn # [rnn, rcnn]
+  - env: smax # [cleaner, connector, vector-connector, gigastep, lbf, matrax, rware, smax]
 
 hydra:
   searchpath:

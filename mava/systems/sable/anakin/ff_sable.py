@@ -186,6 +186,7 @@ def get_learner_fn(
 
                     # Calculate actor loss
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
+                    # Nomalise advantage at minibatch level
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
                     actor_loss1 = ratio * gae
                     actor_loss2 = (
@@ -200,11 +201,10 @@ def get_learner_fn(
                     actor_loss = actor_loss.mean()
                     entropy = entropy.mean()
 
-                    # Calculate value loss
+                    # Clipped MSE loss
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
                         -config.system.clip_eps, config.system.clip_eps
                     )
-                    # MSE loss
                     value_losses = jnp.square(value - value_targets)
                     value_losses_clipped = jnp.square(value_pred_clipped - value_targets)
                     value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
@@ -328,17 +328,13 @@ def learner_setup(
     # Get available TPU cores.
     n_devices = len(jax.devices())
 
-    # Get number of agents.
-    config.system.num_agents = env.num_agents
-
     # PRNG keys.
     key, net_key = keys
 
     # Get number of agents and actions.
     action_dim = env.action_dim
-    n_agents = env.action_spec().shape[0]
+    n_agents = env.num_agents
     config.system.num_agents = n_agents
-    config.system.num_actions = action_dim
 
     # Setting the chunksize - many agent problems require chunking agents
     # Create a dummy decay factor for FF Sable
@@ -353,7 +349,7 @@ def learner_setup(
     # Set positional encoding to False, since ff-sable does not use temporal dependencies.
     config.network.memory_config.timestep_positional_encoding = False
 
-    _, action_space_type = get_action_head(env.action_spec())
+    _, action_space_type = get_action_head(env.action_spec)
 
     # Define network.
     sable_network = SableNetwork(
@@ -373,7 +369,7 @@ def learner_setup(
     )
 
     # Get mock inputs to initialise network.
-    init_obs = env.observation_spec().generate_value()
+    init_obs = env.observation_spec.generate_value()
     init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs)  # Add batch dim
     init_hs = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
     init_hs = tree.map(lambda x: x[0, jnp.newaxis], init_hs)
@@ -461,6 +457,7 @@ def learner_setup(
 
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
+    _config.logger.system_name = "ff_sable"
     config = copy.deepcopy(_config)
 
     n_devices = len(jax.devices())
@@ -611,7 +608,6 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-    cfg.logger.system_name = "ff_sable"
 
     # Run experiment.
     eval_performance = run_experiment(cfg)

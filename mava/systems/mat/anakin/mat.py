@@ -43,11 +43,7 @@ from mava.types import (
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
-from mava.utils.jax_utils import (
-    merge_leading_dims,
-    unreplicate_batch_dim,
-    unreplicate_n_dims,
-)
+from mava.utils.jax_utils import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
@@ -177,10 +173,8 @@ def get_learner_fn(
 
                     # Calculate actor loss
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
-
                     # Nomalise advantage at minibatch level
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
-
                     actor_loss1 = ratio * gae
                     actor_loss2 = (
                         jnp.clip(
@@ -194,11 +188,10 @@ def get_learner_fn(
                     actor_loss = actor_loss.mean()
                     entropy = entropy.mean()
 
+                    # Clipped MSE loss
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
                         -config.system.clip_eps, config.system.clip_eps
                     )
-
-                    # MSE loss
                     value_losses = jnp.square(value - value_targets)
                     value_losses_clipped = jnp.square(value_pred_clipped - value_targets)
                     value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
@@ -327,10 +320,10 @@ def learner_setup(
     key, actor_net_key = keys
 
     # Initialise observation: Obs for all agents.
-    init_x = env.observation_spec().generate_value()
+    init_x = env.observation_spec.generate_value()
     init_x = tree.map(lambda x: x[None, ...], init_x)
 
-    _, action_space_type = get_action_head(env.action_spec())
+    _, action_space_type = get_action_head(env.action_spec)
 
     if action_space_type == "discrete":
         init_action = jnp.zeros((1, config.system.num_agents), dtype=jnp.int32)
@@ -412,6 +405,7 @@ def learner_setup(
 
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
+    _config.logger.system_name = "mat"
     config = copy.deepcopy(_config)
 
     n_devices = len(jax.devices())
@@ -561,7 +555,6 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-    cfg.logger.system_name = "mat"
 
     eval_performance = run_experiment(cfg)
     jax.block_until_ready(eval_performance)

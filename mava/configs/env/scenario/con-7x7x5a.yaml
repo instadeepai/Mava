@@ -1,5 +1,5 @@
 # The config of the 7x7x5a scenario
-name: MaConnector-v2
+name: Connector-v2
 task_name: con-7x7x5a
 
 task_config:

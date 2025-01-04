@@ -36,11 +36,7 @@ from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn, Mar
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
-from mava.utils.jax_utils import (
-    merge_leading_dims,
-    unreplicate_batch_dim,
-    unreplicate_n_dims,
-)
+from mava.utils.jax_utils import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
@@ -161,6 +157,7 @@ def get_learner_fn(
 
                     # Calculate actor loss
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
+                    # Nomalise advantage at minibatch level
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
                     actor_loss1 = ratio * gae
                     actor_loss2 = (
@@ -188,7 +185,7 @@ def get_learner_fn(
                     # Rerun network
                     value = critic_apply_fn(critic_params, traj_batch.obs)
 
-                    # Calculate value loss
+                    # Clipped MSE loss
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
                         -config.system.clip_eps, config.system.clip_eps
                     )
@@ -259,7 +256,7 @@ def get_learner_fn(
             params, opt_states, traj_batch, advantages, targets, key = update_state
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
 
-            # Shuffle minibatches
+            # Shuffle data and create minibatches
             batch_size = config.system.rollout_length * config.arch.num_envs
             permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
@@ -335,7 +332,7 @@ def learner_setup(
 
     # Define network and optimiser.
     actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
-    action_head, _ = get_action_head(env.action_spec())
+    action_head, _ = get_action_head(env.action_spec)
     actor_action_head = hydra.utils.instantiate(action_head, action_dim=env.action_dim)
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 
@@ -355,7 +352,7 @@ def learner_setup(
     )
 
     # Initialise observation with obs of all agents.
-    obs = env.observation_spec().generate_value()
+    obs = env.observation_spec.generate_value()
     init_x = tree.map(lambda x: x[jnp.newaxis, ...], obs)
 
     # Initialise actor params and optimiser state.
@@ -423,6 +420,7 @@ def learner_setup(
 
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
+    _config.logger.system_name = "ff_ippo"
     config = copy.deepcopy(_config)
 
     n_devices = len(jax.devices())
@@ -556,7 +554,6 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-    cfg.logger.system_name = "ff_ippo"
 
     # Run experiment.
     eval_performance = run_experiment(cfg)
