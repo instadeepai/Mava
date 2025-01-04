@@ -468,7 +468,7 @@ def learner_setup(
         (config.system.sample_batch_size, config.system.num_agents), config.network.hidden_state_dim
     )
 
-    # Making recurrent Q network.shao
+    # Making recurrent Q network.
     pre_torso = hydra.utils.instantiate(config.network.q_network.pre_torso)
     post_torso = hydra.utils.instantiate(config.network.q_network.post_torso)
     q_net = RecQNetwork(
