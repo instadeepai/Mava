@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import cached_property
 from typing import Tuple, Union
 
 import chex
@@ -29,6 +30,7 @@ class MatraxWrapper(Wrapper):
     """Multi-agent wrapper for the Matrax environment."""
 
     def __init__(self, env: Environment, add_global_state: bool):
+        self.add_global_state = add_global_state
         super().__init__(env)
         self._env: MatrixGame
 
@@ -36,7 +38,6 @@ class MatraxWrapper(Wrapper):
         self.action_dim = self._env.num_actions
         self.time_limit = self._env.time_limit
         self.action_mask = jnp.ones((self.num_agents, self.num_actions), dtype=bool)
-        self.add_global_state = add_global_state
 
     def modify_timestep(
         self, timestep: TimeStep
@@ -65,6 +66,7 @@ class MatraxWrapper(Wrapper):
         state, timestep = self._env.step(state, action)
         return state, self.modify_timestep(timestep)
 
+    @cached_property
     def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
         """Specification of the observation of the environment."""
         step_count = specs.BoundedArray(
@@ -79,7 +81,7 @@ class MatraxWrapper(Wrapper):
             bool,
             "action_mask",
         )
-        obs_spec = self._env.observation_spec()
+        obs_spec = self._env.observation_spec
         obs_data = {
             "agents_view": obs_spec.agent_obs,
             "action_mask": action_mask,

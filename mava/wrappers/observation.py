@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import cached_property
 from typing import Tuple, Union
 
 import chex
@@ -70,11 +71,12 @@ class AgentIDWrapper(Wrapper):
 
         return state, timestep
 
+    @cached_property
     def observation_spec(
         self,
     ) -> Union[specs.Spec[Observation], specs.Spec[ObservationGlobalState]]:
         """Specification of the observation of the selected environment."""
-        obs_spec = self._env.observation_spec()
+        obs_spec = self._env.observation_spec
         num_obs_features = obs_spec.agents_view.shape[-1] + self._env.num_agents
         dtype = obs_spec.agents_view.dtype
         agents_view = specs.Array((self._env.num_agents, num_obs_features), dtype, "agents_view")

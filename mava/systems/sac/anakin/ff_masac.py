@@ -105,16 +105,16 @@ def init(
 
     key, actor_key, q1_key, q2_key, q1_target_key, q2_target_key = jax.random.split(key, 6)
 
-    acts = env.action_spec().generate_value()  # all agents actions
+    acts = env.action_spec.generate_value()  # all agents actions
     act_single = acts[0]  # single agents action
     joint_acts = jnp.concatenate([act_single for _ in range(n_agents)], axis=0)
     joint_acts_batched = joint_acts[jnp.newaxis, ...]  # joint actions with a batch dim
-    obs = env.observation_spec().generate_value()
+    obs = env.observation_spec.generate_value()
     obs_single_batched = tree.map(lambda x: x[0][jnp.newaxis, ...], obs)
 
     # Making actor network
     actor_torso = hydra.utils.instantiate(cfg.network.actor_network.pre_torso)
-    action_head, _ = get_action_head(env.action_spec())
+    action_head, _ = get_action_head(env.action_spec)
     actor_action_head = hydra.utils.instantiate(
         action_head, action_dim=env.action_dim, independent_std=False
     )
@@ -245,7 +245,7 @@ def make_update_fns(
     actor_net, q_net = networks
     actor_opt, q_opt, alpha_opt = optims
 
-    full_action_shape = (cfg.arch.num_envs, *env.action_spec().shape)
+    full_action_shape = (cfg.arch.num_envs, *env.action_spec.shape)
 
     # losses:
     def q_loss_fn(
@@ -511,6 +511,7 @@ def make_update_fns(
 
 def run_experiment(cfg: DictConfig) -> float:
     # Add runtime variables to config
+    cfg.logger.system_name = "ff_masac"
     cfg.arch.n_devices = len(jax.devices())
     cfg = check_total_timesteps(cfg)
 
@@ -627,7 +628,6 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-    cfg.logger.system_name = "ff_masac"
 
     # Run experiment.
     final_return = run_experiment(cfg)

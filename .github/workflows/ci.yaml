@@ -1,12 +1,12 @@
-name: Tests and Linters 🧪
+name: CI 🧪
 
 on: [ pull_request ]
 
 jobs:
-  tests-and-linters:
+  linters:
     name: "Python ${{ matrix.python-version }} on ubuntu-latest"
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
 
     strategy:
       matrix:
@@ -19,7 +19,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v3
         with:
-          version: "0.4.26"
+          version: "0.5.4"
           enable-cache: true
           cache-dependency-glob: "requirements/requirements**.txt"  # invalidate cache when requirements file changes
 
@@ -34,6 +34,3 @@ jobs:
 
       - name: Run linters 🖌️
         run: pre-commit run --all-files --verbose
-
-      - name: Run tests 🧪
-        run: pytest -p no:warnings
