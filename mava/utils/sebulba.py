@@ -26,7 +26,7 @@ from jax.sharding import Sharding
 from jumanji.types import TimeStep
 
 # todo: remove the ppo dependencies when we make sebulba for other systems
-from mava.systems.ppo.types import Params, PPOTransition
+from mava.systems.ppo.types import Params, PPOTransition, RNNPPOTransition
 from mava.types import Metrics
 
 QUEUE_PUT_TIMEOUT = 100
@@ -46,7 +46,9 @@ class ThreadLifetime:
 
 
 @jax.jit
-def _stack_trajectory(trajectory: List[PPOTransition]) -> PPOTransition:
+def _stack_trajectory(
+    trajectory: List[Union[PPOTransition, RNNPPOTransition]],
+) -> Union[PPOTransition, RNNPPOTransition]:
     """Stack a list of parallel_env transitions into a single
     transition of shape [rollout_len, num_envs, ...]."""
     return tree.map(lambda *x: jnp.stack(x, axis=0).swapaxes(0, 1), *trajectory)  # type: ignore
@@ -92,7 +94,10 @@ class Pipeline(threading.Thread):
                 continue
 
     def put(
-        self, traj: Sequence[PPOTransition], timestep: TimeStep, metrics: Tuple[Dict, List[Dict]]
+        self,
+        traj: Sequence[Union[PPOTransition, RNNPPOTransition]],
+        timestep: TimeStep,
+        metrics: Tuple[Dict, List[Dict]],
     ) -> None:
         """Put a trajectory on the queue to be consumed by the learner."""
         start_condition, end_condition = (threading.Condition(), threading.Condition())
@@ -136,7 +141,7 @@ class Pipeline(threading.Thread):
 
     def get(
         self, block: bool = True, timeout: Union[float, None] = None
-    ) -> Tuple[PPOTransition, TimeStep, Dict, Metrics]:
+    ) -> Tuple[Union[PPOTransition, RNNPPOTransition], TimeStep, Dict, Metrics]:
         """Get a trajectory from the pipeline."""
         return self._queue.get(block, timeout)  # type: ignore
 

@@ -50,7 +50,7 @@ from mava.systems.ppo.types import (
     RNNPPOTransition,
 )
 from mava.types import (
-    ExperimentOutput,
+    Metrics,
     Observation,
     RecActorApply,
     RecCriticApply,
@@ -102,14 +102,13 @@ def rollout(
     def act_fn(
         params: Params,
         observation: Observation,
-        dones,
-        hstates,
+        dones: chex.Array,
+        hstates: HiddenStates,
         key: chex.PRNGKey,
     ) -> Tuple:
         """Get action and value."""
         # actor_policy = actor_apply_fn(params.actor_params, observation)
 
-        # simon
         batched_observation = tree.map(lambda x: x[jnp.newaxis, :], observation)
         ac_in = (
             batched_observation,
@@ -127,13 +126,13 @@ def rollout(
         # It may be faster to calculate the values in the learner as
         # then we won't need to pass critic params to actors.
         # value = critic_apply_fn(params.critic_params, observation).squeeze()
+
         hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
         return action, log_prob, value, hstates
 
     timestep = env.reset(seed=seeds)
     dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
-    # simon
     # Initialise hidden states.
     init_policy_hstate = ScannedRNN.initialize_carry(
         (config.arch.num_envs, num_agents), config.network.hidden_state_dim
@@ -148,6 +147,7 @@ def rollout(
     while not thread_lifetime.should_stop():
         # Rollout
         traj: List[RNNPPOTransition] = []
+        episode_metrics: List[Dict] = []
         actor_timings: Dict[str, List[float]] = defaultdict(list)
         with RecordTimeTo(actor_timings["rollout_time"]):
             for _ in range(config.system.rollout_length):
@@ -186,14 +186,14 @@ def rollout(
                         log_prob,
                         obs_tpu,
                         hstates_tpu,
-                        timestep.extras["episode_metrics"],
                     )
                 )
+                episode_metrics.append(timestep.extras["episode_metrics"])
 
         # send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
             try:
-                rollout_queue.put(traj, timestep, actor_timings)
+                rollout_queue.put(traj, timestep, (actor_timings, episode_metrics))
             except queue.Full:
                 err = "Waited too long to add to the rollout queue, killing the actor thread"
                 warnings.warn(err, stacklevel=2)
@@ -219,7 +219,7 @@ def get_learner_step_fn(
     def _update_step(
         learner_state: RNNLearnerState,
         traj_batch: RNNPPOTransition,
-    ) -> Tuple[RNNLearnerState, Tuple]:
+    ) -> Tuple[RNNLearnerState, Metrics]:
         """A single update of the network.
 
         This function calculates advantages and targets based on the trajectories
@@ -276,7 +276,7 @@ def get_learner_step_fn(
         last_val = last_val.squeeze(0)
         advantages, targets = _calculate_gae(traj_batch, last_val, last_done)
 
-        def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
+        def _update_epoch(update_state: Tuple, _: Any) -> Tuple[Tuple, Metrics]:
             """Update the network for a single epoch."""
 
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
@@ -340,7 +340,7 @@ def get_learner_step_fn(
                     value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
                     total_loss = config.system.vf_coef * value_loss
-                    return total_loss, (value_loss)
+                    return total_loss, value_loss
 
                 # Calculate actor loss
                 key, entropy_key = jax.random.split(key)
@@ -407,7 +407,6 @@ def get_learner_step_fn(
             # permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
 
-            # simon
             num_recurrent_chunks = (
                 config.system.rollout_length // config.system.recurrent_chunk_size
             )
@@ -446,7 +445,7 @@ def get_learner_step_fn(
         )
 
         params, opt_states, traj_batch, advantages, targets, key = update_state
-        # learner_state = LearnerState(params, opt_states, key, None, learner_state.timestep)
+
         learner_state = RNNLearnerState(
             params,
             opt_states,
@@ -456,12 +455,11 @@ def get_learner_step_fn(
             last_done,
             hstates,
         )
-        metric = traj_batch.info
-        return learner_state, (metric, loss_info)
+        return learner_state, loss_info
 
     def learner_fn(
         learner_state: RNNLearnerState, traj_batch: RNNPPOTransition
-    ) -> ExperimentOutput[RNNLearnerState]:
+    ) -> Tuple[RNNLearnerState, Metrics]:
         """Learner function.
 
         This function represents the learner, it updates the network parameters
@@ -481,13 +479,9 @@ def get_learner_step_fn(
         # This function is shard mapped on the batch axis, but `_update_step` needs
         # the first axis to be time
         traj_batch = tree.map(switch_leading_axes, traj_batch)
-        learner_state, (episode_info, loss_info) = _update_step(learner_state, traj_batch)
+        learner_state, loss_info = _update_step(learner_state, traj_batch)
 
-        return ExperimentOutput(
-            learner_state=learner_state,
-            episode_metrics=episode_info,
-            train_metrics=loss_info,
-        )
+        return learner_state, loss_info
 
     return learner_fn
 
@@ -511,7 +505,7 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, timestep, rollout_time = pipeline.get(block=True)
+                    traj_batch, timestep, rollout_time, ep_metrics = pipeline.get(block=True)
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
@@ -519,7 +513,7 @@ def learner_thread(
                 learner_state = learner_state._replace(timestep=timestep)
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
-                    learner_state, ep_metrics, train_metrics = learn_fn(learner_state, traj_batch)
+                    learner_state, train_metrics = learn_fn(learner_state, traj_batch)
 
                 metrics.append((ep_metrics, train_metrics))
                 rollout_times_array.append(rollout_time)
@@ -550,6 +544,7 @@ def learner_setup(
 
     # create temporory envoirnments.
     env = environments.make_gym_env(config, config.arch.num_envs)
+
     # Get number of agents and actions.
     action_space = env.single_action_space
     config.system.num_agents = len(action_space)
@@ -564,7 +559,6 @@ def learner_setup(
     # PRNG keys.
     key, actor_key, critic_key = jax.random.split(key, 3)
 
-    # simon
     # Define network and optimisers.
     actor_pre_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
     actor_post_torso = hydra.utils.instantiate(config.network.actor_network.post_torso)
@@ -600,8 +594,6 @@ def learner_setup(
     )
 
     # Initialise observation: Select only obs for a single agent.
-    # simon
-    # maybe: change 1's to num_agents
     single_obs = jnp.array([[env.single_observation_space.sample()]])
     init_action_mask = jnp.ones((1, config.system.num_agents, config.system.num_actions))
     init_obs = Observation(single_obs, init_action_mask)
@@ -641,11 +633,11 @@ def learner_setup(
             learn,
             mesh=mesh,
             in_specs=(learn_state_spec, data_spec),
-            out_specs=ExperimentOutput(learn_state_spec, data_spec, data_spec),
+            out_specs=(learn_state_spec, data_spec),
         )
     )
 
-    # Load model from checkpoint if specified.
+    # # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
         loaded_checkpoint = Checkpointer(
             model_name=config.logger.system_name,
@@ -693,7 +685,6 @@ def run_experiment(_config: DictConfig) -> float:
     key = jax.random.PRNGKey(config.system.seed)
     np_rng = np.random.default_rng(config.system.seed)
 
-    # simon
     # Set recurrent chunk size.
     if config.system.recurrent_chunk_size is None:
         config.system.recurrent_chunk_size = config.system.rollout_length
@@ -735,9 +726,7 @@ def run_experiment(_config: DictConfig) -> float:
             **config.logger.checkpointing.save_args,  # Checkpoint args
         )
 
-    # simon
     # Create an initial hidden state used for resetting memory for evaluation
-    # eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
     eval_batch_size = min(config.arch.num_eval_episodes, config.arch.num_envs)
     eval_hs = ScannedRNN.initialize_carry(
         (eval_batch_size, config.system.num_agents),
@@ -851,7 +840,6 @@ def run_experiment(_config: DictConfig) -> float:
     if config.arch.absolute_metric:
         print(f"{Fore.BLUE}{Style.BRIGHT}Measuring absolute metric...{Style.RESET_ALL}")
 
-        # simon
         eval_batch_size = get_num_eval_envs(config, absolute_metric=True)
         eval_hs = ScannedRNN.initialize_carry(
             (eval_batch_size, config.system.num_agents),
