@@ -408,7 +408,7 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, timestep, rollout_time, ep_metrics = pipeline.get(block=True)
+                    traj_batch, timestep, rollout_time, ep_metrics = pipeline.get(block=True)  # type: ignore
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as

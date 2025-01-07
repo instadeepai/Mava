@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import queue
 import threading
 import time
@@ -26,8 +25,8 @@ from jax.sharding import Sharding
 from jumanji.types import TimeStep
 
 # todo: remove the ppo dependencies when we make sebulba for other systems
-from mava.systems.ppo.types import Params, PPOTransition, RNNPPOTransition
-from mava.types import Metrics
+from mava.systems.ppo.types import Params
+from mava.types import MavaTransition, Metrics
 
 QUEUE_PUT_TIMEOUT = 100
 
@@ -47,8 +46,8 @@ class ThreadLifetime:
 
 @jax.jit
 def _stack_trajectory(
-    trajectory: List[Union[PPOTransition, RNNPPOTransition]],
-) -> Union[PPOTransition, RNNPPOTransition]:
+    trajectory: List[MavaTransition],
+) -> MavaTransition:
     """Stack a list of parallel_env transitions into a single
     transition of shape [rollout_len, num_envs, ...]."""
     return tree.map(lambda *x: jnp.stack(x, axis=0).swapaxes(0, 1), *trajectory)  # type: ignore
@@ -95,7 +94,7 @@ class Pipeline(threading.Thread):
 
     def put(
         self,
-        traj: Sequence[Union[PPOTransition, RNNPPOTransition]],
+        traj: Sequence[MavaTransition],
         timestep: TimeStep,
         metrics: Tuple[Dict, List[Dict]],
     ) -> None:
@@ -141,7 +140,7 @@ class Pipeline(threading.Thread):
 
     def get(
         self, block: bool = True, timeout: Union[float, None] = None
-    ) -> Tuple[Union[PPOTransition, RNNPPOTransition], TimeStep, Dict, Metrics]:
+    ) -> Tuple[MavaTransition, TimeStep, Dict, Metrics]:
         """Get a trajectory from the pipeline."""
         return self._queue.get(block, timeout)  # type: ignore
 
