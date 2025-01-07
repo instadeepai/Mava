@@ -41,7 +41,7 @@ from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
 from mava.evaluator import make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
-from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
+from mava.systems.ppo.types import OptStates, Params, PPOTransition, SebulbaLearnerState
 from mava.types import (
     ActorApply,
     CriticApply,
@@ -163,7 +163,7 @@ def get_learner_step_fn(
     apply_fns: Tuple[ActorApply, CriticApply],
     update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: DictConfig,
-) -> SebulbaLearnerFn[LearnerState, PPOTransition]:
+) -> SebulbaLearnerFn[SebulbaLearnerState, PPOTransition]:
     """Get the learner function."""
 
     num_envs = config.arch.num_envs
@@ -174,16 +174,16 @@ def get_learner_step_fn(
     actor_update_fn, critic_update_fn = update_fns
 
     def _update_step(
-        learner_state: LearnerState,
+        learner_state: SebulbaLearnerState,
         traj_batch: PPOTransition,
-    ) -> Tuple[LearnerState, Metrics]:
+    ) -> Tuple[SebulbaLearnerState, Metrics]:
         """A single update of the network.
 
         This function calculates advantages and targets based on the trajectories
         from the actor and updates the actor and critic networks based on the losses.
 
         Args:
-            learner_state (LearnerState): contains all the items needed for learning.
+            learner_state (SebulbaLearnerState): contains all the items needed for learning.
             traj_batch (PPOTransition): the batch of data to learn with.
         """
 
@@ -359,12 +359,12 @@ def get_learner_step_fn(
         )
 
         params, opt_states, traj_batch, advantages, targets, key = update_state
-        learner_state = LearnerState(params, opt_states, key, None, learner_state.timestep)
+        learner_state = SebulbaLearnerState(params, opt_states, key, None, learner_state.timestep)
         return learner_state, loss_info
 
     def learner_fn(
-        learner_state: LearnerState, traj_batch: PPOTransition
-    ) -> Tuple[LearnerState, Metrics]:
+        learner_state: SebulbaLearnerState, traj_batch: PPOTransition
+    ) -> Tuple[SebulbaLearnerState, Metrics]:
         """Learner function.
 
         This function represents the learner, it updates the network parameters
@@ -390,8 +390,8 @@ def get_learner_step_fn(
 
 
 def learner_thread(
-    learn_fn: SebulbaLearnerFn[LearnerState, PPOTransition],
-    learner_state: LearnerState,
+    learn_fn: SebulbaLearnerFn[SebulbaLearnerState, PPOTransition],
+    learner_state: SebulbaLearnerState,
     config: DictConfig,
     eval_queue: Queue,
     pipeline: Pipeline,
@@ -438,9 +438,9 @@ def learner_thread(
 def learner_setup(
     key: chex.PRNGKey, config: DictConfig, learner_devices: List
 ) -> Tuple[
-    SebulbaLearnerFn[LearnerState, PPOTransition],
+    SebulbaLearnerFn[SebulbaLearnerState, PPOTransition],
     Tuple[ActorApply, CriticApply],
-    LearnerState,
+    SebulbaLearnerState,
     Sharding,
 ]:
     """Initialise learner_fn, network and learner state."""
@@ -504,7 +504,7 @@ def learner_setup(
     update_fns = (actor_optim.update, critic_optim.update)
 
     # defines how the learner state is sharded: params, opt and key = sharded, timestep = sharded
-    learn_state_spec = LearnerState(model_spec, model_spec, data_spec, None, data_spec)
+    learn_state_spec = SebulbaLearnerState(model_spec, model_spec, data_spec, None, data_spec)
     learn = get_learner_step_fn(apply_fns, update_fns, config)
     learn = jax.jit(
         shard_map(
@@ -537,7 +537,7 @@ def learner_setup(
     )
 
     # Initialise learner state.
-    init_learner_state = LearnerState(params, opt_states, step_keys, None, None)  # type: ignore
+    init_learner_state = SebulbaLearnerState(params, opt_states, step_keys, None, None)  # type: ignore
     env.close()
 
     return learn, apply_fns, init_learner_state, learner_sharding  # type: ignore

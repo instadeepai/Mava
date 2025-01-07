@@ -51,6 +51,17 @@ class LearnerState(NamedTuple):
     key: chex.PRNGKey
     env_state: State
     timestep: TimeStep
+    dones: Done
+
+
+class SebulbaLearnerState(NamedTuple):
+    """State of the learner."""
+
+    params: Params
+    opt_states: OptStates
+    key: chex.PRNGKey
+    env_state: State
+    timestep: TimeStep
 
 
 class RNNLearnerState(NamedTuple):
