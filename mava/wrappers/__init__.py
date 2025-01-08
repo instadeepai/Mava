@@ -22,6 +22,8 @@ from mava.wrappers.gym import (
     GymToJumanji,
     SmacWrapper,
     UoeWrapper,
+    PufferAutoResetWrapper,
+    PufferToJumanji,
     async_multiagent_worker,
 )
 from mava.wrappers.jaxmarl import MabraxWrapper, MPEWrapper, SmaxWrapper

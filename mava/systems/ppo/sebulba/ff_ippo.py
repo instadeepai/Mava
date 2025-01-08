@@ -446,7 +446,7 @@ def learner_setup(
     """Initialise learner_fn, network and learner state."""
 
     # create temporory envoirnments.
-    env = environments.make_gym_env(config, config.arch.num_envs)
+    env = environments.sebulba_make(config, config.arch.num_envs)
     # Get number of agents and actions.
     action_space = env.single_action_space
     config.system.num_agents = len(action_space)
@@ -566,7 +566,7 @@ def run_experiment(_config: DictConfig) -> float:
     # One key per device for evaluation.
     eval_act_fn = make_ff_eval_act_fn(apply_fns[0], config)
     evaluator, evaluator_envs = get_eval_fn(
-        environments.make_gym_env, eval_act_fn, config, np_rng, absolute_metric=False
+        environments.sebulba_make, eval_act_fn, config, np_rng, absolute_metric=False
     )
 
     # Calculate total timesteps.
@@ -623,7 +623,7 @@ def run_experiment(_config: DictConfig) -> float:
                 args=(
                     act_key,
                     # We have to do this here, creating envs inside actor threads causes deadlocks
-                    environments.make_gym_env(config, config.arch.num_envs),
+                    environments.sebulba_make(config, config.arch.num_envs),
                     config,
                     pipe,
                     params_source,
@@ -697,7 +697,7 @@ def run_experiment(_config: DictConfig) -> float:
     if config.arch.absolute_metric:
         print(f"{Fore.BLUE}{Style.BRIGHT}Measuring absolute metric...{Style.RESET_ALL}")
         abs_metric_evaluator, abs_metric_evaluator_envs = get_eval_fn(
-            environments.make_gym_env, eval_act_fn, config, np_rng, absolute_metric=True
+            environments.sebulba_make, eval_act_fn, config, np_rng, absolute_metric=True
         )
         key, eval_key = jax.random.split(key, 2)
         eval_metrics = abs_metric_evaluator(best_params_cpu, eval_key, {})

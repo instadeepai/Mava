@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
+from typing import Tuple, Dict
 
 import gymnasium
 import gymnasium as gym
@@ -23,6 +23,9 @@ import jumanji
 import matrax
 from gigastep import ScenarioBuilder
 from jaxmarl.environments.smax import map_name_to_scenario
+from pufferlib.ocean import Rware
+import pufferlib.vector
+from psutil import cpu_count
 from jumanji.environments.routing.cleaner.generator import (
     RandomGenerator as CleanerRandomGenerator,
 )
@@ -56,6 +59,8 @@ from mava.wrappers import (
     SmacWrapper,
     SmaxWrapper,
     UoeWrapper,
+    PufferAutoResetWrapper,
+    PufferToJumanji,
     VectorConnectorWrapper,
     async_multiagent_worker,
 )
@@ -82,7 +87,9 @@ _gym_registry = {
     "LevelBasedForaging": UoeWrapper,
     "SMACLite": SmacWrapper,
 }
-
+_puffer_registry = {
+    "PufferRobotWarehouse" : Rware
+}
 
 def add_extra_wrappers(
     train_env: MarlEnv, eval_env: MarlEnv, config: DictConfig
@@ -249,9 +256,6 @@ def make_gym_env(
         registered_name = f"{config.env.scenario.name}:{config.env.scenario.task_name}"
         env = gym.make(registered_name, disable_env_checker=True, **config.env.kwargs)
         wrapped_env = wrapper(env, config.env.use_shared_rewards, add_global_state)
-        if config.system.add_agent_id:
-            wrapped_env = GymAgentIDWrapper(wrapped_env)
-        wrapped_env = GymRecordEpisodeMetrics(wrapped_env)
         return wrapped_env
 
     envs = gymnasium.vector.AsyncVectorEnv(
@@ -260,8 +264,72 @@ def make_gym_env(
     )
 
     envs = GymToJumanji(envs)
+    if config.system.add_agent_id:
+        envs = GymAgentIDWrapper(envs)
+    envs = GymRecordEpisodeMetrics(envs)
 
     return envs
+
+def make_puffer_env(
+    config: DictConfig,
+    num_env: int,
+    add_global_state: bool = False,
+) -> GymToJumanji:
+    """Create and configure a Puffer environment wrapped for Jumanji."""
+
+    env_creator = _puffer_registry[config.env.env_name]
+
+    def create_puffer_env(*env_args, **env_kwargs) -> gymnasium.Env:
+        """Wraps the environment with a PufferAutoResetWrapper."""
+        return PufferAutoResetWrapper(env_creator, *env_args, **env_kwargs)
+
+    # Determine the number of CPU cores to use.
+    #todo: should we move this to config? testing showed that running on multiple cores is slower due to the transfer overhead
+    n_cpu_cores = 1  # Using a single CPU core for light environments. 
+    if n_cpu_cores >= num_env:
+        num_workers, num_parallel_envs = num_env, 1
+    else:
+        assert num_env % n_cpu_cores == 0, (
+            f"The number of environments ({num_env}) must be divisible by the number of CPU cores ({n_cpu_cores})."
+        )
+        num_workers, num_parallel_envs = n_cpu_cores, num_env // n_cpu_cores
+
+    # Create the vectorized environments.
+    env_kwargs = {
+        **config['env']['kwargs'],
+        **config['env']['scenario']['task_config'],
+        "num_envs": num_parallel_envs,
+    }
+    envs = pufferlib.vector.make(
+        create_puffer_env,
+        backend=pufferlib.vector.Multiprocessing,
+        num_envs=num_workers,
+        env_kwargs=env_kwargs,
+    )
+
+    # Wrap environments for Jumanji compatibility.
+    envs = PufferToJumanji(envs, num_envs=num_env)
+    if config.system.add_agent_id:
+        envs = GymAgentIDWrapper(envs)
+    envs = GymRecordEpisodeMetrics(envs)
+
+    return envs
+
+def sebulba_make(
+    config: DictConfig,
+    num_env: int,
+    add_global_state: bool = False,
+    ) -> GymToJumanji:
+
+    env_name = config.env.env_name
+    
+    if env_name in _puffer_registry:
+        return make_puffer_env(config, num_env, add_global_state)
+    elif env_name in _gym_registry:
+        return make_gym_env(config, num_env, add_global_state)
+    else:
+        raise ValueError(f"{env_name} is not a supported environment.")
+
 
 
 def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
