@@ -16,8 +16,8 @@ import copy
 import queue
 import threading
 import warnings
-from functools import partial
 from collections import defaultdict
+from functools import partial
 from queue import Queue
 from typing import Any, Dict, List, Sequence, Tuple
 
@@ -29,7 +29,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 from colorama import Fore, Style
-from flax.core.frozen_dict import FrozenDict
+from flax.core.frozen_dict import FrozenDict as Params
 from jax import tree
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
@@ -37,17 +37,18 @@ from jax.sharding import Mesh, NamedSharding, PartitionSpec, Sharding
 from numpy.typing import NDArray
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
-from flax.core.frozen_dict import FrozenDict as Params
 
-from mava.evaluator import ActorState, EvalActFn, get_sebulba_eval_fn as get_eval_fn, get_num_eval_envs
+from mava.evaluator import ActorState, EvalActFn, get_num_eval_envs
+from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
 from mava.networks import SableNetwork
-from mava.systems.sable.types import FFLearnerState as LearnerState
-
 from mava.networks.utils.sable import get_init_hidden_state
 from mava.systems.sable.types import (
     ActorApply,
     HiddenStates,
     LearnerApply,
+)
+from mava.systems.sable.types import FFLearnerState as LearnerState
+from mava.systems.sable.types import (
     RecTransition as Transition,
 )
 from mava.types import (
@@ -106,17 +107,16 @@ def rollout(
         key: chex.PRNGKey,
     ) -> Tuple:
         """Get action and value."""
-        #todo should we just create a new hstate here?
         action, log_prob, value, hstates = apply_fns(  # type: ignore
-                params,
-                observation=observation,
-                hstates=hstates,
-                key=key,
-            )
+            params,
+            observation=observation,
+            hstates=hstates,
+            key=key,
+        )
         return action, log_prob, value, hstates
-    
+
     timestep = env.reset(seed=seeds)
-    
+
     hstates = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
 
     # Loop till the desired num_updates is reached.
@@ -132,10 +132,12 @@ def rollout(
                 obs_tpu = tree.map(move_to_device, timestep.observation)
 
                 prev_dones = tree.map(
-                    lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
+                    lambda x: jnp.repeat(x, config.system.num_agents).reshape(
+                        config.arch.num_envs, -1
+                    ),
                     timestep.last(),
-                    )
-                
+                )
+
                 # Get action and value
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
@@ -147,15 +149,14 @@ def rollout(
                     timestep = env.step(cpu_action)
 
                 info = tree.map(
-                lambda x: jnp.repeat(x[..., jnp.newaxis], config.system.num_agents, axis=-1),
-                timestep.extras["episode_metrics"],
+                    lambda x: jnp.repeat(x[..., jnp.newaxis], config.system.num_agents, axis=-1),
+                    timestep.extras["episode_metrics"],
                 )
 
                 # Updated the dones and Hstates
                 dones = timestep.last()
                 dones = jnp.expand_dims(dones, (1, 2, 3, 4))
                 hstates = tree.map(lambda hs: jnp.where(dones, jnp.zeros_like(hs), hs), hstates)
-
 
                 # Append data to storage
                 traj.append(
@@ -171,11 +172,10 @@ def rollout(
                     )
                 )
 
-                
         # send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
             try:
-                rollout_queue.put(traj, timestep, actor_timings, None)
+                rollout_queue.put(traj, timestep, actor_timings)
             except queue.Full:
                 err = "Waited too long to add to the rollout queue, killing the actor thread"
                 warnings.warn(err, stacklevel=2)
@@ -250,14 +250,14 @@ def get_learner_step_fn(
         _, _, current_val, _ = sable_action_select_fn(  # type: ignore
             params,
             observation=final_timestep.observation,
-            hstates =updated_hstates,
+            hstates=updated_hstates,
             key=key,
         )
         current_done = tree.map(
             lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
             final_timestep.last(),
         )
-        
+
         advantages, targets = _calculate_gae(traj_batch, current_val, current_done)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
@@ -360,13 +360,12 @@ def get_learner_step_fn(
 
             params, opt_states, traj_batch, advantages, targets, key, prev_hstates = update_state
             key, shuffle_key, agent_shuffle_key, entropy_key = jax.random.split(key, 4)
-            
+
             # Shuffle batch
             batch_size = config.arch.num_envs
             batch_perm = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
             batch = tree.map(lambda x: jnp.take(x, batch_perm, axis=1), batch)
-
 
             # Shuffle hidden states
             prev_hstates = tree.map(lambda x: jnp.take(x, batch_perm, axis=0), prev_hstates)
@@ -493,7 +492,6 @@ def learner_setup(
 ) -> Tuple[
     SebulbaLearnerFn[LearnerState, Transition],
     callable,
-    callable,
     LearnerState,
     Sharding,
 ]:
@@ -506,15 +504,6 @@ def learner_setup(
     config.system.num_agents = len(action_space)
     config.system.num_actions = int(action_space[0].n)
 
-
-    # Setting the chunksize - smaller chunks save memory at the cost of speed
-    if config.network.memory_config.timestep_chunk_size:
-        config.network.memory_config.chunk_size = (
-            config.network.memory_config.timestep_chunk_size * config.system.num_agents
-        )
-    else:
-        config.network.memory_config.chunk_size = config.system.rollout_length * config.system.num_agents
-
     devices = mesh_utils.create_device_mesh((len(learner_devices),), devices=learner_devices)
     mesh = Mesh(devices, axis_names=("learner_devices",))
     model_spec = PartitionSpec()
@@ -524,11 +513,21 @@ def learner_setup(
     # PRNG keys.
     key, net_key = jax.random.split(key, 2)
 
+    # Setting the chunksize - smaller chunks save memory at the cost of speed
+    if config.network.memory_config.timestep_chunk_size:
+        config.network.memory_config.chunk_size = (
+            config.network.memory_config.timestep_chunk_size * config.system.num_agents
+        )
+    else:
+        config.network.memory_config.chunk_size = (
+            config.system.rollout_length * config.system.num_agents
+        )
+
     _, action_space_type = get_action_head(env.single_action_space)
 
     # Define network.
     sable_network = SableNetwork(
-        n_agents=config.system.num_agents ,
+        n_agents=config.system.num_agents,
         n_agents_per_chunk=config.system.num_agents,
         action_dim=config.system.num_actions,
         net_config=config.network.net_config,
@@ -565,8 +564,10 @@ def learner_setup(
 
     # Pack apply and update functions.
     apply_fns = (
-        partial(sable_network.apply, method="get_actions"),  # Execution function
-        sable_network.apply,  # Training function
+        partial(
+            sable_network.apply, method="get_actions"
+        ),  # Execution function required for the advantage calculation
+        partial(sable_network.apply),  # Training function
     )
 
     # defines how the learner state is sharded: params, opt and key = sharded, timestep = sharded
@@ -581,7 +582,8 @@ def learner_setup(
         )
     )
 
-   # Load model from checkpoint if specified.
+    # Load model from checkpoint if specified.
+    # TODO: check if this is working
     if config.logger.checkpointing.load_model:
         loaded_checkpoint = Checkpointer(
             model_name=config.logger.system_name,
@@ -598,18 +600,15 @@ def learner_setup(
     # Define params to be replicated across devices and batches.
     key, *step_keys = jax.random.split(key, len(learner_devices) + 1)
     step_keys = jnp.stack(step_keys, 0)
-    opt_states = opt_state
 
     # Duplicate learner across Learner devices.
-    params, opt_states, step_keys = jax.device_put(
-        (params, opt_states, step_keys), learner_sharding
-    )
+    params, opt_state, step_keys = jax.device_put((params, opt_state, step_keys), learner_sharding)
 
     # Initialise learner state.
-    init_learner_state = LearnerState(params, opt_states, step_keys, None, None)  # type: ignore
+    init_learner_state = LearnerState(params, opt_state, step_keys, None, None)  # type: ignore
     env.close()
 
-    return learn, apply_fns[0] , init_learner_state, learner_sharding  # type: ignore
+    return learn, apply_fns[0], init_learner_state, learner_sharding  # type: ignore
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -628,7 +627,9 @@ def run_experiment(_config: DictConfig) -> float:
     np_rng = np.random.default_rng(config.system.seed)
 
     # Setup learner.
-    learn, apply_fns, learner_state, learner_sharding = learner_setup(key, config, learner_devices)
+    learn, select_action_fn, learner_state, learner_sharding = learner_setup(
+        key, config, learner_devices
+    )
 
     # Setup evaluator.
     def make_rec_sable_act_fn(actor_apply_fn: ActorApply) -> EvalActFn:
@@ -648,7 +649,7 @@ def run_experiment(_config: DictConfig) -> float:
 
         return eval_act_fn
 
-    eval_act_fn = make_rec_sable_act_fn(apply_fns)
+    eval_act_fn = make_rec_sable_act_fn(select_action_fn)
     evaluator, evaluator_envs = get_eval_fn(
         environments.sebulba_make, eval_act_fn, config, np_rng, absolute_metric=False
     )
@@ -711,7 +712,7 @@ def run_experiment(_config: DictConfig) -> float:
                     config,
                     pipe,
                     params_source,
-                    apply_fns,
+                    select_action_fn,
                     actor_device,
                     seeds,
                     actor_lifetime,
@@ -734,8 +735,7 @@ def run_experiment(_config: DictConfig) -> float:
     max_episode_return = -np.inf
     best_params_cpu = jax.device_get(inital_params)
 
-
-    eval_batch_size = get_num_eval_envs(config, absolute_metric=False) #todo this is wrong for serbulba with multiple devices
+    eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
     eval_hs = get_init_hidden_state(config.network.net_config, eval_batch_size)
 
     # This is the main loop, all it does is evaluation and logging.
@@ -783,16 +783,13 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Measure absolute metric.
     if config.arch.absolute_metric:
-        evaluator, evaluator_envs = get_eval_fn(
-        environments.sebulba_make, eval_act_fn, config, np_rng, absolute_metric=True
-        )
         print(f"{Fore.BLUE}{Style.BRIGHT}Measuring absolute metric...{Style.RESET_ALL}")
+        eval_batch_size = get_num_eval_envs(config, absolute_metric=True)
+        abs_hs = get_init_hidden_state(config.network.net_config, eval_batch_size)
         abs_metric_evaluator, abs_metric_evaluator_envs = get_eval_fn(
             environments.sebulba_make, eval_act_fn, config, np_rng, absolute_metric=True
         )
         key, eval_key = jax.random.split(key, 2)
-        eval_batch_size = get_num_eval_envs(config, absolute_metric=True)
-        abs_hs = get_init_hidden_state(config.network.net_config, eval_batch_size)
         eval_metrics = abs_metric_evaluator(best_params_cpu, eval_key, {"hidden_state": abs_hs})
 
         t = int(steps_per_rollout * (eval_step + 1))

@@ -528,7 +528,6 @@ def learner_setup(
         ),  # Execution function required for the advantage calculation
         partial(sable_network.apply),  # Training function
     )
-    rollout_apply_fn = partial(sable_network.apply, method="get_actions")
 
     # defines how the learner state is sharded: params, opt and key = sharded, timestep = sharded
     learn_state_spec = LearnerState(model_spec, model_spec, data_spec, None, data_spec)
@@ -543,6 +542,7 @@ def learner_setup(
     )
 
     # Load model from checkpoint if specified.
+    # TODO: check if this is working
     if config.logger.checkpointing.load_model:
         loaded_checkpoint = Checkpointer(
             model_name=config.logger.system_name,
@@ -564,7 +564,7 @@ def learner_setup(
     init_learner_state = LearnerState(params, opt_state, step_keys, None, None)  # type: ignore
     env.close()
 
-    return learn, rollout_apply_fn, init_learner_state, learner_sharding  # type: ignore
+    return learn, apply_fns[0], init_learner_state, learner_sharding  # type: ignore
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -735,11 +735,11 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Measure absolute metric.
     if config.arch.absolute_metric:
+        print(f"{Fore.BLUE}{Style.BRIGHT}Measuring absolute metric...{Style.RESET_ALL}")
         eval_batch_size = get_num_eval_envs(config, absolute_metric=True)
         abs_hs = get_init_hidden_state(config.network.net_config, eval_batch_size)
         sable_execution_fn = partial(select_action_fn, hstates=abs_hs)
         eval_act_fn = make_ff_sable_act_fn(sable_execution_fn)
-        print(f"{Fore.BLUE}{Style.BRIGHT}Measuring absolute metric...{Style.RESET_ALL}")
         abs_metric_evaluator, abs_metric_evaluator_envs = get_eval_fn(
             environments.sebulba_make, eval_act_fn, config, np_rng, absolute_metric=True
         )
