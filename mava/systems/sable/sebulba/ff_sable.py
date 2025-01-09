@@ -42,19 +42,10 @@ from mava.evaluator import ActorState, EvalActFn, get_num_eval_envs
 from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
 from mava.networks import SableNetwork
 from mava.networks.utils.sable import get_init_hidden_state
-from mava.systems.sable.types import (
-    ActorApply,
-    LearnerApply
-)
 from mava.systems.ppo.types import PPOTransition as Transition
+from mava.systems.sable.types import ActorApply, LearnerApply
 from mava.systems.sable.types import FFLearnerState as LearnerState
-
-from mava.types import (
-    Action,
-    Observation,
-    SebulbaLearnerFn,
-    Metrics
-)
+from mava.types import Action, Metrics, Observation, SebulbaLearnerFn
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_sebulba_config, check_total_timesteps
