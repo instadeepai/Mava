@@ -281,7 +281,6 @@ def get_learner_step_fn(
 
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
-                # UNPACK TRAIN STATE AND BATCH INFO
                 params, opt_states, key = train_state
                 traj_batch, advantages, targets = batch_info
 
@@ -292,7 +291,7 @@ def get_learner_step_fn(
                     key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
-                    # RERUN NETWORK
+                    # Rerun network
 
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, actor_policy = actor_apply_fn(
@@ -302,8 +301,8 @@ def get_learner_step_fn(
 
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
-                    loss_actor1 = ratio * gae
-                    loss_actor2 = (
+                    actor_loss1 = ratio * gae
+                    actor_loss2 = (
                         jnp.clip(
                             ratio,
                             1.0 - config.system.clip_eps,
@@ -311,13 +310,13 @@ def get_learner_step_fn(
                         )
                         * gae
                     )
-                    loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
-                    loss_actor = loss_actor.mean()
+                    actor_loss = -jnp.minimum(actor_loss1, actor_loss2)
+                    actor_loss = actor_loss.mean()
                     # The seed will be used in the TanhTransformedDistribution:
                     entropy = actor_policy.entropy(seed=key).mean()
 
-                    total_loss = loss_actor - config.system.ent_coef * entropy
-                    return total_loss, (loss_actor, entropy)
+                    total_value_loss = actor_loss - config.system.ent_coef * entropy
+                    return total_value_loss, (actor_loss, entropy)
 
                 def _critic_loss_fn(
                     critic_params: FrozenDict,
@@ -325,13 +324,13 @@ def get_learner_step_fn(
                     targets: chex.Array,
                 ) -> Tuple:
                     """Calculate the critic loss."""
-                    # RERUN NETWORK
+                    # Rerun network
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, value = critic_apply_fn(
                         critic_params, traj_batch.hstates.critic_hidden_state[0], obs_and_done
                     )
 
-                    # CALCULATE VALUE LOSS
+                    # Calculate value loss
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
                         -config.system.clip_eps, config.system.clip_eps
                     )
@@ -351,7 +350,7 @@ def get_learner_step_fn(
 
                 # Calculate critic loss
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
-                critic_loss_info, critic_grads = critic_grad_fn(
+                value_loss_info, critic_grads = critic_grad_fn(
                     params.critic_params, traj_batch, targets
                 )
 
@@ -365,8 +364,8 @@ def get_learner_step_fn(
                 )
 
                 # pmean over learner devices.
-                critic_grads, critic_loss_info = jax.lax.pmean(
-                    (critic_grads, critic_loss_info), axis_name="learner_devices"
+                critic_grads, value_loss_info = jax.lax.pmean(
+                    (critic_grads, value_loss_info), axis_name="learner_devices"
                 )
 
                 # Update actor params and optimiser state
@@ -385,12 +384,12 @@ def get_learner_step_fn(
                 new_params = Params(actor_new_params, critic_new_params)
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
                 # Pack loss info
-                actor_total_loss, (actor_loss, entropy) = actor_loss_info
-                critic_total_loss, (value_loss) = critic_loss_info
-                total_loss = critic_total_loss + actor_total_loss
+                actor_loss, (_, entropy) = actor_loss_info
+                value_loss, (unscaled_value_loss) = value_loss_info
+                total_loss = actor_loss + value_loss
                 loss_info = {
                     "total_loss": total_loss,
-                    "value_loss": value_loss,
+                    "value_loss": unscaled_value_loss,
                     "actor_loss": actor_loss,
                     "entropy": entropy,
                 }
@@ -403,17 +402,17 @@ def get_learner_step_fn(
             key = jnp.expand_dims(key, axis=0)  # add the learner_devices axis for shape consitency
 
             # Shuffle minibatches
-            # batch_size = config.system.rollout_length * num_learner_envs
-            # permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
 
             num_recurrent_chunks = (
                 config.system.rollout_length // config.system.recurrent_chunk_size
             )
+            batch_size = num_learner_envs * num_recurrent_chunks
+
             batch = tree.map(
                 lambda x: x.reshape(
                     config.system.recurrent_chunk_size,
-                    num_learner_envs * num_recurrent_chunks,
+                    batch_size,
                     *x.shape[2:],
                 ),
                 batch,
@@ -637,7 +636,7 @@ def learner_setup(
         )
     )
 
-    # # Load model from checkpoint if specified.
+    # Load model from checkpoint if specified.Load model
     if config.logger.checkpointing.load_model:
         loaded_checkpoint = Checkpointer(
             model_name=config.logger.system_name,
