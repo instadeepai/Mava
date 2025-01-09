@@ -851,7 +851,7 @@ def run_experiment(_config: DictConfig) -> float:
         )
 
         abs_metric_evaluator, abs_metric_evaluator_envs = get_eval_fn(
-            environments.make_gym_env, eval_act_fn, config, np_rng, absolute_metric=True, add_global_state=True
+            environments.make_gym_env, eval_act_fn, config, np_rng, absolute_metric=True
         )
         key, eval_key = jax.random.split(key, 2)
         eval_metrics = abs_metric_evaluator(best_params_cpu, eval_key, {"hidden_state": eval_hs})
