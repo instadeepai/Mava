@@ -92,7 +92,7 @@ def init(
     # N: Agent
 
     # Make dummy inputs to init recurrent Q network -> need shape (T, B, N, ...)
-    init_obs = env.observation_spec().generate_value()  # (N, ...)
+    init_obs = env.observation_spec.generate_value()  # (N, ...)
     # (B, T, N, ...)
     init_obs_batched = tree.map(lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs)
     init_term_or_trunc = jnp.zeros((1, 1, 1), dtype=bool)  # (T, B, 1)
@@ -130,7 +130,7 @@ def init(
     init_hidden_state = replicate(init_hidden_state)
 
     # Create dummy transition
-    init_acts = env.action_spec().generate_value()  # (N,)
+    init_acts = env.action_spec.generate_value()  # (N,)
     init_transition = Transition(
         obs=init_obs,  # (N, ...)
         action=init_acts,
@@ -491,6 +491,7 @@ def make_update_fns(
 
 def run_experiment(cfg: DictConfig) -> float:
     # Add runtime variables to config
+    cfg.logger.system_name = "rec_iql"
     cfg.arch.n_devices = len(jax.devices())
     cfg = check_total_timesteps(cfg)
 
@@ -627,7 +628,6 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-    cfg.logger.system_name = "rec_iql"
 
     # Run experiment.
     eval_performance = run_experiment(cfg)

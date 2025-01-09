@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import cached_property
 from typing import TYPE_CHECKING, Dict, Tuple, Union
 
 import jax
@@ -56,6 +57,10 @@ class GigastepWrapper(Wrapper):
             has_global_state (bool): Whether the environment has a global state. Defaults to False.
 
         """
+        self.has_global_state = has_global_state
+        self.time_limit = env.max_episode_length
+        self.num_agents = env.n_agents_team1
+        self.action_dim = env.n_actions
         super().__init__(env)
         assert (
             env.discrete_actions
@@ -65,10 +70,6 @@ class GigastepWrapper(Wrapper):
         ), "Only Vector observations are currently supported for Gigastep environments"
 
         self._env: GigastepEnv
-        self.time_limit = self._env.max_episode_length
-        self.num_agents = self._env.n_agents_team1
-        self.action_dim = self._env.n_actions
-        self.has_global_state = has_global_state
 
     def reset(self, key: PRNGKey) -> Tuple[GigastepState, TimeStep]:
         """Reset the Gigastep environment.
@@ -184,6 +185,7 @@ class GigastepWrapper(Wrapper):
         global_obs = jnp.concatenate(obs, axis=0)
         return jnp.tile(global_obs, (self.num_agents, 1))
 
+    @cached_property
     def observation_spec(self) -> specs.Spec:
         agents_view = specs.BoundedArray(
             (self.num_agents, *self._env.observation_space.shape),
@@ -223,12 +225,15 @@ class GigastepWrapper(Wrapper):
             step_count=step_count,
         )
 
+    @cached_property
     def action_spec(self) -> specs.Spec:
         return specs.MultiDiscreteArray(num_values=jnp.full(self.num_agents, self.action_dim))
 
+    @cached_property
     def reward_spec(self) -> specs.Array:
         return specs.Array(shape=(self.num_agents,), dtype=float, name="reward")
 
+    @cached_property
     def discount_spec(self) -> specs.BoundedArray:
         return specs.BoundedArray(
             shape=(self.num_agents,), dtype=float, minimum=0.0, maximum=1.0, name="discount"

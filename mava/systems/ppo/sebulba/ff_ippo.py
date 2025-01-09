@@ -41,11 +41,11 @@ from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
 from mava.evaluator import make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
-from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
+from mava.systems.ppo.types import OptStates, Params, PPOTransition, SebulbaLearnerState
 from mava.types import (
     ActorApply,
     CriticApply,
-    ExperimentOutput,
+    Metrics,
     Observation,
     SebulbaLearnerFn,
 )
@@ -113,6 +113,7 @@ def rollout(
     while not thread_lifetime.should_stop():
         # Rollout
         traj: List[PPOTransition] = []
+        episode_metrics: List[Dict] = []
         actor_timings: Dict[str, List[float]] = defaultdict(list)
         with RecordTimeTo(actor_timings["rollout_time"]):
             for _ in range(config.system.rollout_length):
@@ -142,14 +143,14 @@ def rollout(
                         timestep.reward,
                         log_prob,
                         obs_tpu,
-                        timestep.extras["episode_metrics"],
                     )
                 )
+                episode_metrics.append(timestep.extras["episode_metrics"])
 
         # send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
             try:
-                rollout_queue.put(traj, timestep, actor_timings)
+                rollout_queue.put(traj, timestep, (actor_timings, episode_metrics))
             except queue.Full:
                 err = "Waited too long to add to the rollout queue, killing the actor thread"
                 warnings.warn(err, stacklevel=2)
@@ -162,7 +163,7 @@ def get_learner_step_fn(
     apply_fns: Tuple[ActorApply, CriticApply],
     update_fns: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: DictConfig,
-) -> SebulbaLearnerFn[LearnerState, PPOTransition]:
+) -> SebulbaLearnerFn[SebulbaLearnerState, PPOTransition]:
     """Get the learner function."""
 
     num_envs = config.arch.num_envs
@@ -173,16 +174,16 @@ def get_learner_step_fn(
     actor_update_fn, critic_update_fn = update_fns
 
     def _update_step(
-        learner_state: LearnerState,
+        learner_state: SebulbaLearnerState,
         traj_batch: PPOTransition,
-    ) -> Tuple[LearnerState, Tuple]:
+    ) -> Tuple[SebulbaLearnerState, Metrics]:
         """A single update of the network.
 
         This function calculates advantages and targets based on the trajectories
         from the actor and updates the actor and critic networks based on the losses.
 
         Args:
-            learner_state (LearnerState): contains all the items needed for learning.
+            learner_state (SebulbaLearnerState): contains all the items needed for learning.
             traj_batch (PPOTransition): the batch of data to learn with.
         """
 
@@ -216,7 +217,7 @@ def get_learner_step_fn(
         last_val = critic_apply_fn(params.critic_params, final_timestep.observation)
         advantages, targets = _calculate_gae(traj_batch, last_val)
 
-        def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
+        def _update_epoch(update_state: Tuple, _: Any) -> Tuple[Tuple, Metrics]:
             """Update the network for a single epoch."""
 
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
@@ -240,8 +241,8 @@ def get_learner_step_fn(
                     # Calculate actor loss
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
-                    loss_actor1 = ratio * gae
-                    loss_actor2 = (
+                    actor_loss1 = ratio * gae
+                    actor_loss2 = (
                         jnp.clip(
                             ratio,
                             1.0 - config.system.clip_eps,
@@ -249,13 +250,13 @@ def get_learner_step_fn(
                         )
                         * gae
                     )
-                    loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
-                    loss_actor = loss_actor.mean()
+                    actor_loss = -jnp.minimum(actor_loss1, actor_loss2)
+                    actor_loss = actor_loss.mean()
                     # The seed will be used in the TanhTransformedDistribution:
                     entropy = actor_policy.entropy(seed=key).mean()
 
-                    total_loss_actor = loss_actor - config.system.ent_coef * entropy
-                    return total_loss_actor, (loss_actor, entropy)
+                    total_actor_loss = actor_loss - config.system.ent_coef * entropy
+                    return total_actor_loss, (actor_loss, entropy)
 
                 def _critic_loss_fn(
                     critic_params: FrozenDict, traj_batch: PPOTransition, targets: chex.Array
@@ -272,8 +273,8 @@ def get_learner_step_fn(
                     value_losses_clipped = jnp.square(value_pred_clipped - targets)
                     value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
-                    critic_total_loss = config.system.vf_coef * value_loss
-                    return critic_total_loss, (value_loss)
+                    total_value_loss = config.system.vf_coef * value_loss
+                    return total_value_loss, value_loss
 
                 # Calculate actor loss
                 key, entropy_key = jax.random.split(key)
@@ -284,7 +285,7 @@ def get_learner_step_fn(
 
                 # Calculate critic loss
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
-                critic_loss_info, critic_grads = critic_grad_fn(
+                value_loss_info, critic_grads = critic_grad_fn(
                     params.critic_params, traj_batch, targets
                 )
 
@@ -298,8 +299,8 @@ def get_learner_step_fn(
                 )
 
                 # pmean over learner devices.
-                critic_grads, critic_loss_info = jax.lax.pmean(
-                    (critic_grads, critic_loss_info), axis_name="learner_devices"
+                critic_grads, value_loss_info = jax.lax.pmean(
+                    (critic_grads, value_loss_info), axis_name="learner_devices"
                 )
 
                 # Update actor params and optimiser state
@@ -318,12 +319,12 @@ def get_learner_step_fn(
                 new_params = Params(actor_new_params, critic_new_params)
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
                 # Pack loss info
-                actor_total_loss, (actor_loss, entropy) = actor_loss_info
-                critic_total_loss, (value_loss) = critic_loss_info
-                total_loss = critic_total_loss + actor_total_loss
+                actor_loss, (_, entropy) = actor_loss_info
+                value_loss, unscaled_value_loss = value_loss_info
+                total_loss = actor_loss + value_loss
                 loss_info = {
                     "total_loss": total_loss,
-                    "value_loss": value_loss,
+                    "value_loss": unscaled_value_loss,
                     "actor_loss": actor_loss,
                     "entropy": entropy,
                 }
@@ -358,13 +359,12 @@ def get_learner_step_fn(
         )
 
         params, opt_states, traj_batch, advantages, targets, key = update_state
-        learner_state = LearnerState(params, opt_states, key, None, learner_state.timestep)
-        metric = traj_batch.info
-        return learner_state, (metric, loss_info)
+        learner_state = SebulbaLearnerState(params, opt_states, key, None, learner_state.timestep)
+        return learner_state, loss_info
 
     def learner_fn(
-        learner_state: LearnerState, traj_batch: PPOTransition
-    ) -> ExperimentOutput[LearnerState]:
+        learner_state: SebulbaLearnerState, traj_batch: PPOTransition
+    ) -> Tuple[SebulbaLearnerState, Metrics]:
         """Learner function.
 
         This function represents the learner, it updates the network parameters
@@ -382,20 +382,16 @@ def get_learner_step_fn(
         # This function is shard mapped on the batch axis, but `_update_step` needs
         # the first axis to be time
         traj_batch = tree.map(switch_leading_axes, traj_batch)
-        learner_state, (episode_info, loss_info) = _update_step(learner_state, traj_batch)
+        learner_state, loss_info = _update_step(learner_state, traj_batch)
 
-        return ExperimentOutput(
-            learner_state=learner_state,
-            episode_metrics=episode_info,
-            train_metrics=loss_info,
-        )
+        return learner_state, loss_info
 
     return learner_fn
 
 
 def learner_thread(
-    learn_fn: SebulbaLearnerFn[LearnerState, PPOTransition],
-    learner_state: LearnerState,
+    learn_fn: SebulbaLearnerFn[SebulbaLearnerState, PPOTransition],
+    learner_state: SebulbaLearnerState,
     config: DictConfig,
     eval_queue: Queue,
     pipeline: Pipeline,
@@ -412,7 +408,7 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, timestep, rollout_time = pipeline.get(block=True)
+                    traj_batch, timestep, rollout_time, ep_metrics = pipeline.get(block=True)
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
@@ -420,7 +416,7 @@ def learner_thread(
                 learner_state = learner_state._replace(timestep=timestep)
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
-                    learner_state, ep_metrics, train_metrics = learn_fn(learner_state, traj_batch)
+                    learner_state, train_metrics = learn_fn(learner_state, traj_batch)
 
                 metrics.append((ep_metrics, train_metrics))
                 rollout_times_array.append(rollout_time)
@@ -442,9 +438,9 @@ def learner_thread(
 def learner_setup(
     key: chex.PRNGKey, config: DictConfig, learner_devices: List
 ) -> Tuple[
-    SebulbaLearnerFn[LearnerState, PPOTransition],
+    SebulbaLearnerFn[SebulbaLearnerState, PPOTransition],
     Tuple[ActorApply, CriticApply],
-    LearnerState,
+    SebulbaLearnerState,
     Sharding,
 ]:
     """Initialise learner_fn, network and learner state."""
@@ -508,14 +504,14 @@ def learner_setup(
     update_fns = (actor_optim.update, critic_optim.update)
 
     # defines how the learner state is sharded: params, opt and key = sharded, timestep = sharded
-    learn_state_spec = LearnerState(model_spec, model_spec, data_spec, None, data_spec)
+    learn_state_spec = SebulbaLearnerState(model_spec, model_spec, data_spec, None, data_spec)
     learn = get_learner_step_fn(apply_fns, update_fns, config)
     learn = jax.jit(
         shard_map(
             learn,
             mesh=mesh,
             in_specs=(learn_state_spec, data_spec),
-            out_specs=ExperimentOutput(learn_state_spec, data_spec, data_spec),
+            out_specs=(learn_state_spec, data_spec),
         )
     )
 
@@ -541,7 +537,7 @@ def learner_setup(
     )
 
     # Initialise learner state.
-    init_learner_state = LearnerState(params, opt_states, step_keys, None, None)  # type: ignore
+    init_learner_state = SebulbaLearnerState(params, opt_states, step_keys, None, None)  # type: ignore
     env.close()
 
     return learn, apply_fns, init_learner_state, learner_sharding  # type: ignore
@@ -549,6 +545,7 @@ def learner_setup(
 
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
+    _config.logger.system_name = "ff_ippo_sebulba"
     config = copy.deepcopy(_config)
 
     local_devices = jax.local_devices()
@@ -739,7 +736,6 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-    cfg.logger.system_name = "ff_ippo_sebulba"
 
     # Run experiment.
     eval_performance = run_experiment(cfg)

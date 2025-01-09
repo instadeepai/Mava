@@ -10,9 +10,9 @@ id-marl-eval @ git+https://github.com/instadeepai/marl-eval
 jax==0.4.30
 jaxlib==0.4.30
 jaxmarl @ git+https://github.com/RuanJohn/JaxMARL@unpin-jax  # This only unpins the version of Jax.
-jumanji @ git+https://github.com/sash-a/jumanji@old_jumanji  # Includes a few extra MARL envs
+jumanji>= 1.1.0
 lbforaging
-matrax @ git+https://github.com/instadeepai/matrax@4c5d8aa97214848ea659274f16c48918c13e845b
+matrax>= 0.0.5
 mujoco==3.1.3
 mujoco-mjx==3.1.3
 neptune

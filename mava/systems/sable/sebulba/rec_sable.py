@@ -47,15 +47,14 @@ from mava.systems.sable.types import (
     HiddenStates,
     LearnerApply,
 )
+from mava.systems.ppo.types import RNNPPOTransition as Transition
 from mava.systems.sable.types import FFLearnerState as LearnerState
-from mava.systems.sable.types import (
-    RecTransition as Transition,
-)
+
 from mava.types import (
     Action,
-    ExperimentOutput,
     Observation,
     SebulbaLearnerFn,
+    Metrics,
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
@@ -123,6 +122,7 @@ def rollout(
     while not thread_lifetime.should_stop():
         # Rollout
         traj: List[Transition] = []
+        episode_metrics: List[Dict] = []
         actor_timings: Dict[str, List[float]] = defaultdict(list)
         with RecordTimeTo(actor_timings["rollout_time"]):
             for _ in range(config.system.rollout_length):
@@ -148,11 +148,6 @@ def rollout(
                 with RecordTimeTo(actor_timings["env_step_time"]):
                     timestep = env.step(cpu_action)
 
-                info = tree.map(
-                    lambda x: jnp.repeat(x[..., jnp.newaxis], config.system.num_agents, axis=-1),
-                    timestep.extras["episode_metrics"],
-                )
-
                 # Updated the dones and Hstates
                 dones = timestep.last()
                 dones = jnp.expand_dims(dones, (1, 2, 3, 4))
@@ -168,14 +163,14 @@ def rollout(
                         log_prob,
                         obs_tpu,
                         hstates,
-                        info,
                     )
                 )
+                episode_metrics.append(timestep.extras["episode_metrics"])
 
         # send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
             try:
-                rollout_queue.put(traj, timestep, actor_timings)
+                rollout_queue.put(traj, timestep, (actor_timings, episode_metrics))
             except queue.Full:
                 err = "Waited too long to add to the rollout queue, killing the actor thread"
                 warnings.warn(err, stacklevel=2)
@@ -406,12 +401,11 @@ def get_learner_step_fn(
         params, opt_states, traj_batch, advantages, targets, key, _ = update_state
         key = jnp.expand_dims(key, axis=0)  # add the learner_devices axis for shape consitency
         learner_state = LearnerState(params, opt_states, key, None, learner_state.timestep)
-        metric = traj_batch.info
-        return learner_state, (metric, loss_info)
+        return learner_state, loss_info
 
     def learner_fn(
         learner_state: LearnerState, traj_batch: Transition
-    ) -> ExperimentOutput[LearnerState]:
+    ) -> Tuple[LearnerState, Metrics]:
         """Learner function.
 
         This function represents the learner, it updates the network parameters
@@ -430,13 +424,9 @@ def get_learner_step_fn(
         # This function is shard mapped on the batch axis, but `_update_step` needs
         # the first axis to be time
         traj_batch = tree.map(switch_leading_axes, traj_batch)
-        learner_state, (episode_info, loss_info) = _update_step(learner_state, traj_batch)
+        learner_state, loss_info = _update_step(learner_state, traj_batch)
 
-        return ExperimentOutput(
-            learner_state=learner_state,
-            episode_metrics=episode_info,
-            train_metrics=loss_info,
-        )
+        return learner_state, loss_info
 
     return learner_fn
 
@@ -460,7 +450,7 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, timestep, rollout_time = pipeline.get(block=True)
+                    traj_batch, timestep, rollout_time, ep_metrics = pipeline.get(block=True)
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
@@ -468,7 +458,7 @@ def learner_thread(
                 learner_state = learner_state._replace(timestep=timestep)
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
-                    learner_state, ep_metrics, train_metrics = learn_fn(learner_state, traj_batch)
+                    learner_state, train_metrics = learn_fn(learner_state, traj_batch)
 
                 metrics.append((ep_metrics, train_metrics))
                 rollout_times_array.append(rollout_time)
@@ -578,7 +568,7 @@ def learner_setup(
             learn,
             mesh=mesh,
             in_specs=(learn_state_spec, data_spec),
-            out_specs=ExperimentOutput(learn_state_spec, data_spec, data_spec),
+            out_specs=(learn_state_spec, data_spec),
         )
     )
 
@@ -613,6 +603,7 @@ def learner_setup(
 
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
+    _config.logger.system_name = "rec_sable_sebulba"
     config = copy.deepcopy(_config)
 
     local_devices = jax.local_devices()
@@ -826,7 +817,6 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     """Experiment entry point."""
     # Allow dynamic attributes.
     OmegaConf.set_struct(cfg, False)
-    cfg.logger.system_name = "rec_sable_sebulba"
 
     # Run experiment.
     eval_performance = run_experiment(cfg)
