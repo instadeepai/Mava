@@ -65,10 +65,9 @@ class EvalActFn(Protocol):
 
 def get_num_eval_envs(config: DictConfig, absolute_metric: bool) -> int:
     """Returns the number of vmapped envs/batch size during evaluation."""
-    # Evaluation on sebulba runs on a single device 
+    # Evaluation on sebulba runs on a single device
     n_devices = len(jax.devices()) if config.arch.architecture_name == "anakin" else 1
     n_parallel_envs = config.arch.num_envs * n_devices
-    
 
     if absolute_metric:
         eval_episodes = config.arch.num_absolute_metric_eval_episodes

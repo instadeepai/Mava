@@ -1,6 +1,6 @@
 task_name: puffer-tiny-2ag
 task_config:
-  map_choice: 1 
+  map_choice: 1
   num_agents: 2
   num_requested_shelves: 2
 # 1 : tiny_shelf_locations (32 shelves), 2 : small_shelf_locations (80), 3: medium_shelf_locations (144)

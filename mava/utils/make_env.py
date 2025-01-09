@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Dict
+from typing import Tuple
 
 import gymnasium
 import gymnasium as gym
@@ -21,11 +21,9 @@ import gymnasium.wrappers
 import jaxmarl
 import jumanji
 import matrax
+import pufferlib.vector
 from gigastep import ScenarioBuilder
 from jaxmarl.environments.smax import map_name_to_scenario
-from pufferlib.ocean import Rware
-import pufferlib.vector
-from psutil import cpu_count
 from jumanji.environments.routing.cleaner.generator import (
     RandomGenerator as CleanerRandomGenerator,
 )
@@ -39,6 +37,7 @@ from jumanji.environments.routing.robot_warehouse.generator import (
     RandomGenerator as RwareRandomGenerator,
 )
 from omegaconf import DictConfig
+from pufferlib.ocean import Rware
 
 from mava.types import MarlEnv
 from mava.wrappers import (
@@ -54,13 +53,13 @@ from mava.wrappers import (
     MabraxWrapper,
     MatraxWrapper,
     MPEWrapper,
+    PufferAutoResetWrapper,
+    PufferToJumanji,
     RecordEpisodeMetrics,
     RwareWrapper,
     SmacWrapper,
     SmaxWrapper,
     UoeWrapper,
-    PufferAutoResetWrapper,
-    PufferToJumanji,
     VectorConnectorWrapper,
     async_multiagent_worker,
 )
@@ -87,9 +86,8 @@ _gym_registry = {
     "LevelBasedForaging": UoeWrapper,
     "SMACLite": SmacWrapper,
 }
-_puffer_registry = {
-    "PufferRobotWarehouse" : Rware
-}
+_puffer_registry = {"PufferRobotWarehouse": Rware}
+
 
 def add_extra_wrappers(
     train_env: MarlEnv, eval_env: MarlEnv, config: DictConfig
@@ -270,31 +268,37 @@ def make_gym_env(
 
     return envs
 
+
 def make_puffer_env(
     config: DictConfig,
     num_env: int,
     add_global_state: bool = False,
 ) -> GymToJumanji:
-    
     env_creator = _puffer_registry[config.env.env_name]
 
-    def create_puffer_env( *env_args, **env_kwargs) -> gymnasium.Env:
+    def create_puffer_env(*env_args, **env_kwargs) -> gymnasium.Env:
         wrapped_env = PufferAutoResetWrapper(env_creator, *env_args, **env_kwargs)
         return wrapped_env
-    # todo running with a signle cpu core is much faster for light envs 
+
+    # todo running with a signle cpu core is much faster for light envs
     # the data transfer overhead makes using multiple cores not worth it for rware :thinking:
     # todo: is using more than 1 actor bad?
-    n_cpu_cores = 1#cpu_count(logical = False)
+    n_cpu_cores = 1  # cpu_count(logical = False)
     if n_cpu_cores >= num_env:
         num_workers, num_parrallel_envs = num_env, 1
     else:
-        assert num_env % n_cpu_cores == 0, f"the numlber of envs({num_env}) must be divisable by the number of cpu cores ({n_cpu_cores})"
-        num_workers, num_parrallel_envs = n_cpu_cores, num_env // n_cpu_cores 
-    
-    
-    envs = pufferlib.vector.make(create_puffer_env,
-    backend=pufferlib.vector.Multiprocessing,
-    num_envs=num_workers, env_kwargs = dict(config['env']['kwargs']) | dict(config['env']['scenario']['task_config']) | {"num_envs" : num_parrallel_envs}
+        assert (
+            num_env % n_cpu_cores == 0
+        ), f"the numlber of envs({num_env}) must be divisable by the number of cpu cores ({n_cpu_cores})"
+        num_workers, num_parrallel_envs = n_cpu_cores, num_env // n_cpu_cores
+
+    envs = pufferlib.vector.make(
+        create_puffer_env,
+        backend=pufferlib.vector.Multiprocessing,
+        num_envs=num_workers,
+        env_kwargs=dict(config["env"]["kwargs"])
+        | dict(config["env"]["scenario"]["task_config"])
+        | {"num_envs": num_parrallel_envs},
     )
 
     envs = PufferToJumanji(envs, num_envs=num_env)
@@ -303,21 +307,20 @@ def make_puffer_env(
     envs = GymRecordEpisodeMetrics(envs)
     return envs
 
+
 def sebulba_make(
     config: DictConfig,
     num_env: int,
     add_global_state: bool = False,
-    ) -> GymToJumanji:
-
+) -> GymToJumanji:
     env_name = config.env.env_name
-    
+
     if env_name in _puffer_registry:
         return make_puffer_env(config, num_env, add_global_state)
     elif env_name in _gym_registry:
         return make_gym_env(config, num_env, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")
-
 
 
 def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:

@@ -23,13 +23,13 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Un
 
 import gymnasium
 import gymnasium.vector.async_vector_env
-from pufferlib import PufferEnv
 import numpy as np
 from gymnasium import spaces
 from gymnasium.spaces.utils import is_space_dtype_shape_equiv
 from gymnasium.vector.utils import write_to_shared_memory
-from numpy.typing import NDArray
 from jax import tree
+from numpy.typing import NDArray
+from pufferlib import PufferEnv
 
 from mava.types import Observation, ObservationGlobalState
 
@@ -172,7 +172,7 @@ class GymToJumanji:
         self.env = env
         self.single_action_space = env.unwrapped.single_action_space
         self.single_observation_space = env.unwrapped.single_observation_space
-        
+
         self.num_envs = self.env.num_envs
         self.num_agents = len(env.unwrapped.single_action_space)
 
@@ -207,7 +207,7 @@ class GymToJumanji:
         action_mask = np.stack(info["action_mask"])
         step_count = np.zeros((self.num_envs, self.num_agents), dtype=int)
 
-        obs_data = {"agents_view": obs, "action_mask": action_mask, "step_count" : step_count}
+        obs_data = {"agents_view": obs, "action_mask": action_mask, "step_count": step_count}
 
         if "global_obs" in info:
             global_obs = np.array(info["global_obs"])
@@ -333,7 +333,6 @@ def async_multiagent_worker(  # CCR001
         env.close()
 
 
-
 class GymRecordEpisodeMetrics:
     """Record the episode returns and lengths."""
 
@@ -352,9 +351,7 @@ class GymRecordEpisodeMetrics:
         self.single_action_space = env.single_action_space
         self.single_observation_space = env.single_observation_space
 
-    def reset(
-        self, seed: Optional[int] = None, options: Optional[dict] = None
-    ) -> TimeStep:
+    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> TimeStep:
         timestep = self.env.reset(seed, options)
 
         # Reset the metrics
@@ -382,9 +379,9 @@ class GymRecordEpisodeMetrics:
         not_done = 1 - done
 
         # Counting episode return and length.
-        new_episode_return = self.running_count_episode_return + np.mean(timestep.reward, axis= 1)
+        new_episode_return = self.running_count_episode_return + np.mean(timestep.reward, axis=1)
         new_episode_length = self.running_count_episode_length + 1
-        
+
         # Previous episode return/length until done and then the next episode return.
         self.episode_return = self.episode_return * not_done + new_episode_return * done
         self.episode_length = self.episode_length * not_done + new_episode_length * done
@@ -401,7 +398,7 @@ class GymRecordEpisodeMetrics:
         timestep.extras["episode_metrics"] = metrics
 
         return timestep
-    
+
     def close(self):
         self.env.close()
 
@@ -414,39 +411,43 @@ class GymAgentIDWrapper:
         self.num_envs = self.env.num_envs
         self.num_agents = self.env.num_agents
 
-        self.agent_ids = np.repeat(np.eye(env.num_agents)[np.newaxis, ...], repeats=env.num_envs, axis = 0)
+        self.agent_ids = np.repeat(
+            np.eye(env.num_agents)[np.newaxis, ...], repeats=env.num_envs, axis=0
+        )
         self.single_observation_space = self.modify_space(env.single_observation_space)
         self.single_action_space = env.single_action_space
 
-    def reset(
-        self, seed: Optional[int] = None, options: Optional[dict] = None
-    ) -> TimeStep:
+    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> TimeStep:
         """Reset the environment."""
         timestep = self.env.reset(seed, options)
         agents_view = np.concatenate([self.agent_ids, timestep.observation.agents_view], axis=2)
-        timestep.observation = timestep.observation._replace(agents_view = agents_view)
+        timestep.observation = timestep.observation._replace(agents_view=agents_view)
         return timestep
 
     def step(self, action: list) -> TimeStep:
         """Step the environment."""
         timestep = self.env.step(action)
         agents_view = np.concatenate([self.agent_ids, timestep.observation.agents_view], axis=2)
-        timestep.observation = timestep.observation._replace(agents_view = agents_view)
+        timestep.observation = timestep.observation._replace(agents_view=agents_view)
         return timestep
 
     def modify_space(self, space: spaces.Space) -> spaces.Space:
         if isinstance(space, spaces.Box):
             new_shape = (space.shape[0], space.shape[1] + self.env.num_agents)
-            high = np.concatenate((space.high, np.ones((self.env.num_agents,self.env.num_agents))), axis=1)
-            low = np.concatenate((space.low, np.zeros((self.env.num_agents,self.env.num_agents))), axis=1)
+            high = np.concatenate(
+                (space.high, np.ones((self.env.num_agents, self.env.num_agents))), axis=1
+            )
+            low = np.concatenate(
+                (space.low, np.zeros((self.env.num_agents, self.env.num_agents))), axis=1
+            )
             return spaces.Box(low=low, high=high, shape=new_shape, dtype=space.dtype)
         elif isinstance(space, spaces.Tuple):
             return spaces.Tuple(self.modify_space(s) for s in space)
         else:
             raise ValueError(f"Space {type(space)} is not currently supported.")
+
     def close(self):
         self.env.close()
-
 
 
 class PufferToJumanji:
@@ -457,17 +458,21 @@ class PufferToJumanji:
         self.num_agents = env.num_agents // num_envs
         self.num_actions = env.single_action_space.n
 
-        self.single_action_space = spaces.MultiDiscrete([self.num_actions] * self.num_agents) 
+        self.single_action_space = spaces.MultiDiscrete([self.num_actions] * self.num_agents)
 
         # Box(...) --> Box(N, ...)
         single_obs = env.single_observation_space  # type: ignore
         shape = (self.num_agents, *single_obs.shape)
         low = np.tile(single_obs.low, (self.num_agents, 1))
         high = np.tile(single_obs.high, (self.num_agents, 1))
-        self.single_observation_space = spaces.Box(low=low, high=high, shape=shape, dtype=single_obs.dtype)
+        self.single_observation_space = spaces.Box(
+            low=low, high=high, shape=shape, dtype=single_obs.dtype
+        )
 
-        self.fix_shape_copy = lambda x : x.reshape(self.num_envs, self.num_agents, *x.shape[1:]).copy() #copy to avoid pointer magic
-    
+        self.fix_shape_copy = lambda x: x.reshape(
+            self.num_envs, self.num_agents, *x.shape[1:]
+        ).copy()  # copy to avoid pointer magic
+
     def reset(self, seed: Optional[list[int]] = None, options: Optional[dict] = None) -> TimeStep:
         obs, info = self.env.reset()
         obs = self.fix_shape_copy(obs)
@@ -478,7 +483,7 @@ class PufferToJumanji:
         action_mask = np.ones((self.num_envs, self.num_agents, self.num_actions))
         step_count = np.zeros((self.num_envs, self.num_agents), dtype=int)
 
-        obs_data = {"agents_view": obs, "action_mask": action_mask, "step_count" : step_count}
+        obs_data = {"agents_view": obs, "action_mask": action_mask, "step_count": step_count}
 
         return TimeStep(
             step_type=step_type,
@@ -487,21 +492,23 @@ class PufferToJumanji:
             observation=Observation(**obs_data),
             extras={},
         )
+
     def step(self, action: list) -> TimeStep:
         action = action.flatten()
         obs, rewards, terminated, truncated, info = self.env.step(action)
-        obs, rewards, terminated, truncated = tree.map(self.fix_shape_copy, (obs, rewards, terminated, truncated))
+        obs, rewards, terminated, truncated = tree.map(
+            self.fix_shape_copy, (obs, rewards, terminated, truncated)
+        )
 
-        terminated = np.any(terminated, axis = -1) # Agent termination flag to env termination flag
-        truncated = np.any(truncated, axis = -1)
+        terminated = np.any(terminated, axis=-1)  # Agent termination flag to env termination flag
+        truncated = np.any(truncated, axis=-1)
 
         ep_done = np.logical_or(terminated, truncated)
         step_type = np.where(ep_done, StepType.LAST, StepType.MID)
         action_mask = np.ones((self.num_envs, self.num_agents, self.num_actions))
         step_count = np.zeros((self.num_envs, self.num_agents), dtype=int)
-        
-        obs_data = {"agents_view": obs, "action_mask": action_mask, "step_count" : step_count}
-        
+
+        obs_data = {"agents_view": obs, "action_mask": action_mask, "step_count": step_count}
 
         return TimeStep(
             step_type=step_type,
@@ -516,7 +523,7 @@ class PufferToJumanji:
 
 
 class PufferAutoResetWrapper(PufferEnv):
-    def __init__(self, env_class : PufferEnv, max_episode_steps: int = 0, *args, **kwargs):
+    def __init__(self, env_class: PufferEnv, max_episode_steps: int = 0, *args, **kwargs):
         """
         Generic wrapper for PufferLib environments to track the number of steps taken.
 
@@ -531,24 +538,25 @@ class PufferAutoResetWrapper(PufferEnv):
 
     def reset(self, seed: Optional[int] = None) -> Tuple[NDArray, Dict]:
         self.steps = 0
-        return self.env.reset(seed = seed)
+        return self.env.reset(seed=seed)
 
     def step(self, actions: List) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
-
         if self.steps == 0:
             self.env.terminals.fill(False)
-        
+
         self.steps += 1
         observation, reward, terminated, truncated, _ = self.env.step(actions)
-        info = {"real_next_obs" : observation.copy()} #todo i dislike replacing the info
+        info = {"real_next_obs": observation.copy()}  # todo i dislike replacing the info
 
         if np.logical_or(terminated, truncated).all() or self.steps == self.max_steps:
             # The returned values are ignored when using puffer's vector envs
             # Intsted the updates have to be directly made in the env
-            self.env.observations[:], _ = self.reset() # change values without changing array refrence
-            self.env.terminals.fill(True) 
+            self.env.observations[:], _ = (
+                self.reset()
+            )  # change values without changing array refrence
+            self.env.terminals.fill(True)
 
-        return self.env.observations, reward, self.env.terminals, truncated, info 
+        return self.env.observations, reward, self.env.terminals, truncated, info
 
     def render(self, *args, **kwargs):
         return self.env.render(*args, **kwargs)
