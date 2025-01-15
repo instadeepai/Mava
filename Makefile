@@ -7,15 +7,22 @@ RUN_FLAGS=$(GPUS) $(BASE_FLAGS)
 
 DOCKER_IMAGE_NAME = mava
 IMAGE = $(DOCKER_IMAGE_NAME):latest
-DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
+DOCKER_RUN=docker run $(RUN_FLAGS)
 USE_CUDA = $(if $(GPUS),true,false)
+
+# Mount path for mava folder
+MOUNT_FLAGS=-v $(PWD)/:/home/app/mava
+API_TOKEN=...
 
 # make file commands
 build:
 	DOCKER_BUILDKIT=1 docker build --build-arg USE_CUDA=$(USE_CUDA) --tag $(IMAGE) .
 
 run:
-	$(DOCKER_RUN) python $(example)
+	$(DOCKER_RUN) $(IMAGE) python $(example)
+
+run_mount:
+	$(DOCKER_RUN) $(MOUNT_FLAGS) -e NEPTUNE_API_TOKEN=$(API_TOKEN) $(IMAGE) python $(example)
 
 bash:
-	$(DOCKER_RUN) bash
+	$(DOCKER_RUN) $(MOUNT_FLAGS) $(IMAGE) bash
