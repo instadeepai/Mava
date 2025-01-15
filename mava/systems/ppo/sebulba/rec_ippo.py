@@ -123,9 +123,6 @@ def rollout(
 
         action = actor_policy.sample(seed=key)
         log_prob = actor_policy.log_prob(action)
-        # It may be faster to calculate the values in the learner as
-        # then we won't need to pass critic params to actors.
-        # value = critic_apply_fn(params.critic_params, observation).squeeze()
 
         hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
         return action, log_prob, value, hstates
@@ -141,7 +138,7 @@ def rollout(
         (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
     hstates = HiddenStates(init_policy_hstate, init_critic_hstate)
-    hstates_tpu = tree.map(move_to_device, hstates)
+    hstates_tpu = move_to_device(hstates)
 
     # Loop till the desired num_updates is reached.
     while not thread_lifetime.should_stop():
@@ -154,8 +151,8 @@ def rollout(
                 with RecordTimeTo(actor_timings["get_params_time"]):
                     params = params_source.get()  # Get the latest parameters from the learner
 
-                obs_tpu = tree.map(move_to_device, timestep.observation)
-                last_dones = tree.map(move_to_device, dones)
+                obs_tpu = move_to_device(timestep.observation)
+                last_dones = move_to_device(dones)
 
                 # Sample action from the policy and squeeze out the batch dimension.
                 with RecordTimeTo(actor_timings["compute_action_time"]):
