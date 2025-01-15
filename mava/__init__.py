@@ -21,11 +21,15 @@ register(
     entry_point="lbforaging.foraging:ForagingEnv",
     kwargs={
         "players": 4,
+        "min_player_level": 1,
         "max_player_level": 2,
         "field_size": (15, 15),
-        "max_food": 5,
+        "max_num_food": 5,
+        "min_food_level": 1,
+        "max_food_level": None,
         "sight": 2,
         "max_episode_steps": 100,
         "force_coop": True,
+        "grid_observation": False,
     },
 )
