@@ -12,7 +12,7 @@ USE_CUDA = $(if $(GPUS),true,false)
 
 # Mount path for mava folder
 MOUNT_FLAGS=-v $(PWD)/:/home/app/mava
-API_TOKEN=...
+API_TOKEN=eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI4MjI2YjBiNi0zY2FjLTQ0YjktODFmNy0zZjBkZjAxMjkxZjcifQ==
 
 # make file commands
 build:

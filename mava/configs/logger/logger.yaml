@@ -8,7 +8,7 @@ use_neptune: True  # Whether to log to neptune.ai.
 
 # --- Other logger kwargs ---
 kwargs:
-  neptune_project: Instadeep/Mava
+  neptune_project: Instadeep/Tinkerer
   neptune_tag: [dries-test]
   detailed_neptune_logging: False  # having mean/std/min/max can clutter neptune so we make it optional
   json_path: ~ # If set, json files will be logged to a set path so that multiple experiments can

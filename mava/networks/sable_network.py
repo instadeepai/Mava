@@ -14,7 +14,7 @@
 
 from functools import partial
 from typing import Optional, Tuple
-
+from jax.nn import softmax
 import chex
 import jax.numpy as jnp
 from flax import linen as nn
@@ -82,10 +82,12 @@ class EncodeBlock(nn.Module):
 
 class Encoder(nn.Module):
     """Multi-block encoder consisting of multiple `EncoderBlock` modules."""
-
     net_config: SableNetworkConfig
     memory_config: DictConfig
     n_agents: int
+    num_atoms: int = 101
+    v_min: float = -10.0
+    v_max: float = 10.0
 
     def setup(self) -> None:
         self.ln = nn.RMSNorm()
@@ -100,6 +102,17 @@ class Encoder(nn.Module):
             ],
         )
         self.head = nn.Sequential(
+            [
+                nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
+                nn.gelu,
+                nn.RMSNorm(),
+                nn.Dense(self.num_atoms, kernel_init=orthogonal(0.01)),
+            ],
+        )
+        self.support = jnp.linspace(self.v_min, self.v_max, self.num_atoms)
+
+        # Delete this: Old head
+        self.old_head = nn.Sequential(
             [
                 nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
                 nn.gelu,
@@ -132,8 +145,10 @@ class Encoder(nn.Module):
             obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
-        value = self.head(obs_rep)
-
+        # TODO: Create a function to compute the value function
+        logits = self.head(obs_rep)
+        probabilities = softmax(logits, axis=-1)
+        value = jnp.expand_dims(jnp.sum(probabilities * self.support, axis=-1), axis=-1)
         return value, obs_rep, updated_hstate
 
     def recurrent(
@@ -151,8 +166,10 @@ class Encoder(nn.Module):
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
         # Compute the value function
-        value = self.head(obs_rep)
-
+        # TODO: Create a function to compute the value function
+        logits = self.head(obs_rep)
+        probabilities = softmax(logits, axis=-1)
+        value = jnp.expand_dims(jnp.sum(probabilities * self.support, axis=-1), axis=-1)
         return value, obs_rep, updated_hstate
 
 
