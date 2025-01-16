@@ -149,10 +149,11 @@ def rollout(
         traj: List[RNNPPOTransition] = []
         episode_metrics: List[Dict] = []
         actor_timings: Dict[str, List[float]] = defaultdict(list)
+        with RecordTimeTo(actor_timings["get_params_time"]):
+            params = params_source.get()  # Get the latest parameters from the learner
         with RecordTimeTo(actor_timings["rollout_time"]):
             for _ in range(config.system.rollout_length):
-                with RecordTimeTo(actor_timings["get_params_time"]):
-                    params = params_source.get()  # Get the latest parameters from the learner
+                
 
                 obs_tpu = tree.map(move_to_device, timestep.observation)
                 last_dones = tree.map(move_to_device, dones)
