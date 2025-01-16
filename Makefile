@@ -12,7 +12,6 @@ USE_CUDA = $(if $(GPUS),true,false)
 
 # Mount path for mava folder
 MOUNT_FLAGS=-v $(PWD)/:/home/app/mava
-API_TOKEN=eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI4MjI2YjBiNi0zY2FjLTQ0YjktODFmNy0zZjBkZjAxMjkxZjcifQ==
 
 # make file commands
 build:
@@ -22,7 +21,7 @@ run:
 	$(DOCKER_RUN) $(IMAGE) python $(example)
 
 run_mount:
-	$(DOCKER_RUN) $(MOUNT_FLAGS) -e NEPTUNE_API_TOKEN=$(API_TOKEN) $(IMAGE) python $(example)
+	$(DOCKER_RUN) $(MOUNT_FLAGS) -e NEPTUNE_API_TOKEN=$(NEPTUNE_API_TOKEN) $(IMAGE) python $(example)
 
 bash:
 	$(DOCKER_RUN) $(MOUNT_FLAGS) $(IMAGE) bash
