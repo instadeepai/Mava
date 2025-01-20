@@ -87,7 +87,7 @@ class Encoder(nn.Module):
     n_agents: int
     num_atoms: int = 101
     v_min: float = 0.0
-    v_max: float = 0.0 # TODO: Change this back to 50.0
+    v_max: float = 50.0
 
     def setup(self) -> None:
         self.ln = nn.RMSNorm()
