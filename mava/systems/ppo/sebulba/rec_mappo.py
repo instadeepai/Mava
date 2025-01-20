@@ -641,7 +641,7 @@ def learner_setup(
         )
     )
 
-    # # Load model from checkpoint if specified.
+    # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
         loaded_checkpoint = Checkpointer(
             model_name=config.logger.system_name,
