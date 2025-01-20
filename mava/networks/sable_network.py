@@ -86,8 +86,8 @@ class Encoder(nn.Module):
     memory_config: DictConfig
     n_agents: int
     num_atoms: int = 101
-    v_min: float = -10.0
-    v_max: float = 10.0
+    v_min: float = 0.0
+    v_max: float = 0.0 # TODO: Change this back to 50.0
 
     def setup(self) -> None:
         self.ln = nn.RMSNorm()
@@ -112,14 +112,14 @@ class Encoder(nn.Module):
         self.support = jnp.linspace(self.v_min, self.v_max, self.num_atoms)
 
         # Delete this: Old head
-        self.old_head = nn.Sequential(
-            [
-                nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
-                nn.gelu,
-                nn.RMSNorm(),
-                nn.Dense(1, kernel_init=orthogonal(0.01)),
-            ],
-        )
+        # self.old_head = nn.Sequential(
+        #     [
+        #         nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
+        #         nn.gelu,
+        #         nn.RMSNorm(),
+        #         nn.Dense(1, kernel_init=orthogonal(0.01)),
+        #     ],
+        # )
 
         self.blocks = [
             EncodeBlock(
