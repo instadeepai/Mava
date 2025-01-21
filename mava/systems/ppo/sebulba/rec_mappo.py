@@ -68,6 +68,8 @@ from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 from mava.wrappers.gym import GymToJumanji
 
+from copy import deepcopy
+
 
 def rollout(
     key: chex.PRNGKey,
@@ -161,7 +163,7 @@ def rollout(
                 # Sample action from the policy and squeeze out the batch dimension.
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
-                    action, log_prob, value, hstates_tpu = act_fn(
+                    action, log_prob, value, hstates_tpu_new = act_fn(
                         params, obs_tpu, last_dones, hstates_tpu, act_key
                     )
                     value, action, log_prob = (
@@ -189,6 +191,7 @@ def rollout(
                         hstates_tpu,
                     )
                 )
+                hstates_tpu = deepcopy(hstates_tpu_new)
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
         # send trajectories to learner
