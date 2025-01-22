@@ -154,14 +154,15 @@ def rollout(
                 with RecordTimeTo(actor_timings["get_params_time"]):
                     params = params_source.get()  # Get the latest parameters from the learner
 
-                obs_tpu = tree.map(move_to_device, timestep.observation)
-                last_dones = tree.map(move_to_device, dones)
+                last_obs = tree.map(move_to_device, timestep.observation)
+                last_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
+                last_dones = tree.map(move_to_device, last_dones)
 
                 # Sample action from the policy and squeeze out the batch dimension.
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
-                    action, log_prob, value, hstates_tpu = act_fn(
-                        params, obs_tpu, last_dones, hstates_tpu, act_key
+                    action, log_prob, value, hstates = act_fn(
+                        params, last_obs, last_dones, last_hstates, act_key
                     )
                     value, action, log_prob = (
                         value.squeeze(0),
@@ -173,9 +174,7 @@ def rollout(
                 # Step environment
                 with RecordTimeTo(actor_timings["env_step_time"]):
                     timestep = env.step(cpu_action)
-
-                dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
-
+                
                 # Append data to storage
                 traj.append(
                     RNNPPOTransition(
@@ -184,10 +183,11 @@ def rollout(
                         value,
                         timestep.reward,
                         log_prob,
-                        obs_tpu,
-                        hstates_tpu,
+                        last_obs,
+                        last_hstates,
                     )
                 )
+                last_hstates = copy.deepcopy(hstates)
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
         # send trajectories to learner
