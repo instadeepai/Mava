@@ -1,11 +1,26 @@
-
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import queue
 import threading
 import time
+from typing import Any
+
 import jax
+
 from mava.systems.ppo.types import Params
-from typing import Any 
+
 
 class RecordTimeTo:
     """Context manager to record the runtime in a `with` block"""
@@ -19,6 +34,7 @@ class RecordTimeTo:
     def __exit__(self, *args: Any) -> None:
         end = time.monotonic()
         self.to.append(end - self.start)
+
 
 class ParamsSource(threading.Thread):
     """A `ParamSource` is a component that allows networks params to be passed from a
@@ -55,4 +71,6 @@ class ParamsSource(threading.Thread):
         """Get the current value of the `ParamSource`."""
         return self.value
 
-
+    def stop(self) -> None:
+        """Signal the thread to stop."""
+        self._stop_event.set()

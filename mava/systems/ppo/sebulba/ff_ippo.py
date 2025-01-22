@@ -55,8 +55,8 @@ from mava.utils.config import check_sebulba_config, check_total_timesteps
 from mava.utils.jax_utils import merge_leading_dims, switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.network_utils import get_action_head
-from mava.utils.sebulba.utils import ParamsSource, RecordTimeTo
 from mava.utils.sebulba.pipelines import Pipeline
+from mava.utils.sebulba.utils import ParamsSource, RecordTimeTo
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 from mava.wrappers.gym import GymToJumanji

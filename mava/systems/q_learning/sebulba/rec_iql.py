@@ -49,8 +49,8 @@ from mava.utils.config import check_sebulba_config, check_total_timesteps
 from mava.utils.jax_utils import switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.sebulba.pipelines import OffPolicyPipeline as Pipeline
-from mava.utils.sebulba.utils import ParamsSource, RecordTimeTo
 from mava.utils.sebulba.rate_limiters import SampleToInsertRatio
+from mava.utils.sebulba.utils import ParamsSource, RecordTimeTo
 from mava.wrappers.episode_metrics import get_final_step_metrics
 from mava.wrappers.gym import GymToJumanji
 
@@ -120,7 +120,7 @@ def rollout(
             params, hidden_state, (obs, term_or_trunc), eps
         )
 
-        action = eps_greedy_dist.sample(seed=key).squeeze(0)  # (B, A)  
+        action = eps_greedy_dist.sample(seed=key).squeeze(0)  # (B, A)
 
         return action, next_hidden_state, t + config.arch.num_envs
 
@@ -417,15 +417,17 @@ def learner_thread(
 
         # Pass all the metrics and  params to the main thread (evaluator) for logging and evaluation
         if ep_metrics:
-            # [{metric1 : (num_envs, ...), ...} * n_rollouts] --> {metric1 : (n_rollouts, num_envs, ...), ...]
+            # [{metric1 : (num_envs, ...), ...} * n_rollouts] -->
+            # {metric1 : (n_rollouts, num_envs, ...), ...]
             ep_metrics = tree.map(lambda *x: np.asarray(x), *ep_metrics)
             train_metrics = tree.map(lambda *x: np.asarray(x), *train_metrics)
 
-        # rollout times : [{metric1: value1, ...} * n_rollouts] --> {metric1: mean(value1_rollout1, value1_rollout2, ...), ...}
+        # rollout times : [{metric1: value1, ...} * n_rollouts] -->
+        # {metric1: mean(value1_rollout1, value1_rollout2, ...), ...}
         # learn_times : {metric1: (1,) or (num_updates_per_eval,), ...}
-        time_metrics  = tree.map(lambda *x: np.mean(x), *rollout_times) | learn_times
+        time_metrics = tree.map(lambda *x: np.mean(x), *rollout_times) | learn_times
         # time_metrics  : {metric1: Array, ...} - > {metric1: mean(Array), ...}
-        time_metrics  = tree.map(np.mean, time_metrics , is_leaf=lambda x: isinstance(x, list))
+        time_metrics = tree.map(np.mean, time_metrics, is_leaf=lambda x: isinstance(x, list))
 
         eval_queue.put((ep_metrics, train_metrics, learner_state, time_metrics))
 
@@ -441,7 +443,7 @@ def learner_setup(
 ]:
     """Initialise learner_fn, network and learner state."""
 
-    # create temporary environments.  
+    # create temporary environments.
     env = environments.make_gym_env(config, 1)
     # Get number of agents and actions.
     action_space = env.single_action_space
@@ -594,7 +596,9 @@ def run_experiment(_config: DictConfig) -> float:
         1,
     )
 
-    rate_limiter = SampleToInsertRatio(config.system.sample_per_insert, min_num_inserts, config.system.tolerance)
+    rate_limiter = SampleToInsertRatio(
+        config.system.sample_per_insert, min_num_inserts, config.system.tolerance
+    )
 
     # Setup logger
     logger = MavaLogger(config)

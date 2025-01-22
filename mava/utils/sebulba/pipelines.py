@@ -1,3 +1,16 @@
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import queue
 import threading
@@ -13,12 +26,13 @@ from jax.sharding import Sharding
 from jumanji.types import TimeStep
 from omegaconf import DictConfig
 
-from mava.utils.sebulba.rate_limiters import RateLimiter
 from mava.systems.ppo.types import PPOTransition
 from mava.systems.q_learning.types import Transition
 from mava.types import Metrics
+from mava.utils.sebulba.rate_limiters import RateLimiter
 
 QUEUE_PUT_TIMEOUT = 100
+
 
 @jax.jit
 def _stack_trajectory(
@@ -222,7 +236,6 @@ class OffPolicyPipeline(threading.Thread):
         traj = jax.device_get(traj)
         # [Transition(num_envs)] * rollout_len -> Transition[done=(num_envs, rollout_len, ...)]
         traj = _stack_trajectory(traj)
-        
 
         time_dict, episode_metrics = metrics
         # [{'metric1' : value1, ...} * rollout_len -> {'metric1' : [value1, value2, ...], ...}
@@ -232,7 +245,7 @@ class OffPolicyPipeline(threading.Thread):
         self.buffer_adds_count[actor_id] += 1
 
         if self._timing_queue.full():
-            self._timing_queue.get() # remove the oldest entry
+            self._timing_queue.get()  # remove the oldest entry
 
         self._timing_queue.put((time_dict, episode_metrics))
 
@@ -281,7 +294,7 @@ class OffPolicyPipeline(threading.Thread):
     def qsize(self) -> int:
         """Returns the number of trajectories in the pipeline."""
         return self._timing_queue.qsize()
-    
+
     def stop(self) -> None:
         """Signal the thread to stop."""
         self._stop_event.set()
