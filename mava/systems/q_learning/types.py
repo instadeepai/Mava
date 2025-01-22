@@ -21,7 +21,7 @@ from jax import Array
 from jumanji.env import State
 from typing_extensions import NamedTuple, TypeAlias
 
-from mava.types import MavaObservation, Observation
+from mava.types import MavaObservation
 
 Metrics = Dict[str, Array]
 
@@ -64,7 +64,7 @@ class ActionState(NamedTuple):
     action_selection_state: ActionSelectionState
     env_state: State
     buffer_state: BufferState
-    obs: Observation
+    obs: MavaObservation
     terminal: Array
     term_or_trunc: Array
 
@@ -83,7 +83,7 @@ class LearnerState(NamedTuple, Generic[QLearningParams]):
     """State of the learner in an interaction-training loop."""
 
     # Interaction vars
-    obs: Observation
+    obs: MavaObservation
     terminal: Array
     term_or_trunc: Array
     hidden_state: Array

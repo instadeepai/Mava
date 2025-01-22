@@ -175,7 +175,7 @@ class OffPolicyPipeline(threading.Thread):
         self.cpu = jax.devices("cpu")[0]
 
         self.tickets_queue: queue.Queue = queue.Queue()
-        self._timing_queue: queue.Queue = queue.Queue(maxsize=100)
+        self.metrics_queue: queue.Queue = queue.Queue(maxsize=100)
         self._stop_event = threading.Event()
 
         self.num_buffers = len(config.arch.actor_device_ids) * config.arch.n_threads_per_executor
@@ -244,10 +244,10 @@ class OffPolicyPipeline(threading.Thread):
         self.buffer_states[actor_id] = self.buffer_add(self.buffer_states[actor_id], traj)
         self.buffer_adds_count[actor_id] += 1
 
-        if self._timing_queue.full():
-            self._timing_queue.get()  # remove the oldest entry
+        if self.metrics_queue.full():
+            self.metrics_queue.get()  # remove the oldest entry
 
-        self._timing_queue.put((time_dict, episode_metrics))
+        self.metrics_queue.put((time_dict, episode_metrics))
 
         self.rate_limiter.insert(1 / self.num_buffers)
 
@@ -278,22 +278,22 @@ class OffPolicyPipeline(threading.Thread):
 
         self.rate_limiter.sample()
 
-        if not self._timing_queue.empty():
-            return transitions, self._timing_queue.get()
+        if not self.metrics_queue.empty():
+            return transitions, self.metrics_queue.get()
 
         return transitions, (None, None)
 
     def clear(self) -> None:
         """Clear the pipeline."""
-        while not self._timing_queue.empty():
+        while not self.metrics_queue.empty():
             try:
-                self._timing_queue.get(block=False)
+                self.metrics_queue.get(block=False)
             except queue.Empty:
                 break
 
     def qsize(self) -> int:
         """Returns the number of trajectories in the pipeline."""
-        return self._timing_queue.qsize()
+        return self.metrics_queue.qsize()
 
     def stop(self) -> None:
         """Signal the thread to stop."""

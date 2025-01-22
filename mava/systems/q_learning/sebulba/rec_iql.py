@@ -45,7 +45,8 @@ from mava.systems.q_learning.types import SebulbaLearnerState as LearnerState
 from mava.types import Observation, SebulbaLearnerFn
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.config import check_sebulba_config, check_total_timesteps
+from mava.utils.config import base_sebulba_checks as check_sebulba_config
+from mava.utils.config import check_total_timesteps
 from mava.utils.jax_utils import switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.sebulba.pipelines import OffPolicyPipeline as Pipeline
@@ -390,9 +391,9 @@ def learner_thread(
 ) -> None:
     for _ in range(config.arch.num_evaluation):
         # Create the lists to store metrics and timings for this learning iteration.
-        ep_metrics: List[Dict] = []
+        ep_metrics_list: List[Dict] = []
         train_metrics: List[Dict] = []
-        rollout_times: List[Dict] = []
+        rollout_times_list: List[Dict] = []
         learn_times: Dict[str, List[float]] = defaultdict(list)
 
         with RecordTimeTo(learn_times["learner_time_per_eval"]):
@@ -407,8 +408,8 @@ def learner_thread(
 
                 train_metrics.append(train_metric)
                 if ep_metric is not None:
-                    ep_metrics.append(ep_metric)
-                    rollout_times.append(rollout_time)
+                    ep_metrics_list.append(ep_metric)
+                    rollout_times_list.append(rollout_time)
 
                 # Update all the params sources so all actors can get the latest params
                 params = jax.block_until_ready(learner_state.params)
@@ -416,16 +417,23 @@ def learner_thread(
                     source.update(params.online)
 
         # Pass all the metrics and  params to the main thread (evaluator) for logging and evaluation
-        if ep_metrics:
+
+        if ep_metrics_list:
             # [{metric1 : (num_envs, ...), ...} * n_rollouts] -->
             # {metric1 : (n_rollouts, num_envs, ...), ...]
-            ep_metrics = tree.map(lambda *x: np.asarray(x), *ep_metrics)
-            train_metrics = tree.map(lambda *x: np.asarray(x), *train_metrics)
+            ep_metrics = tree.map(lambda *x: np.asarray(x), *ep_metrics_list)
 
-        # rollout times : [{metric1: value1, ...} * n_rollouts] -->
-        # {metric1: mean(value1_rollout1, value1_rollout2, ...), ...}
+            # [{metric1: value1, ...} * n_rollouts] -->
+            # {metric1: mean(value1_rollout1, value1_rollout2, ...), ...}
+            rollout_times = tree.map(lambda *x: np.mean(x), *rollout_times_list)
+        else:
+            rollout_times = {}
+            ep_metrics = {}
+
+        train_metrics = tree.map(lambda *x: np.asarray(x), *train_metrics)
+
         # learn_times : {metric1: (1,) or (num_updates_per_eval,), ...}
-        time_metrics = tree.map(lambda *x: np.mean(x), *rollout_times) | learn_times
+        time_metrics = rollout_times | learn_times
         # time_metrics  : {metric1: Array, ...} - > {metric1: mean(Array), ...}
         time_metrics = tree.map(np.mean, time_metrics, is_leaf=lambda x: isinstance(x, list))
 
@@ -693,11 +701,11 @@ def run_experiment(_config: DictConfig) -> float:
             if ep_completed:
                 logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
 
-            train_metrics["learner_step"] = (eval_step + 1) * config.system.num_updates_per_eval
-            train_metrics["learner_steps_per_second"] = (
-                config.system.num_updates_per_eval
-            ) / time_metrics["learner_time_per_eval"]
-            logger.log(train_metrics, t, eval_step, LogEvent.TRAIN)
+        train_metrics["learner_step"] = (eval_step + 1) * config.system.num_updates_per_eval
+        train_metrics["learner_steps_per_second"] = (
+            config.system.num_updates_per_eval
+        ) / time_metrics["learner_time_per_eval"]
+        logger.log(train_metrics, t, eval_step, LogEvent.TRAIN)
 
         learner_state_cpu = jax.device_get(learner_state)
         key, eval_key = jax.random.split(key, 2)

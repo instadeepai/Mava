@@ -18,7 +18,7 @@ from colorama import Fore, Style
 from omegaconf import DictConfig
 
 
-def check_sebulba_config(config: DictConfig) -> None:
+def base_sebulba_checks(config: DictConfig) -> None:
     """Checks that the given config does not have conflicting values."""
     assert (
         config.system.num_updates > config.arch.num_evaluation
@@ -30,17 +30,18 @@ def check_sebulba_config(config: DictConfig) -> None:
         + "The output of each actor is equally split across the learners."
     )
 
+
+def ppo_sebulba_checks(config: DictConfig) -> None:
+    base_sebulba_checks(config)
+
     num_eval_samples = (
         int(config.arch.num_envs / len(config.arch.learner_device_ids))
         * config.system.rollout_length
     )
-
-    # PPO specifique check
-    if "num_minibatches" in config.system:
-        assert num_eval_samples % config.system.num_minibatches == 0, (
-            f"Number of training samples per evaluator ({num_eval_samples})"
-            + f"must be divisible by num_minibatches ({config.system.num_minibatches})."
-        )
+    assert num_eval_samples % config.system.num_minibatches == 0, (
+        f"Number of training samples per evaluator ({num_eval_samples})"
+        + f"must be divisible by num_minibatches ({config.system.num_minibatches})."
+    )
 
 
 def check_total_timesteps(config: DictConfig) -> DictConfig:

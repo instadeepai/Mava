@@ -34,7 +34,6 @@ class RateLimiter:
 
         self.inserts = 0.0
         self.samples = 0
-        self.deletes = 0
 
         self.mutex = threading.Lock()
         self.condition = threading.Condition(self.mutex)
@@ -49,21 +48,10 @@ class RateLimiter:
         with self.mutex:
             return self.samples
 
-    def num_deletes(self) -> int:
-        """Returns the number of deletes."""
-        with self.mutex:
-            return self.deletes
-
     def insert(self, insert_fraction: float = 1) -> None:
         """Increment the number of inserts and notify all waiting threads."""
         with self.mutex:
             self.inserts += insert_fraction
-            self.condition.notify_all()  # Notify all waiting threads
-
-    def delete(self) -> None:
-        """Increment the number of deletes and notify all waiting threads."""
-        with self.mutex:
-            self.deletes += 1
             self.condition.notify_all()  # Notify all waiting threads
 
     def sample(self) -> None:
@@ -77,7 +65,7 @@ class RateLimiter:
         # Assume lock is already held by the caller
         if num_inserts <= 0:
             return False
-        if ceil(self.inserts) + num_inserts - self.deletes <= self.min_size_to_sample:
+        if ceil(self.inserts) + num_inserts <= self.min_size_to_sample:
             return True
         diff = (num_inserts + ceil(self.inserts)) * self.samples_per_insert - self.samples
         return diff <= self.max_diff
@@ -87,7 +75,7 @@ class RateLimiter:
         # Assume lock is already held by the caller
         if num_samples <= 0:
             return False
-        if ceil(self.inserts) - self.deletes < self.min_size_to_sample:
+        if ceil(self.inserts) < self.min_size_to_sample:
             return False
         diff = ceil(self.inserts) * self.samples_per_insert - self.samples - num_samples
         return diff >= self.min_diff

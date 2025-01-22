@@ -51,7 +51,8 @@ from mava.types import (
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.config import check_sebulba_config, check_total_timesteps
+from mava.utils.config import check_total_timesteps
+from mava.utils.config import ppo_sebulba_checks as check_sebulba_config
 from mava.utils.jax_utils import merge_leading_dims, switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.network_utils import get_action_head
