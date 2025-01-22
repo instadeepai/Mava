@@ -134,7 +134,7 @@ def rollout(
         return action, log_prob, value, hstates
 
     timestep = env.reset(seed=seeds)
-    dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
+    
 
     # Initialise hidden states.
     init_policy_hstate = ScannedRNN.initialize_carry(
@@ -143,8 +143,8 @@ def rollout(
     init_critic_hstate = ScannedRNN.initialize_carry(
         (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
-    hstates = HiddenStates(init_policy_hstate, init_critic_hstate)
-    hstates_tpu = tree.map(move_to_device, hstates)
+    last_hstates = HiddenStates(init_policy_hstate, init_critic_hstate)
+    last_hstates = tree.map(move_to_device, last_hstates)
 
     # Loop till the desired num_updates is reached.
     while not thread_lifetime.should_stop():
@@ -157,14 +157,15 @@ def rollout(
                 with RecordTimeTo(actor_timings["get_params_time"]):
                     params = params_source.get()  # Get the latest parameters from the learner
 
-                obs_tpu = tree.map(move_to_device, timestep.observation)
-                last_dones = tree.map(move_to_device, dones)
+                last_obs = tree.map(move_to_device, timestep.observation)
+                last_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
+                last_dones = tree.map(move_to_device, last_dones)
 
                 # Sample action from the policy and squeeze out the batch dimension.
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
-                    action, log_prob, value, hstates_tpu_new = act_fn(
-                        params, obs_tpu, last_dones, hstates_tpu, act_key
+                    action, log_prob, value, hstates = act_fn(
+                        params, last_obs, last_dones, last_hstates, act_key
                     )
                     value, action, log_prob = (
                         value.squeeze(0),
@@ -176,9 +177,7 @@ def rollout(
                 # Step environment
                 with RecordTimeTo(actor_timings["env_step_time"]):
                     timestep = env.step(cpu_action)
-
-                dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
-
+                
                 # Append data to storage
                 traj.append(
                     RNNPPOTransition(
@@ -187,11 +186,12 @@ def rollout(
                         value,
                         timestep.reward,
                         log_prob,
-                        obs_tpu,
-                        hstates_tpu,
+                        last_obs,
+                        last_hstates,
                     )
                 )
-                hstates_tpu = deepcopy(hstates_tpu_new)
+                last_hstates = deepcopy(hstates)
+
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
         # send trajectories to learner
