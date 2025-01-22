@@ -131,7 +131,6 @@ def rollout(
         return action, log_prob, value, hstates
 
     timestep = env.reset(seed=seeds)
-    dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
     # Initialise hidden states.
     init_policy_hstate = ScannedRNN.initialize_carry(
@@ -140,8 +139,8 @@ def rollout(
     init_critic_hstate = ScannedRNN.initialize_carry(
         (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
-    hstates = HiddenStates(init_policy_hstate, init_critic_hstate)
-    hstates_tpu = tree.map(move_to_device, hstates)
+    last_hstates = HiddenStates(init_policy_hstate, init_critic_hstate)
+    last_hstates = tree.map(move_to_device, last_hstates)
 
     # Loop till the desired num_updates is reached.
     while not thread_lifetime.should_stop():
