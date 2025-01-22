@@ -48,8 +48,9 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_sebulba_config, check_total_timesteps
 from mava.utils.jax_utils import switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.sebulba import OffPolicyPipeline as Pipeline
-from mava.utils.sebulba import ParamsSource, RecordTimeTo, SampleToInsertRatio, ThreadLifetime
+from mava.utils.sebulba.pipelines import OffPolicyPipeline as Pipeline
+from mava.utils.sebulba.utils import ParamsSource, RecordTimeTo
+from mava.utils.sebulba.rate_limiters import SampleToInsertRatio
 from mava.wrappers.episode_metrics import get_final_step_metrics
 from mava.wrappers.gym import GymToJumanji
 
@@ -63,7 +64,7 @@ def rollout(
     q_net: RecQNetwork,
     actor_device: int,
     seeds: List[int],
-    thread_lifetime: ThreadLifetime,
+    stop_event: threading.Event,
     actor_id: int,
 ) -> None:
     """Collects trajectories from the environment by running rollouts.
@@ -119,13 +120,12 @@ def rollout(
             params, hidden_state, (obs, term_or_trunc), eps
         )
 
-        action = eps_greedy_dist.sample(seed=key)
-        action = action[0, ...]  # (1, B, A) -> (B, A)
+        action = eps_greedy_dist.sample(seed=key).squeeze(0)  # (B, A)  
 
         return action, next_hidden_state, t + config.arch.num_envs
 
     next_timestep = env.reset(seed=seeds)
-    dones = next_timestep.last()[..., jnp.newaxis]
+    next_dones = next_timestep.last()[..., jnp.newaxis]
 
     # Initialise hidden states.
     hstate = ScannedRNN.initialize_carry(
@@ -135,7 +135,7 @@ def rollout(
     step_count = 0
 
     # Loop till the desired num_updates is reached.
-    while not thread_lifetime.should_stop():
+    while not stop_event.is_set():
         # Rollout
         episode_metrics: List[Dict] = []
         traj: List[Transition] = []
@@ -146,15 +146,15 @@ def rollout(
                     params = params_source.get()  # Get the latest parameters from the learner
 
                 timestep = next_timestep
-                obs_tpu = tree.map(move_to_device, timestep.observation)
+                obs_tpu = move_to_device(timestep.observation)
 
-                last_dones = tree.map(move_to_device, dones)
+                dones = move_to_device(next_dones)
 
                 # Get action and value
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
                     action, hstate_tpu, step_count = select_eps_greedy_action(
-                        params, hstate_tpu, obs_tpu, last_dones, act_key, step_count
+                        params, hstate_tpu, obs_tpu, dones, act_key, step_count
                     )
                     cpu_action = jax.device_get(action)
 
@@ -164,7 +164,7 @@ def rollout(
 
                 # Prepare the transation
                 terminal = (1 - timestep.discount[..., 0, jnp.newaxis]).astype(bool)
-                dones = next_timestep.last()[..., jnp.newaxis]
+                next_dones = next_timestep.last()[..., jnp.newaxis]
 
                 # Append data to storage
                 traj.append(
@@ -173,7 +173,7 @@ def rollout(
                         action,
                         next_timestep.reward,
                         terminal,
-                        dones,
+                        next_dones,
                         next_timestep.extras["real_next_obs"],
                     )
                 )
@@ -417,13 +417,17 @@ def learner_thread(
 
         # Pass all the metrics and  params to the main thread (evaluator) for logging and evaluation
         if ep_metrics:
+            # [{metric1 : (num_envs, ...), ...} * n_rollouts] --> {metric1 : (n_rollouts, num_envs, ...), ...]
             ep_metrics = tree.map(lambda *x: np.asarray(x), *ep_metrics)
             train_metrics = tree.map(lambda *x: np.asarray(x), *train_metrics)
 
-        timing_dict = tree.map(lambda *x: np.mean(x), *rollout_times) | learn_times
-        timing_dict = tree.map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
+        # rollout times : [{metric1: value1, ...} * n_rollouts] --> {metric1: mean(value1_rollout1, value1_rollout2, ...), ...}
+        # learn_times : {metric1: (1,) or (num_updates_per_eval,), ...}
+        time_metrics  = tree.map(lambda *x: np.mean(x), *rollout_times) | learn_times
+        # time_metrics  : {metric1: Array, ...} - > {metric1: mean(Array), ...}
+        time_metrics  = tree.map(np.mean, time_metrics , is_leaf=lambda x: isinstance(x, list))
 
-        eval_queue.put((ep_metrics, train_metrics, learner_state, timing_dict))
+        eval_queue.put((ep_metrics, train_metrics, learner_state, time_metrics))
 
 
 def learner_setup(
@@ -437,7 +441,7 @@ def learner_setup(
 ]:
     """Initialise learner_fn, network and learner state."""
 
-    # create temporory envoirnments.
+    # create temporary environments.  
     env = environments.make_gym_env(config, 1)
     # Get number of agents and actions.
     action_space = env.single_action_space
@@ -581,8 +585,8 @@ def run_experiment(_config: DictConfig) -> float:
         * config.arch.n_threads_per_executor
     ) / (config.system.sample_sequence_length * config.system.sample_batch_size)
 
-    config.sample_per_insert = config.system.data_sample_mean * insert_to_sample_ratio
-    config.tolerance = config.sample_per_insert * config.system.error_tolerance
+    config.system.sample_per_insert = config.system.mean_data_sample_rate * insert_to_sample_ratio
+    config.system.tolerance = config.system.sample_per_insert * config.system.error_tolerance
 
     min_num_inserts = max(
         config.system.sample_sequence_length // config.system.rollout_length,
@@ -590,7 +594,7 @@ def run_experiment(_config: DictConfig) -> float:
         1,
     )
 
-    rate_limiter = SampleToInsertRatio(config.sample_per_insert, min_num_inserts, config.tolerance)
+    rate_limiter = SampleToInsertRatio(config.system.sample_per_insert, min_num_inserts, config.system.tolerance)
 
     # Setup logger
     logger = MavaLogger(config)
@@ -611,20 +615,17 @@ def run_experiment(_config: DictConfig) -> float:
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
     # Setup Pipeline
-    pipe_lifetime = ThreadLifetime()
-    pipe = Pipeline(config, learner_sharding, key, rate_limiter, init_transition, pipe_lifetime)
+    pipe = Pipeline(config, learner_sharding, key, rate_limiter, init_transition)
     pipe.start()
 
     params_sources: List[ParamsSource] = []
     actor_threads: List[threading.Thread] = []
-    actor_lifetime = ThreadLifetime()
-    params_sources_lifetime = ThreadLifetime()
-
+    actors_stop_event = threading.Event()
     # Create the actor threads
     print(f"{Fore.BLUE}{Style.BRIGHT}Starting up actor threads...{Style.RESET_ALL}")
     for device_idx, actor_device in enumerate(actor_devices):
         # Create 1 params source per device
-        params_source = ParamsSource(inital_params.online, actor_device, params_sources_lifetime)
+        params_source = ParamsSource(inital_params.online, actor_device)
         params_source.start()
         params_sources.append(params_source)
         # Create multiple rollout threads per actor device
@@ -633,7 +634,6 @@ def run_experiment(_config: DictConfig) -> float:
             seeds = np_rng.integers(np.iinfo(np.int32).max, size=config.arch.num_envs).tolist()
             act_key = jax.device_put(key, actor_device)
             actor_id = device_idx * config.arch.n_threads_per_executor + thread_id
-
             actor = threading.Thread(
                 target=rollout,
                 args=(
@@ -646,7 +646,7 @@ def run_experiment(_config: DictConfig) -> float:
                     q_net,
                     actor_device,
                     seeds,
-                    actor_lifetime,
+                    actors_stop_event,
                     actor_id,
                 ),
                 name=f"Actor-{actor_device}-{thread_id}",
@@ -711,7 +711,7 @@ def run_experiment(_config: DictConfig) -> float:
                 episode_return=episode_return,
             )
 
-        if config.arch.absolute_metric and max_episode_return <= episode_return:
+        if config.arch.absolute_metric and (max_episode_return <= episode_return):
             best_params_cpu = copy.deepcopy(learner_state_cpu.params.online)
             max_episode_return = float(episode_return)
 
@@ -740,7 +740,7 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Stop all the threads.
     logger.stop()
-    actor_lifetime.stop()
+    actors_stop_event.set()
     pipe.clear()  # We clear the pipeline before stopping the actor threads to avoid deadlock
     print(f"{Fore.RED}{Style.BRIGHT}Pipe cleared{Style.RESET_ALL}")
     print(f"{Fore.RED}{Style.BRIGHT}Stopping actor threads...{Style.RESET_ALL}")
@@ -748,11 +748,11 @@ def run_experiment(_config: DictConfig) -> float:
         actor.join()
         print(f"{Fore.RED}{Style.BRIGHT}{actor.name} stopped{Style.RESET_ALL}")
     print(f"{Fore.RED}{Style.BRIGHT}Stopping pipeline...{Style.RESET_ALL}")
-    pipe_lifetime.stop()
+    pipe.stop()
     pipe.join()
     print(f"{Fore.RED}{Style.BRIGHT}Stopping params sources...{Style.RESET_ALL}")
-    params_sources_lifetime.stop()
     for params_source in params_sources:
+        params_source.stop()
         params_source.join()
     print(f"{Fore.RED}{Style.BRIGHT}All threads stopped...{Style.RESET_ALL}")
 

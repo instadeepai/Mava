@@ -11,7 +11,7 @@ add_agent_id: True
 min_buffer_size: 32
 update_batch_size: 1 # Number of vectorised gradient updates per device.
 
-rollout_length:  2 # Number of environment steps per vectorised enviro²nment.
+rollout_length: 2 # Number of environment steps per vectorised environment.
 epochs: 2 # Number of learn epochs per training data batch.
 
 # sizes
@@ -33,5 +33,5 @@ eps_min: 0.05
 eps_decay: 1e5
 
 # --- Sebulba parameters ---
-data_sample_mean: 150  # Average number of times the learner should sample each item from the replay buffer.
+mean_data_sample_rate: 150  # Average number of times the learner should sample each item from the replay buffer.
 error_tolerance: 2     # Tolerance for how much the learner/actor can sample/insert before being blocked. Must be greater than 2 to avoid deadlocks.
