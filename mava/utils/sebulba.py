@@ -25,7 +25,7 @@ from jax.sharding import Sharding
 from jumanji.types import TimeStep
 
 # todo: remove the ppo dependencies when we make sebulba for other systems
-from mava.systems.ppo.types import Params
+from mava.systems.ppo.types import HiddenStates, Params
 from mava.types import MavaTransition, Metrics
 
 QUEUE_PUT_TIMEOUT = 100
@@ -97,6 +97,7 @@ class Pipeline(threading.Thread):
         traj: Sequence[MavaTransition],
         timestep: TimeStep,
         metrics: Tuple[Dict, List[Dict]],
+        hstates: HiddenStates = None
     ) -> None:
         """Put a trajectory on the queue to be consumed by the learner."""
         start_condition, end_condition = (threading.Condition(), threading.Condition())
@@ -112,6 +113,8 @@ class Pipeline(threading.Thread):
         # [{'metric1' : value1, ...} * rollout_len -> {'metric1' : [value1, value2, ...], ...}
         episode_metrics = _stack_trajectory(episode_metrics)
 
+        #hstates = _stack_trajectory(hstates)
+
         # We block on the `put` to ensure that actors wait for the learners to catch up.
         # This ensures two things:
         #  The actors don't get too far ahead of the learners, which could lead to off-policy data.
@@ -121,7 +124,7 @@ class Pipeline(threading.Thread):
         # We use a try-finally so the lock is released even if an exception is raised.
         try:
             self._queue.put(
-                (traj, timestep, time_dict, episode_metrics),
+                (traj, timestep, time_dict, episode_metrics, hstates),
                 block=True,
                 timeout=QUEUE_PUT_TIMEOUT,
             )
