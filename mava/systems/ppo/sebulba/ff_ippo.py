@@ -132,8 +132,6 @@ def rollout(
                 with RecordTimeTo(actor_timings["env_step_time"]):
                     timestep = env.step(cpu_action)
 
-                dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
-
                 # Append data to storage
                 traj.append(
                     PPOTransition(
@@ -146,6 +144,8 @@ def rollout(
                     )
                 )
                 episode_metrics.append(timestep.extras["episode_metrics"])
+
+                dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
         # send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
@@ -408,7 +408,7 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, timestep, rollout_time, ep_metrics = pipeline.get(block=True)  # type: ignore
+                    traj_batch, timestep, rollout_time, ep_metrics, _ = pipeline.get(block=True)  # type: ignore
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as

@@ -192,7 +192,7 @@ def rollout(
         # send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
             try:
-                rollout_queue.put(traj, timestep, (actor_timings, episode_metrics))
+                rollout_queue.put(traj, timestep, (actor_timings, episode_metrics), hstates)
             except queue.Full:
                 err = "Waited too long to add to the rollout queue, killing the actor thread"
                 warnings.warn(err, stacklevel=2)
@@ -504,12 +504,15 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, timestep, rollout_time, ep_metrics = pipeline.get(block=True)  # type: ignore
+                    traj_batch, timestep, rollout_time, ep_metrics, hstates = pipeline.get(block=True)  # type: ignore
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
                 # an additional timestep which it can use to bootstrap.
                 learner_state = learner_state._replace(timestep=timestep)
+                learner_state = learner_state._replace(dones=timestep.last().repeat(config.system.num_agents).reshape(config.arch.num_envs, -1))
+                learner_state = learner_state._replace(hstates=hstates)
+                
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
                     learner_state, train_metrics = learn_fn(learner_state, traj_batch)
