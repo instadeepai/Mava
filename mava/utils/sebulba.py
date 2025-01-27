@@ -113,8 +113,6 @@ class Pipeline(threading.Thread):
         # [{'metric1' : value1, ...} * rollout_len -> {'metric1' : [value1, value2, ...], ...}
         episode_metrics = _stack_trajectory(episode_metrics)
 
-        #hstates = _stack_trajectory(hstates)
-
         # We block on the `put` to ensure that actors wait for the learners to catch up.
         # This ensures two things:
         #  The actors don't get too far ahead of the learners, which could lead to off-policy data.
