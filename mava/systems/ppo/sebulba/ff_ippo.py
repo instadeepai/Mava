@@ -101,8 +101,6 @@ def rollout(
         actor_policy = actor_apply_fn(params.actor_params, observation)
         action = actor_policy.sample(seed=key)
         log_prob = actor_policy.log_prob(action)
-        # It may be faster to calculate the values in the learner as
-        # then we won't need to pass critic params to actors.
         value = critic_apply_fn(params.critic_params, observation).squeeze()
         return action, log_prob, value
 
@@ -132,8 +130,6 @@ def rollout(
                 with RecordTimeTo(actor_timings["env_step_time"]):
                     timestep = env.step(cpu_action)
 
-                dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
-
                 # Append data to storage
                 traj.append(
                     PPOTransition(
@@ -147,10 +143,12 @@ def rollout(
                 )
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
-        # send trajectories to learner
+                dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
+
+        # Send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
             try:
-                rollout_queue.put(traj, timestep, (actor_timings, episode_metrics))
+                rollout_queue.put(traj, (actor_timings, episode_metrics), (timestep, None))
             except queue.Full:
                 err = "Waited too long to add to the rollout queue, killing the actor thread"
                 warnings.warn(err, stacklevel=2)
@@ -333,7 +331,8 @@ def get_learner_step_fn(
             params, opt_states, traj_batch, advantages, targets, key = update_state
             key = jnp.squeeze(key, axis=0)  # Remove the learner_devices axis
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
-            key = jnp.expand_dims(key, axis=0)  # add the learner_devices axis for shape consitency
+            key = jnp.expand_dims(key, axis=0)  # Add the learner_devices axis for shape consitency
+
             # Shuffle minibatches
             batch_size = config.system.rollout_length * num_learner_envs
             permutation = jax.random.permutation(shuffle_key, batch_size)
@@ -408,7 +407,7 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, timestep, rollout_time, ep_metrics = pipeline.get(block=True)
+                    traj_batch, rollout_time, ep_metrics, (timestep, _) = pipeline.get(block=True)  # type: ignore
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
@@ -445,7 +444,7 @@ def learner_setup(
 ]:
     """Initialise learner_fn, network and learner state."""
 
-    # create temporory envoirnments.
+    # Create temporory envoirnments.
     env = environments.make_gym_env(config, config.arch.num_envs)
     # Get number of agents and actions.
     action_space = env.single_action_space
@@ -503,7 +502,7 @@ def learner_setup(
     apply_fns = (actor_network.apply, critic_network.apply)
     update_fns = (actor_optim.update, critic_optim.update)
 
-    # defines how the learner state is sharded: params, opt and key = sharded, timestep = sharded
+    # Defines how the learner state is sharded: params, opt and key = sharded, timestep = sharded
     learn_state_spec = SebulbaLearnerState(model_spec, model_spec, data_spec, None, data_spec)
     learn = get_learner_step_fn(apply_fns, update_fns, config)
     learn = jax.jit(
@@ -537,10 +536,10 @@ def learner_setup(
     )
 
     # Initialise learner state.
-    init_learner_state = SebulbaLearnerState(params, opt_states, step_keys, None, None)  # type: ignore
+    init_learner_state = SebulbaLearnerState(params, opt_states, step_keys, None, None)
     env.close()
 
-    return learn, apply_fns, init_learner_state, learner_sharding  # type: ignore
+    return learn, apply_fns, init_learner_state, learner_sharding
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -595,7 +594,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Executor setup and launch.
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
-    # the rollout queue/ the pipe between actor and learner
+    # The rollout queue/ the pipe between actor and learner
     pipe_lifetime = ThreadLifetime()
     pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding, pipe_lifetime)
     pipe.start()
