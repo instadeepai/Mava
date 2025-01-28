@@ -332,7 +332,7 @@ def get_learner_step_fn(
             key = jnp.squeeze(key, axis=0)  # Remove the learner_devices axis
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
             key = jnp.expand_dims(key, axis=0)  # Add the learner_devices axis for shape consitency
-            
+
             # Shuffle minibatches
             batch_size = config.system.rollout_length * num_learner_envs
             permutation = jax.random.permutation(shuffle_key, batch_size)
@@ -407,7 +407,7 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, rollout_time, ep_metrics, (timestep, _) = pipeline.get(block=True)
+                    traj_batch, rollout_time, ep_metrics, (timestep, _) = pipeline.get(block=True)  # type: ignore
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as

@@ -15,7 +15,7 @@
 import queue
 import threading
 import time
-from typing import Any, Dict, List, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -96,7 +96,7 @@ class Pipeline(threading.Thread):
         self,
         traj: Sequence[MavaTransition],
         metrics: Tuple[Dict, List[Dict]],
-        final_timestep: Tuple[TimeStep, HiddenStates],
+        final_timestep: Tuple[TimeStep, Optional[HiddenStates]],
     ) -> None:
         """Put a trajectory on the queue to be consumed by the learner."""
         start_condition, end_condition = (threading.Condition(), threading.Condition())
@@ -105,7 +105,7 @@ class Pipeline(threading.Thread):
             start_condition.wait()  # wait to be allowed to start
 
         timestep, hstates = final_timestep
-        
+
         # [Transition(num_envs)] * rollout_len -> Transition[done=(num_envs, rollout_len, ...)]
         traj = _stack_trajectory(traj)
         traj, timestep = jax.device_put((traj, timestep), device=self.sharding)
@@ -142,7 +142,7 @@ class Pipeline(threading.Thread):
 
     def get(
         self, block: bool = True, timeout: Union[float, None] = None
-    ) -> Tuple[MavaTransition, Dict, Metrics, Tuple[TimeStep, HiddenStates]]:
+    ) -> Tuple[MavaTransition, Dict, Metrics, Tuple[TimeStep, Optional[HiddenStates]]]:
         """Get a trajectory from the pipeline."""
         return self._queue.get(block, timeout)  # type: ignore
 
