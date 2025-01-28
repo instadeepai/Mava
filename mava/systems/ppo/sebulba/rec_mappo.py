@@ -17,6 +17,7 @@ import queue
 import threading
 import warnings
 from collections import defaultdict
+from copy import deepcopy
 from queue import Queue
 from typing import Any, Dict, List, Sequence, Tuple
 
@@ -67,8 +68,6 @@ from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifet
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 from mava.wrappers.gym import GymToJumanji
-
-from copy import deepcopy
 
 
 def rollout(
@@ -132,7 +131,6 @@ def rollout(
         return action, log_prob, value, hstates
 
     timestep = env.reset(seed=seeds)
-    
 
     # Initialise hidden states.
     init_policy_hstate = ScannedRNN.initialize_carry(
@@ -175,7 +173,7 @@ def rollout(
                 # Step environment
                 with RecordTimeTo(actor_timings["env_step_time"]):
                     timestep = env.step(cpu_action)
-                
+
                 # Append data to storage
                 traj.append(
                     RNNPPOTransition(
@@ -506,14 +504,20 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, rollout_time, ep_metrics, (timestep, hstates) = pipeline.get(block=True)
+                    traj_batch, rollout_time, ep_metrics, (timestep, hstates) = pipeline.get(  # type: ignore
+                        block=True
+                    )
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
                 # an additional timestep which it can use to bootstrap.
                 learner_state = learner_state._replace(timestep=timestep)
-                learner_state = learner_state._replace(dones=timestep.last().repeat(config.system.num_agents).reshape(config.arch.num_envs, -1))
-                learner_state = learner_state._replace(hstates=hstates)
+                learner_state = learner_state._replace(
+                    dones=timestep.last()
+                    .repeat(config.system.num_agents)
+                    .reshape(config.arch.num_envs, -1)
+                )
+                learner_state = learner_state._replace(hstates=hstates)  # type: ignore
 
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
@@ -598,11 +602,11 @@ def learner_setup(
         optax.adam(critic_lr, eps=1e-5),
     )
 
-     # Initialise observation: Select only obs for a single agent.
+    # Initialise observation: Select only obs for a single agent.
     init_obs = env.reset().observation
     init_agents_view = init_obs.agents_view[0][jnp.newaxis, jnp.newaxis, :]
     init_action_mask = init_obs.action_mask[0][jnp.newaxis, jnp.newaxis, :]
-    init_global_state = init_obs.global_state[0][jnp.newaxis, jnp.newaxis, :]
+    init_global_state = init_obs.global_state[0][jnp.newaxis, jnp.newaxis, :]  # type: ignore
     single_obs = ObservationGlobalState(init_agents_view, init_action_mask, init_global_state)
     init_done = jnp.zeros((1, config.arch.num_envs, config.system.num_agents), dtype=bool)
     init_x = (single_obs, init_done)
