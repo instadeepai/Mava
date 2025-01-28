@@ -1,0 +1,11 @@
+defaults:
+  - logger: logger
+  - arch: sebulba
+  - system: ppo/ff_mappo
+  - network: mlp  # [mlp, continuous_mlp, cnn]
+  - env: lbf_gym  # [rware_gym, lbf_gym, smaclite_gym]
+  - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs
