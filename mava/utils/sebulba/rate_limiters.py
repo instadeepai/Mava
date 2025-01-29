@@ -21,8 +21,29 @@ from colorama import Fore, Style
 
 # from https://github.com/EdanToledo/Stoix/blob/feat/sebulba-dqn/stoix/utils/rate_limiters.py
 class RateLimiter:
+    """
+    Rate limiter to control the ratio of samples to inserts.
+
+    This class is designed to regulate the rate at which samples are drawn
+    compared to the rate at which new data is inserted.
+
+    Args:
+        samples_per_insert (float): The target ratio of samples to inserts.
+            For example, a value of 4.0 means the system aims to sample 4 times
+            for every insertion.
+        min_size_to_sample (int): The minimum number of inserts required before
+            sampling is allowed.
+        min_diff (float): The minimum acceptable difference between the expected
+            number of samples (based on inserts and `samples_per_insert`) and
+            the actual number of samples. Sampling is allowed if the difference
+            is greater than or equal to this value.
+        max_diff (float): The maximum acceptable difference between the expected
+            number of samples and the actual number of samples. Inserting is allowed
+            if the difference is less than or equal to this value.
+    """
+
     def __init__(
-        self, samples_per_insert: float, min_size_to_sample: int, min_diff: float, max_diff: float
+        self, samples_per_insert: float, min_size_to_sample: float, min_diff: float, max_diff: float
     ):
         assert min_size_to_sample > 0, "min_size_to_sample must be greater than 0"
         assert samples_per_insert > 0, "samples_per_insert must be greater than 0"
@@ -207,3 +228,63 @@ class SampleToInsertRatio(RateLimiter):
             min_diff=min_diff,
             max_diff=max_diff,
         )
+
+
+class BlockingRatioLimiter(RateLimiter):
+    """
+    Blocking rate limiter that enforces a ratio of X samples per insert and 1/X inserts per sample.
+
+    Args:
+        sample_insert_ratio (float): The ratio of samples to inserts (X).
+            For example, a value of 2.0 means for every insert, up to 2 samples are allowed,
+            and for every 2 samples, up to 1 insert is allowed. Must be greater than 0.
+    """
+
+    def __init__(self, sample_insert_ratio: float, min_num_inserts: float):
+        if sample_insert_ratio <= 0:
+            raise ValueError("sample_insert_ratio must be greater than 0")
+        super().__init__(
+            samples_per_insert=sample_insert_ratio,
+            min_size_to_sample=min_num_inserts,
+            min_diff=float("-inf"),
+            max_diff=float("inf"),
+        )
+        self.available_inserts = 1.0
+        self.available_samples = 0.0
+        self.sample_insert_ratio = sample_insert_ratio
+
+    def insert(self, insert_fraction: float = 1.0) -> None:
+        """
+        Increments the available samples by insert_fraction * sample_insert_ratio.
+        """
+        with self.mutex:
+            if self.min_size_to_sample > 0:
+                self.min_size_to_sample -= insert_fraction
+            else:
+                self.available_samples += insert_fraction * self.sample_insert_ratio
+                self.available_inserts -= insert_fraction
+
+            self.inserts += insert_fraction
+            self.condition.notify_all()
+
+    def sample(self, num_samples: int = 1) -> None:
+        """
+        Increments the available inserts by num_samples / sample_insert_ratio.
+        """
+        with self.mutex:
+            self.available_inserts += num_samples / self.sample_insert_ratio
+            self.available_samples -= num_samples
+            self.samples += 1
+            self.condition.notify_all()
+
+    def can_insert(self, num_inserts: float = 1.0) -> bool:
+        """
+        Checks if it is possible to insert num_inserts, based on available insert credits.
+        """
+        return self.available_inserts >= num_inserts
+
+    def can_sample(self, num_samples: int = 1) -> bool:
+        """
+        Checks if it is possible to sample num_samples, based on available sample credits.
+        """
+        return self.available_samples >= num_samples

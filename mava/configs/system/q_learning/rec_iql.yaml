@@ -33,5 +33,5 @@ eps_min: 0.05
 eps_decay: 1e5
 
 # --- Sebulba parameters ---
-mean_data_sample_rate: 150  # Average number of times the learner should sample each item from the replay buffer.
-error_tolerance: 2     # Tolerance for how much the learner/actor can sample/insert before being blocked. Must be greater than 2 to avoid deadlocks.
+replay_ratio : 4  # Average number of times the learner should sample each item from the replay buffer.
+error_tolerance:  ~ # Tolerance for how much the learner/actor can sample/insert before being blocked. Must be greater than 2 to avoid deadlocks.

@@ -50,7 +50,7 @@ from mava.utils.config import check_total_timesteps
 from mava.utils.jax_utils import switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.sebulba.pipelines import OffPolicyPipeline as Pipeline
-from mava.utils.sebulba.rate_limiters import SampleToInsertRatio
+from mava.utils.sebulba.rate_limiters import BlockingRatioLimiter, RateLimiter, SampleToInsertRatio
 from mava.utils.sebulba.utils import ParamsSource, RecordTimeTo
 from mava.wrappers.episode_metrics import get_final_step_metrics
 from mava.wrappers.gym import GymToJumanji
@@ -588,15 +588,20 @@ def run_experiment(_config: DictConfig) -> float:
     )
 
     # Setup RateLimiter
-    insert_to_sample_ratio = (
-        config.system.rollout_length
+    # Replay_ratio = num_gradient_updates / num_env_steps
+    # num_gradient_updates = sample_batch_size * epochs * rollout_length * samples_per_insert
+    num_updates_per_insert = (
+        config.system.epochs * config.system.sample_batch_size * config.system.rollout_length
+    )
+    num_setps_per_insert = (
+        config.system.sample_sequence_length
         * config.arch.num_envs
         * len(config.arch.actor_device_ids)
         * config.arch.n_threads_per_executor
-    ) / (config.system.sample_sequence_length * config.system.sample_batch_size)
-
-    config.system.sample_per_insert = config.system.mean_data_sample_rate * insert_to_sample_ratio
-    config.system.tolerance = config.system.sample_per_insert * config.system.error_tolerance
+    )
+    config.system.sample_per_insert = (
+        num_setps_per_insert * config.system.replay_ratio
+    ) / num_updates_per_insert
 
     min_num_inserts = max(
         config.system.sample_sequence_length // config.system.rollout_length,
@@ -604,9 +609,13 @@ def run_experiment(_config: DictConfig) -> float:
         1,
     )
 
-    rate_limiter = SampleToInsertRatio(
-        config.system.sample_per_insert, min_num_inserts, config.system.tolerance
-    )
+    rate_limiter: RateLimiter
+    if config.system.error_tolerance:
+        rate_limiter = SampleToInsertRatio(
+            config.system.sample_per_insert, min_num_inserts, config.system.error_tolerance
+        )
+    else:
+        rate_limiter = BlockingRatioLimiter(config.system.sample_per_insert, min_num_inserts)
 
     # Setup logger
     logger = MavaLogger(config)
