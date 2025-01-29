@@ -102,11 +102,9 @@ class Pipeline(threading.Thread):
             self.tickets_queue.put((start_condition, end_condition))
             start_condition.wait()  # wait to be allowed to start
 
-        timestep, hstates = final_timestep
-
         # [Transition(num_envs)] * rollout_len -> Transition[done=(num_envs, rollout_len, ...)]
         traj = _stack_trajectory(traj)
-        traj, timestep = jax.device_put((traj, timestep), device=self.sharding)
+        traj, final_timestep = jax.device_put((traj, final_timestep), device=self.sharding)
 
         time_dict, episode_metrics = metrics
         # [{'metric1' : value1, ...} * rollout_len -> {'metric1' : [value1, value2, ...], ...}
@@ -121,7 +119,7 @@ class Pipeline(threading.Thread):
         # We use a try-finally so the lock is released even if an exception is raised.
         try:
             self._queue.put(
-                (traj, time_dict, episode_metrics, (timestep, hstates)),
+                (traj, time_dict, episode_metrics, final_timestep),
                 block=True,
                 timeout=QUEUE_PUT_TIMEOUT,
             )
