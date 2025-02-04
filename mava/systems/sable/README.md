@@ -1,6 +1,6 @@
 # Sable
 
-Sable is an algorithm that was developed by the research team at InstaDeep. It also casts MARL as a sequence modelling problem and leverages the [advantage decompostion theorem](https://arxiv.org/pdf/2108.08612) through auto-regressive action selection for convergence guarantees and can scale to thousands of agents by leveraging the memory efficiency of Retentive Networks.
+Sable is an algorithm that was developed by the research team at InstaDeep. It also casts MARL as a sequence modelling problem and leverages the [advantage decomposition theorem](https://arxiv.org/pdf/2108.08612) through auto-regressive action selection for convergence guarantees and can scale to thousands of agents by leveraging the memory efficiency of Retentive Networks.
 
 We provide two Anakin based implementations of Sable:
 * [ff-sable](../../systems/sable/anakin/ff_sable.py)
