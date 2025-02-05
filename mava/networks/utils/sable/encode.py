@@ -46,7 +46,7 @@ def train_encoder_fn(
         chunk_obs = obs[:, start_idx:end_idx]
         chunk_dones = dones[:, start_idx:end_idx]
         chunk_step_count = step_count[:, start_idx:end_idx]
-        chunk_v_loc, chunk_obs_rep, hstate = encoder(
+        chunck_logitschunk_v_loc, chunk_obs_rep, hstate = encoder(
             chunk_obs, hstate, chunk_dones, chunk_step_count
         )
         v_loc = v_loc.at[:, start_idx:end_idx].set(chunk_v_loc)
