@@ -46,13 +46,13 @@ class ParamsSource(threading.Thread):
         self.value: Params = jax.device_put(init_value, device)
         self.device = device
         self.new_value: queue.Queue = queue.Queue()
-        self._stop_event = threading.Event()
+        self._should_stop = False
 
     def run(self) -> None:
         """This function is responsible for updating the value of the `ParamSource` when a new value
         is available.
         """
-        while not self._stop_event.is_set():
+        while not self._should_stop:
             try:
                 waiting = self.new_value.get(block=True, timeout=1)
                 self.value = jax.device_put(waiting, self.device)
@@ -73,4 +73,4 @@ class ParamsSource(threading.Thread):
 
     def stop(self) -> None:
         """Signal the thread to stop."""
-        self._stop_event.set()
+        self._should_stop = True

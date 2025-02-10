@@ -65,14 +65,14 @@ class Pipeline(threading.Thread):
         self.sharding = learner_sharding
         self.tickets_queue: queue.Queue = queue.Queue()
         self._queue: queue.Queue = queue.Queue(maxsize=max_size)
-        self._stop_event = threading.Event()
+        self._should_stop = False
 
     def run(self) -> None:
         """This function ensures that trajectories on the queue are consumed in the right order. The
         start_condition and end_condition are used to ensure that only 1 thread is processing an
         item from the queue at one time, ensuring predictable memory usage.
         """
-        while not self._stop_event.is_set():
+        while not self._should_stop:
             try:
                 start_condition, end_condition = self.tickets_queue.get(timeout=1)
                 with end_condition:
@@ -96,7 +96,7 @@ class Pipeline(threading.Thread):
         traj, timestep = jax.device_put((traj, timestep), device=self.sharding)
 
         time_dict, episode_metrics = metrics
-        # [{'metric1' : value1, ...} * rollout_len -> {'metric1' : [value1, value2, ...], ...}
+        # [{'metric1' : value1, ...] * rollout_len -> {'metric1' : [value1, value2, ...], ...}
         episode_metrics = _stack_trajectory(episode_metrics)
 
         # We block on the `put` to ensure that actors wait for the learners to catch up.
@@ -141,7 +141,7 @@ class Pipeline(threading.Thread):
 
     def stop(self) -> None:
         """Signal the thread to stop."""
-        self._stop_event.set()
+        self._should_stop = True
 
 
 class OffPolicyPipeline(threading.Thread):
@@ -175,8 +175,9 @@ class OffPolicyPipeline(threading.Thread):
         self.cpu = jax.devices("cpu")[0]
 
         self.tickets_queue: queue.Queue = queue.Queue()
+        # Only keep the latest 100 metrics, otherwise too many metrics are added we risk an OOM
         self.metrics_queue: queue.Queue = queue.Queue(maxsize=100)
-        self._stop_event = threading.Event()
+        self._should_stop = False
 
         self.num_buffers = len(config.arch.actor_device_ids) * config.arch.n_threads_per_executor
         self.rate_limiter = rate_limiter
@@ -198,7 +199,6 @@ class OffPolicyPipeline(threading.Thread):
             min_length_time_axis=config.system.min_buffer_size,
         )
         self.buffer_states = [rb.init(init_transition) for _ in range(self.num_buffers)]
-        self.buffer_adds_count = [0] * self.num_buffers
 
         # Setup functions
         self.buffer_add = jax.jit(rb.add, device=self.cpu)
@@ -209,7 +209,7 @@ class OffPolicyPipeline(threading.Thread):
         start_condition and end_condition are used to ensure that only 1 thread is processing an
         item from the queue at one time, ensuring predictable memory usage.
         """
-        while not self._stop_event.is_set():
+        while not self._should_stop:
             try:
                 start_condition, end_condition = self.tickets_queue.get(timeout=1)
                 with end_condition:
@@ -238,11 +238,10 @@ class OffPolicyPipeline(threading.Thread):
         traj = _stack_trajectory(traj)
 
         time_dict, episode_metrics = metrics
-        # [{'metric1' : value1, ...} * rollout_len -> {'metric1' : [value1, value2, ...], ...}
+        # [{'metric1' : value1, ...] * rollout_len -> {'metric1' : [value1, value2, ...], ...}
         episode_metrics = _stack_trajectory(episode_metrics)
 
         self.buffer_states[actor_id] = self.buffer_add(self.buffer_states[actor_id], traj)
-        self.buffer_adds_count[actor_id] += 1
 
         if self.metrics_queue.full():
             self.metrics_queue.get()  # remove the oldest entry
@@ -297,4 +296,4 @@ class OffPolicyPipeline(threading.Thread):
 
     def stop(self) -> None:
         """Signal the thread to stop."""
-        self._stop_event.set()
+        self._should_stop = True

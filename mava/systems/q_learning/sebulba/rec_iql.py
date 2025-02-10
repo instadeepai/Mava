@@ -60,7 +60,7 @@ def rollout(
     key: chex.PRNGKey,
     env: GymToJumanji,
     config: DictConfig,
-    rollout_queue: Pipeline,
+    rollout_pipeline: Pipeline,
     params_source: ParamsSource,
     q_net: RecQNetwork,
     actor_device: int,
@@ -74,12 +74,12 @@ def rollout(
         key: The PRNG key for stochasticity.
         env: The environment to interact with.
         config: Configuration settings for rollout and environment.
-        rollout_queue: Queue for sending collected trajectories to the learner.
+        rollout_pipeline: Pipeline for sending collected trajectories to the learner.
         params_source: Provides the latest network parameters from the learner.
         q_net: The Q-network.
         actor_device: Index of the actor device to use for rollout.
         seeds: Seeds for environment initialization.
-        thread_lifetime: Controls the thread's lifecycle.
+        stop_event: used to inform this thread that it is time to stop.
         actor_id: Unique identifier for the actor.
     """
     name = threading.current_thread().name
@@ -184,7 +184,7 @@ def rollout(
         # send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
             try:
-                rollout_queue.put(traj, (actor_timings, episode_metrics), actor_id)
+                rollout_pipeline.put(traj, (actor_timings, episode_metrics), actor_id)
             except queue.Full:
                 err = "Waited too long to add to the rollout queue, killing the actor thread"
                 warnings.warn(err, stacklevel=2)
@@ -419,11 +419,11 @@ def learner_thread(
         # Pass all the metrics and  params to the main thread (evaluator) for logging and evaluation
 
         if ep_metrics_list:
-            # [{metric1 : (num_envs, ...), ...} * n_rollouts] -->
-            # {metric1 : (n_rollouts, num_envs, ...), ...]
+            # [{metric1 : (num_envs, ...), ...}] * n_rollouts -->
+            # {metric1 : (n_rollouts, num_envs, ...), ...
             ep_metrics = tree.map(lambda *x: np.asarray(x), *ep_metrics_list)
 
-            # [{metric1: value1, ...} * n_rollouts] -->
+            # [{metric1: value1, ...}] * n_rollouts -->
             # {metric1: mean(value1_rollout1, value1_rollout2, ...), ...}
             rollout_times = tree.map(lambda *x: np.mean(x), *rollout_times_list)
         else:
