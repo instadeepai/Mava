@@ -427,13 +427,17 @@ class SableNetwork(nn.Module):
             encoder=self.encoder, obs=obs, hstate=hstates[0], dones=dones, step_count=step_count
         )
 
+        # Zero the hiddenstates and behave like there is a reset at each timestep.
+        zeroed_dec_hs = tree.map(lambda x: jnp.zeros_like(x), hstates[1:])
+        decoder_trainer_dones = tree.map(lambda x: jnp.ones_like(x, dtype=bool), dones)
+
         action_log, entropy = self.train_decoder_fn(
             decoder=self.decoder,
             obs_rep=obs_rep,
             action=action,
             legal_actions=legal_actions,
-            hstates=hstates[1:],
-            dones=dones,
+            hstates=zeroed_dec_hs,
+            dones=decoder_trainer_dones,
             step_count=step_count,
             rng_key=rng_key,
         )
@@ -464,11 +468,14 @@ class SableNetwork(nn.Module):
             step_count=step_count,
         )
 
+        # Manually set decoder hstates to zeros
+        zeroed_dec_hs = tree.map(lambda x: jnp.zeros_like(x), hstates[1:])
+
         output_actions, output_actions_log, updated_dec_hs = self.autoregressive_act(
             decoder=self.decoder,
             obs_rep=obs_rep,
             legal_actions=legal_actions,
-            hstates=decayed_hstates[1:],
+            hstates=zeroed_dec_hs,
             step_count=step_count,
             key=key,
         )
