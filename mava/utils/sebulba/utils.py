@@ -15,11 +15,13 @@
 import queue
 import threading
 import time
-from typing import Any
+from typing import Any, List, Union
 
 import jax
+from colorama import Fore, Style
 
 from mava.systems.ppo.types import Params
+from mava.utils.sebulba.pipelines import OffPolicyPipeline, Pipeline
 
 
 class RecordTimeTo:
@@ -74,3 +76,26 @@ class ParamsSource(threading.Thread):
     def stop(self) -> None:
         """Signal the thread to stop."""
         self._should_stop = True
+
+
+def stop_sebulba(
+    actors_stop_event: threading.Event,
+    pipe: Union[Pipeline, OffPolicyPipeline],
+    params_sources: List[ParamsSource],
+    actor_threads: List[threading.Thread],
+) -> None:
+    actors_stop_event.set()
+    pipe.clear()  # We clear the pipeline before stopping the actor threads to avoid deadlock
+    print(f"{Fore.RED}{Style.BRIGHT}Pipe cleared{Style.RESET_ALL}")
+    print(f"{Fore.RED}{Style.BRIGHT}Stopping actor threads...{Style.RESET_ALL}")
+    for actor in actor_threads:
+        actor.join()
+        print(f"{Fore.RED}{Style.BRIGHT}{actor.name} stopped{Style.RESET_ALL}")
+    print(f"{Fore.RED}{Style.BRIGHT}Stopping pipeline...{Style.RESET_ALL}")
+    pipe.stop()
+    pipe.join()
+    print(f"{Fore.RED}{Style.BRIGHT}Stopping params sources...{Style.RESET_ALL}")
+    for params_source in params_sources:
+        params_source.stop()
+        params_source.join()
+    print(f"{Fore.RED}{Style.BRIGHT}All threads stopped...{Style.RESET_ALL}")

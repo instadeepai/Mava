@@ -57,7 +57,7 @@ from mava.utils.jax_utils import merge_leading_dims, switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.network_utils import get_action_head
 from mava.utils.sebulba.pipelines import Pipeline
-from mava.utils.sebulba.utils import ParamsSource, RecordTimeTo
+from mava.utils.sebulba.utils import ParamsSource, RecordTimeTo, stop_sebulba
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 from mava.wrappers.gym import GymToJumanji
@@ -693,6 +693,9 @@ def run_experiment(_config: DictConfig) -> float:
     evaluator_envs.close()
     eval_performance = float(np.mean(eval_metrics[config.env.eval_metric]))
 
+    # Gracefully shutting down all actors and resources.
+    stop_sebulba(actors_stop_event, pipe, params_sources, actor_threads)
+
     # Measure absolute metric.
     if config.arch.absolute_metric:
         print(f"{Fore.BLUE}{Style.BRIGHT}Measuring absolute metric...{Style.RESET_ALL}")
@@ -705,24 +708,7 @@ def run_experiment(_config: DictConfig) -> float:
         t = int(steps_per_rollout * (eval_step + 1))
         logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
         abs_metric_evaluator_envs.close()
-
-    # Stop all the threads.
     logger.stop()
-    actors_stop_event.set()
-    pipe.clear()  # We clear the pipeline before stopping the actor threads to avoid deadlock
-    print(f"{Fore.RED}{Style.BRIGHT}Pipe cleared{Style.RESET_ALL}")
-    print(f"{Fore.RED}{Style.BRIGHT}Stopping actor threads...{Style.RESET_ALL}")
-    for actor in actor_threads:
-        actor.join()
-        print(f"{Fore.RED}{Style.BRIGHT}{actor.name} stopped{Style.RESET_ALL}")
-    print(f"{Fore.RED}{Style.BRIGHT}Stopping pipeline...{Style.RESET_ALL}")
-    pipe.stop()
-    pipe.join()
-    print(f"{Fore.RED}{Style.BRIGHT}Stopping params sources...{Style.RESET_ALL}")
-    for params_source in params_sources:
-        params_source.stop()
-        params_source.join()
-    print(f"{Fore.RED}{Style.BRIGHT}All threads stopped...{Style.RESET_ALL}")
 
     return eval_performance
 
