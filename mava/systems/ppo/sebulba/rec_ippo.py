@@ -61,6 +61,7 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_sebulba_config, check_total_timesteps
 from mava.utils.jax_utils import switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
 from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
 from mava.utils.training import make_learning_rate
@@ -107,7 +108,6 @@ def rollout(
         key: chex.PRNGKey,
     ) -> Tuple:
         """Get action and value."""
-        # actor_policy = actor_apply_fn(params.actor_params, observation)
 
         batched_observation = tree.map(lambda x: x[jnp.newaxis, :], observation)
         ac_in = (
@@ -123,9 +123,6 @@ def rollout(
 
         action = actor_policy.sample(seed=key)
         log_prob = actor_policy.log_prob(action)
-        # It may be faster to calculate the values in the learner as
-        # then we won't need to pass critic params to actors.
-        # value = critic_apply_fn(params.critic_params, observation).squeeze()
 
         hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
         return action, log_prob, value, hstates
@@ -189,10 +186,10 @@ def rollout(
                 last_hstates = copy.deepcopy(hstates)
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
-        # send trajectories to learner
+        # Send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
             try:
-                rollout_queue.put(traj, timestep, (actor_timings, episode_metrics), hstates)
+                rollout_queue.put(traj, (actor_timings, episode_metrics), (timestep, hstates))
             except queue.Full:
                 err = "Waited too long to add to the rollout queue, killing the actor thread"
                 warnings.warn(err, stacklevel=2)
@@ -229,29 +226,6 @@ def get_learner_step_fn(
             traj_batch (PPOTransition): the batch of data to learn with.
         """
 
-        def _calculate_gae(
-            traj_batch: RNNPPOTransition, last_val: chex.Array, last_done: chex.Array
-        ) -> Tuple[chex.Array, chex.Array]:
-            gamma, gae_lambda = config.system.gamma, config.system.gae_lambda
-
-            def _get_advantages(
-                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
-            ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
-                gae, next_value, next_done = carry
-                done, value, reward = transition.done, transition.value, transition.reward
-                delta = reward + gamma * next_value * (1 - next_done) - value
-                gae = delta + gamma * gae_lambda * (1 - next_done) * gae
-                return (gae, value, done), gae
-
-            _, advantages = jax.lax.scan(
-                _get_advantages,
-                (jnp.zeros_like(last_val), last_val, last_done),
-                traj_batch,
-                reverse=True,
-                unroll=16,
-            )
-            return advantages, advantages + traj_batch.value
-
         # Add a batch dimension to the observation.
         (
             params,
@@ -273,14 +247,16 @@ def get_learner_step_fn(
         _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
-        advantages, targets = _calculate_gae(traj_batch, last_val, last_done)
-
+        # Calculate advantage
+        advantages, targets = calculate_gae(
+            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+        )
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple[Tuple, Metrics]:
             """Update the network for a single epoch."""
 
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
-                # UNPACK TRAIN STATE AND BATCH INFO
+                # Unpack train state and batch info
                 params, opt_states, key = train_state
                 traj_batch, advantages, targets = batch_info
 
@@ -291,7 +267,7 @@ def get_learner_step_fn(
                     key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
-                    # RERUN NETWORK
+                    # Rerun network
 
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, actor_policy = actor_apply_fn(
@@ -301,8 +277,8 @@ def get_learner_step_fn(
 
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
-                    loss_actor1 = ratio * gae
-                    loss_actor2 = (
+                    actor_loss1 = ratio * gae
+                    actor_loss2 = (
                         jnp.clip(
                             ratio,
                             1.0 - config.system.clip_eps,
@@ -310,13 +286,13 @@ def get_learner_step_fn(
                         )
                         * gae
                     )
-                    loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
-                    loss_actor = loss_actor.mean()
+                    actor_loss = -jnp.minimum(actor_loss1, actor_loss2)
+                    actor_loss = actor_loss.mean()
                     # The seed will be used in the TanhTransformedDistribution:
                     entropy = actor_policy.entropy(seed=key).mean()
 
-                    total_loss = loss_actor - config.system.ent_coef * entropy
-                    return total_loss, (loss_actor, entropy)
+                    total_loss = actor_loss - config.system.ent_coef * entropy
+                    return total_loss, (actor_loss, entropy)
 
                 def _critic_loss_fn(
                     critic_params: FrozenDict,
@@ -324,13 +300,13 @@ def get_learner_step_fn(
                     targets: chex.Array,
                 ) -> Tuple:
                     """Calculate the critic loss."""
-                    # RERUN NETWORK
+                    # Rerun network
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, value = critic_apply_fn(
                         critic_params, traj_batch.hstates.critic_hidden_state[0], obs_and_done
                     )
 
-                    # CALCULATE VALUE LOSS
+                    # Calculate value loss
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
                         -config.system.clip_eps, config.system.clip_eps
                     )
@@ -385,8 +361,8 @@ def get_learner_step_fn(
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
                 # Pack loss info
                 actor_total_loss, (actor_loss, entropy) = actor_loss_info
-                critic_total_loss, (value_loss) = critic_loss_info
-                total_loss = critic_total_loss + actor_total_loss
+                value_loss, (value_loss) = critic_loss_info
+                total_loss = value_loss + actor_total_loss
                 loss_info = {
                     "total_loss": total_loss,
                     "value_loss": value_loss,
@@ -399,20 +375,20 @@ def get_learner_step_fn(
 
             key = jnp.squeeze(key, axis=0)  # Remove the learner_devices axis
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
-            key = jnp.expand_dims(key, axis=0)  # add the learner_devices axis for shape consitency
+            key = jnp.expand_dims(key, axis=0)  # Add the learner_devices axis for shape consitency
 
             # Shuffle minibatches
-            # batch_size = config.system.rollout_length * num_learner_envs
-            # permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
 
             num_recurrent_chunks = (
                 config.system.rollout_length // config.system.recurrent_chunk_size
             )
+
+            batch_size = num_learner_envs * num_recurrent_chunks
             batch = tree.map(
                 lambda x: x.reshape(
                     config.system.recurrent_chunk_size,
-                    num_learner_envs * num_recurrent_chunks,
+                    batch_size,
                     *x.shape[2:],
                 ),
                 batch,
@@ -504,7 +480,7 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, timestep, rollout_time, ep_metrics, hstates = pipeline.get(block=True)  # type: ignore
+                    traj_batch, rollout_time, ep_metrics, (timestep, hstates) = pipeline.get(block=True)
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
@@ -544,7 +520,7 @@ def learner_setup(
 ]:
     """Initialise learner_fn, network and learner state."""
 
-    # create temporory envoirnments.
+    # Create temporory envoirnments.
     env = environments.make_gym_env(config, config.arch.num_envs)
 
     # Get number of agents and actions.
@@ -610,7 +586,7 @@ def learner_setup(
         (config.arch.num_envs, config.system.num_agents), config.network.hidden_state_dim
     )
 
-    # initialise params and optimiser state.
+    # Initialise params and optimiser state.
     actor_params = actor_network.init(actor_key, init_policy_hstate, init_x)
     actor_opt_state = actor_optim.init(actor_params)
     critic_params = critic_network.init(critic_key, init_critic_hstate, init_x)
@@ -624,7 +600,7 @@ def learner_setup(
     apply_fns = (actor_network.apply, critic_network.apply)
     update_fns = (actor_optim.update, critic_optim.update)
 
-    # defines how the learner state is sharded: params, opt and key = replicated, timestep = sharded
+    # Defines how the learner state is sharded: params, opt and key = replicated, timestep = sharded
     learn_state_spec = RNNLearnerState(
         model_spec, model_spec, data_spec, None, data_spec, data_spec, data_spec
     )
@@ -639,7 +615,7 @@ def learner_setup(
         )
     )
 
-    # # Load model from checkpoint if specified.
+    # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
         loaded_checkpoint = Checkpointer(
             model_name=config.logger.system_name,
@@ -666,10 +642,10 @@ def learner_setup(
     )
 
     # Initialise learner state.
-    init_learner_state = RNNLearnerState(params, opt_states, step_keys, None, None, dones, hstates)  # type: ignore
+    init_learner_state = RNNLearnerState(params, opt_states, step_keys, None, None, dones, hstates)
     env.close()
 
-    return learn, apply_fns, init_learner_state, learner_sharding  # type: ignore
+    return learn, apply_fns, init_learner_state, learner_sharding
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -739,7 +715,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Executor setup and launch.
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
-    # the rollout queue/ the pipe between actor and learner
+    # The rollout queue/ the pipe between actor and learner
     pipe_lifetime = ThreadLifetime()
     pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding, pipe_lifetime)
     pipe.start()

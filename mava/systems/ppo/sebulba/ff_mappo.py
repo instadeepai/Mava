@@ -55,6 +55,7 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_sebulba_config, check_total_timesteps
 from mava.utils.jax_utils import merge_leading_dims, switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
 from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
 from mava.utils.training import make_learning_rate
@@ -148,10 +149,10 @@ def rollout(
 
                 dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
-        # send trajectories to learner
+        # Send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
             try:
-                rollout_queue.put(traj, timestep, (actor_timings, episode_metrics))
+                rollout_queue.put(traj, (actor_timings, episode_metrics), (timestep, None))
             except queue.Full:
                 err = "Waited too long to add to the rollout queue, killing the actor thread"
                 warnings.warn(err, stacklevel=2)
@@ -188,35 +189,13 @@ def get_learner_step_fn(
             traj_batch (PPOTransition): the batch of data to learn with.
         """
 
-        def _calculate_gae(
-            traj_batch: PPOTransition, last_val: chex.Array
-        ) -> Tuple[chex.Array, chex.Array]:
-            """Calculate the GAE."""
-
-            gamma, gae_lambda = config.system.gamma, config.system.gae_lambda
-
-            def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
-                """Calculate the GAE for a single transition."""
-                gae, next_value = gae_and_next_value
-                done, value, reward = transition.done, transition.value, transition.reward
-
-                delta = reward + gamma * next_value * (1 - done) - value
-                gae = delta + gamma * gae_lambda * (1 - done) * gae
-                return (gae, value), gae
-
-            _, advantages = jax.lax.scan(
-                _get_advantages,
-                (jnp.zeros_like(last_val), last_val),
-                traj_batch,
-                reverse=True,
-                unroll=16,
-            )
-            return advantages, advantages + traj_batch.value
-
         # Calculate advantage
         params, opt_states, key, _, final_timestep = learner_state
         last_val = critic_apply_fn(params.critic_params, final_timestep.observation)
-        advantages, targets = _calculate_gae(traj_batch, last_val)
+        last_done = np.repeat(final_timestep.last(), config.system.num_agents).reshape(num_envs, -1)
+        advantages, targets = calculate_gae(
+            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+        )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple[Tuple, Metrics]:
             """Update the network for a single epoch."""
@@ -334,7 +313,8 @@ def get_learner_step_fn(
             params, opt_states, traj_batch, advantages, targets, key = update_state
             key = jnp.squeeze(key, axis=0)  # Remove the learner_devices axis
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
-            key = jnp.expand_dims(key, axis=0)  # add the learner_devices axis for shape consitency
+            key = jnp.expand_dims(key, axis=0)  # Add the learner_devices axis for shape consitency
+
             # Shuffle minibatches
             batch_size = config.system.rollout_length * num_learner_envs
             permutation = jax.random.permutation(shuffle_key, batch_size)
@@ -409,7 +389,7 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, timestep, rollout_time, ep_metrics, _ = pipeline.get(block=True) # type: ignore
+                    traj_batch, rollout_time, ep_metrics, (timestep, _) = pipeline.get(block=True)
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
@@ -446,7 +426,7 @@ def learner_setup(
 ]:
     """Initialise learner_fn, network and learner state."""
 
-    # create temporory envoirnments.
+    # Create temporory envoirnments.
     env = environments.make_gym_env(config, config.arch.num_envs, add_global_state=True)
     # Get number of agents and actions.
     action_space = env.single_action_space
@@ -506,7 +486,7 @@ def learner_setup(
     apply_fns = (actor_network.apply, critic_network.apply)
     update_fns = (actor_optim.update, critic_optim.update)
 
-    # defines how the learner state is sharded: params, opt and key = sharded, timestep = sharded
+    # Defines how the learner state is sharded: params, opt and key = sharded, timestep = sharded
     learn_state_spec = SebulbaLearnerState(model_spec, model_spec, data_spec, None, data_spec)
     learn = get_learner_step_fn(apply_fns, update_fns, config)
     learn = jax.jit(
@@ -598,7 +578,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Executor setup and launch.
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
-    # the rollout queue/ the pipe between actor and learner
+    # The rollout queue/ the pipe between actor and learner
     pipe_lifetime = ThreadLifetime()
     pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding, pipe_lifetime)
     pipe.start()
