@@ -717,6 +717,9 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     OmegaConf.set_struct(cfg, False)
 
     # Run experiment.
+    print("\n\n\n")
+    print("sanity check")
+    print("\n\n\n")
     eval_performance = run_experiment(cfg)
     print(f"{Fore.CYAN}{Style.BRIGHT}IPPO experiment completed{Style.RESET_ALL}")
     return eval_performance
