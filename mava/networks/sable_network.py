@@ -81,7 +81,7 @@ class EncodeBlock(nn.Module):
 
 
 class Encoder(nn.Module):
-    """Multi-block encoder consisting of multiple `EncoderBlock` modules."""
+    """Multi-block encoder with dynamic residual connection in value head."""
 
     net_config: SableNetworkConfig
     memory_config: DictConfig
@@ -99,6 +99,18 @@ class Encoder(nn.Module):
                 nn.gelu,
             ],
         )
+
+        # Dynamic residual connection with scaling gate
+        self.head_transform = nn.Sequential(
+            [
+                nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
+                nn.gelu,
+                nn.RMSNorm(),
+                nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
+            ],
+        )
+        self.gate = self.param("gate", nn.initializers.ones, (self.net_config.embed_dim,))
+
         self.head = nn.Sequential(
             [
                 nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
@@ -121,37 +133,40 @@ class Encoder(nn.Module):
     def __call__(
         self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        """Apply chunkwise encoding."""
+        """Apply chunkwise encoding with dynamic residual connection."""
         updated_hstate = jnp.zeros_like(hstate)
         obs_rep = self.obs_encoder(obs)
 
         # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
             hs = hstate[:, :, i]  # Get the hidden state for the current block
-            # Apply the chunkwise encoder block
             obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
-        value = self.head(obs_rep)
+        # Apply dynamic residual connections in the value head
+        transformed = self.head_transform(obs_rep)
+        residual_scaled = transformed * self.gate
+        value = self.head(obs_rep + residual_scaled)
 
         return value, obs_rep, updated_hstate
 
     def recurrent(
         self, obs: chex.Array, hstate: chex.Array, step_count: chex.Array
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        """Apply recurrent encoding."""
+        """Apply recurrent encoding with dynamic residual connection."""
         updated_hstate = jnp.zeros_like(hstate)
         obs_rep = self.obs_encoder(obs)
 
         # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
-            hs = hstate[:, :, i]  # Get the hidden state for the current block
-            # Apply the recurrent encoder block
+            hs = hstate[:, :, i]
             obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
-        # Compute the value function
-        value = self.head(obs_rep)
+        # Compute the value function with dynamic residual connections
+        transformed = self.head_transform(obs_rep)
+        residual_scaled = transformed * self.gate
+        value = self.head(obs_rep + residual_scaled)
 
         return value, obs_rep, updated_hstate
 
