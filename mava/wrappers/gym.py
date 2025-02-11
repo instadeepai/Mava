@@ -91,6 +91,7 @@ class UoeWrapper(gymnasium.Wrapper):
         self.add_global_state = add_global_state
         self.num_agents = len(self._env.action_space)
         self.num_actions = self._env.action_space[0].n
+        self.step_count = 0
 
         # Tuple(Box(...) * N) --> Box(N, ...)
         single_obs = self.observation_space[0]  # type: ignore
@@ -114,6 +115,8 @@ class UoeWrapper(gymnasium.Wrapper):
         if self.add_global_state:
             info["global_obs"] = self.get_global_obs(agents_view)
 
+        self.step_count = 0
+        info["step_count"] = self.step_count
         return np.array(agents_view), info
 
     def step(self, actions: List) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
@@ -128,6 +131,7 @@ class UoeWrapper(gymnasium.Wrapper):
         else:
             reward = np.array(reward)
 
+        info["step_count"] = self.step_count
         return agents_view, reward, terminated, truncated, info
 
     def get_action_mask(self, info: Dict) -> NDArray:
@@ -282,7 +286,9 @@ class GymToJumanji:
         """Create an observation from the raw observation and environment state."""
 
         action_mask = np.stack(info["action_mask"])
-        obs_data = {"agents_view": obs, "action_mask": action_mask}
+        step_count = np.stack(info["step_count"])[:, np.newaxis]
+
+        obs_data = {"agents_view": obs, "action_mask": action_mask, "step_count": step_count}
 
         if "global_obs" in info:
             global_obs = np.array(info["global_obs"])
