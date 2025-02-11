@@ -12,472 +12,154 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
-from typing import Optional, Tuple
+from typing import Any, Optional
 
 import chex
+import jax
 import jax.numpy as jnp
-from flax import linen as nn
-from flax.linen.initializers import orthogonal
-from jax import tree
-from omegaconf import DictConfig
-
-from mava.networks.retention import MultiScaleRetention
-from mava.networks.torsos import SwiGLU
-from mava.networks.utils.sable import (
-    act_encoder_fn,
-    continuous_autoregressive_act,
-    continuous_train_decoder_fn,
-    discrete_autoregressive_act,
-    discrete_train_decoder_fn,
-    train_encoder_fn,
-)
-from mava.systems.sable.types import HiddenStates, SableNetworkConfig
-from mava.types import Observation
-from mava.utils.network_utils import _CONTINUOUS, _DISCRETE
+import tensorflow_probability.substrates.jax.bijectors as tfb
+import tensorflow_probability.substrates.jax.distributions as tfd
 
 
-class EncodeBlock(nn.Module):
-    """Sable encoder block."""
+class TanhTransformedDistribution(tfd.TransformedDistribution):
+    """A distribution transformed using the `tanh` function.
 
-    net_config: SableNetworkConfig
-    memory_config: DictConfig
-    n_agents: int
+    This transformation was adapted to acme's implementation.
+    For details, please see: http://tinyurl.com/2x5xea57
+    """
 
-    def setup(self) -> None:
-        self.ln1 = nn.RMSNorm()
-        self.ln2 = nn.RMSNorm()
-
-        self.retn = MultiScaleRetention(
-            embed_dim=self.net_config.embed_dim,
-            n_head=self.net_config.n_head,
-            n_agents=self.n_agents,
-            masked=False,  # Full retention for the encoder
-            memory_config=self.memory_config,
-            decay_scaling_factor=self.memory_config.decay_scaling_factor,
-        )
-
-        self.ffn = SwiGLU(self.net_config.embed_dim, self.net_config.embed_dim)
-
-    def __call__(
-        self, x: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array
-    ) -> chex.Array:
-        """Applies Chunkwise MultiScaleRetention."""
-        ret, updated_hstate = self.retn(
-            key=x, query=x, value=x, hstate=hstate, dones=dones, step_count=step_count
-        )
-        x = self.ln1(x + ret)
-        output = self.ln2(x + self.ffn(x))
-        return output, updated_hstate
-
-    def recurrent(self, x: chex.Array, hstate: chex.Array, step_count: chex.Array) -> chex.Array:
-        """Applies Recurrent MultiScaleRetention."""
-        ret, updated_hstate = self.retn.recurrent(
-            key_n=x, query_n=x, value_n=x, hstate=hstate, step_count=step_count
-        )
-        x = self.ln1(x + ret)
-        output = self.ln2(x + self.ffn(x))
-        return output, updated_hstate
-
-
-class Encoder(nn.Module):
-    """Multi-block encoder consisting of multiple `EncoderBlock` modules."""
-
-    net_config: SableNetworkConfig
-    memory_config: DictConfig
-    n_agents: int
-
-    def setup(self) -> None:
-        self.ln = nn.RMSNorm()
-
-        self.obs_encoder = nn.Sequential(
-            [
-                nn.RMSNorm(),
-                nn.Dense(
-                    self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2)), use_bias=False
-                ),
-                nn.gelu,
-            ],
-        )
-        self.head = nn.Sequential(
-            [
-                nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
-                nn.gelu,
-                nn.RMSNorm(),
-                nn.Dense(1, kernel_init=orthogonal(0.01)),
-            ],
-        )
-
-        self.blocks = [
-            EncodeBlock(
-                self.net_config,
-                self.memory_config,
-                self.n_agents,
-                name=f"encoder_block_{block_id}",
-            )
-            for block_id in range(self.net_config.n_block)
-        ]
-
-    def __call__(
-        self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array
-    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        """Apply chunkwise encoding."""
-        updated_hstate = jnp.zeros_like(hstate)
-        obs_rep = self.obs_encoder(obs)
-
-        # Apply the encoder blocks
-        for i, block in enumerate(self.blocks):
-            hs = hstate[:, :, i]  # Get the hidden state for the current block
-            # Apply the chunkwise encoder block
-            obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
-            updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
-
-        value = self.head(obs_rep)
-
-        return value, obs_rep, updated_hstate
-
-    def recurrent(
-        self, obs: chex.Array, hstate: chex.Array, step_count: chex.Array
-    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        """Apply recurrent encoding."""
-        updated_hstate = jnp.zeros_like(hstate)
-        obs_rep = self.obs_encoder(obs)
-
-        # Apply the encoder blocks
-        for i, block in enumerate(self.blocks):
-            hs = hstate[:, :, i]  # Get the hidden state for the current block
-            # Apply the recurrent encoder block
-            obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs, step_count)
-            updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
-
-        # Compute the value function
-        value = self.head(obs_rep)
-
-        return value, obs_rep, updated_hstate
-
-
-class DecodeBlock(nn.Module):
-    """Sable decoder block."""
-
-    net_config: SableNetworkConfig
-    memory_config: DictConfig
-    n_agents: int
-
-    def setup(self) -> None:
-        self.ln1, self.ln2, self.ln3 = nn.RMSNorm(), nn.RMSNorm(), nn.RMSNorm()
-
-        self.retn1 = MultiScaleRetention(
-            embed_dim=self.net_config.embed_dim,
-            n_head=self.net_config.n_head,
-            n_agents=self.n_agents,
-            masked=True,  # Masked retention for the decoder
-            memory_config=self.memory_config,
-            decay_scaling_factor=self.memory_config.decay_scaling_factor,
-        )
-        self.retn2 = MultiScaleRetention(
-            embed_dim=self.net_config.embed_dim,
-            n_head=self.net_config.n_head,
-            n_agents=self.n_agents,
-            masked=True,  # Masked retention for the decoder
-            memory_config=self.memory_config,
-            decay_scaling_factor=self.memory_config.decay_scaling_factor,
-        )
-
-        self.ffn = SwiGLU(self.net_config.embed_dim, self.net_config.embed_dim)
-
-    def __call__(
+    def __init__(
         self,
-        x: chex.Array,
-        obs_rep: chex.Array,
-        hstates: Tuple[chex.Array, chex.Array],
-        dones: chex.Array,
-        step_count: chex.Array,
-    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
-        """Applies Chunkwise MultiScaleRetention."""
-        hs1, hs2 = hstates
+        distribution: tfd.Distribution,
+        threshold: float = 0.999,
+        validate_args: bool = False,
+    ) -> None:
+        """Initialises the TanhTransformedDistribution.
 
-        # Apply the self-retention over actions
-        ret, hs1_new = self.retn1(
-            key=x, query=x, value=x, hstate=hs1, dones=dones, step_count=step_count
+        Args:
+        ----
+          distribution: The base distribution to be transformed.
+          bijector: The bijective transformation applied to the distribution.
+          threshold: Clipping value for the action when computing the log_prob.
+          validate_args: Whether to validate input with respect to distribution parameters.
+
+        """
+        super().__init__(
+            distribution=distribution, bijector=tfb.Tanh(), validate_args=validate_args
         )
-        ret = self.ln1(x + ret)
-
-        # Apply the cross-retention over obs x action
-        ret2, hs2_new = self.retn2(
-            key=ret,
-            query=obs_rep,
-            value=ret,
-            hstate=hs2,
-            dones=dones,
-            step_count=step_count,
-        )
-        y = self.ln2(obs_rep + ret2)
-        output = self.ln3(y + self.ffn(y))
-
-        return output, (hs1_new, hs2_new)
-
-    def recurrent(
-        self,
-        x: chex.Array,
-        obs_rep: chex.Array,
-        hstates: Tuple[chex.Array, chex.Array],
-        step_count: chex.Array,
-    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
-        """Applies Recurrent MultiScaleRetention."""
-        hs1, hs2 = hstates
-
-        # Apply the self-retention over actions
-        ret, hs1_new = self.retn1.recurrent(
-            key_n=x, query_n=x, value_n=x, hstate=hs1, step_count=step_count
-        )
-        ret = self.ln1(x + ret)
-
-        # Apply the cross-retention over obs x action
-        ret2, hs2_new = self.retn2.recurrent(
-            key_n=ret, query_n=obs_rep, value_n=ret, hstate=hs2, step_count=step_count
-        )
-        y = self.ln2(obs_rep + ret2)
-        output = self.ln3(y + self.ffn(y))
-
-        return output, (hs1_new, hs2_new)
-
-
-class Decoder(nn.Module):
-    """Multi-block decoder consisting of multiple `DecoderBlock` modules."""
-
-    net_config: SableNetworkConfig
-    memory_config: DictConfig
-    n_agents: int
-    action_dim: int
-    action_space_type: str = _DISCRETE
-
-    def setup(self) -> None:
-        self.ln = nn.RMSNorm()
-
-        use_bias = self.action_space_type == _CONTINUOUS
-        self.action_encoder = nn.Sequential(
-            [
-                nn.Dense(
-                    self.net_config.embed_dim,
-                    use_bias=use_bias,
-                    kernel_init=orthogonal(jnp.sqrt(2)),
-                ),
-                nn.gelu,
-            ],
+        # Computes the log of the average probability distribution outside the
+        # clipping range, i.e. on the interval [-inf, -atanh(threshold)] for
+        # log_prob_left and [atanh(threshold), inf] for log_prob_right.
+        self._threshold = threshold
+        inverse_threshold = self.bijector.inverse(threshold)
+        # average(pdf) = p/epsilon
+        # So log(average(pdf)) = log(p) - log(epsilon)
+        log_epsilon = jnp.log(1.0 - threshold)
+        # Those 2 values are differentiable w.r.t. model parameters, such that the
+        # gradient is defined everywhere.
+        self._log_prob_left = self.distribution.log_cdf(-inverse_threshold) - log_epsilon
+        self._log_prob_right = (
+            self.distribution.log_survival_function(inverse_threshold) - log_epsilon
         )
 
-        # Always initialize log_std but set to None for discrete action spaces
-        # This ensures the attribute exists but signals it should not be used.
-        self.log_std = (
-            self.param("log_std", nn.initializers.zeros, (self.action_dim,))
-            if self.action_space_type == _CONTINUOUS
-            else None
+    def log_prob(self, event: chex.Array) -> chex.Array:
+        """Computes the log probability of the event under the transformed distribution."""
+        # Without this clip, there would be NaNs in the internal tf.where.
+        event = jnp.clip(event, -self._threshold, self._threshold)
+        # The inverse image of {threshold} is the interval [atanh(threshold), inf]
+        # which has a probability of "log_prob_right" under the given distribution.
+        return jnp.where(
+            event <= -self._threshold,
+            self._log_prob_left,
+            jnp.where(event >= self._threshold, self._log_prob_right, super().log_prob(event)),
         )
 
-        self.head = nn.Sequential(
-            [
-                nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
-                nn.gelu,
-                nn.RMSNorm(),
-                nn.Dense(self.action_dim, kernel_init=orthogonal(0.01)),
-            ],
+    def mode(self) -> chex.Array:
+        """Returns the mode of the distribution."""
+        return self.bijector.forward(self.distribution.mode())
+
+    def entropy(self, seed: chex.PRNGKey = None) -> chex.Array:
+        """Computes an estimation of the entropy using a sample of the log_det_jacobian."""
+        return self.distribution.entropy() + self.bijector.forward_log_det_jacobian(
+            self.distribution.sample(seed=seed), event_ndims=0
         )
 
-        self.blocks = [
-            DecodeBlock(
-                self.net_config,
-                self.memory_config,
-                self.n_agents,
-                name=f"decoder_block_{block_id}",
-            )
-            for block_id in range(self.net_config.n_block)
-        ]
-
-    def __call__(
-        self,
-        action: chex.Array,
-        obs_rep: chex.Array,
-        hstates: Tuple[chex.Array, chex.Array],
-        dones: chex.Array,
-        step_count: chex.Array,
-    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
-        """Apply chunkwise decoding."""
-        updated_hstates = tree.map(jnp.zeros_like, hstates)
-        action_embeddings = self.action_encoder(action)
-        x = self.ln(action_embeddings)
-
-        # Apply the decoder blocks
-        for i, block in enumerate(self.blocks):
-            hs = tree.map(lambda x, j=i: x[:, :, j], hstates)
-            x, hs_new = block(x=x, obs_rep=obs_rep, hstates=hs, dones=dones, step_count=step_count)
-            updated_hstates = tree.map(
-                lambda x, y, j=i: x.at[:, :, j].set(y), updated_hstates, hs_new
-            )
-
-        logit = self.head(x)
-
-        return logit, updated_hstates
-
-    def recurrent(
-        self,
-        action: chex.Array,
-        obs_rep: chex.Array,
-        hstates: Tuple[chex.Array, chex.Array],
-        step_count: chex.Array,
-    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
-        """Apply recurrent decoding."""
-        updated_hstates = tree.map(jnp.zeros_like, hstates)
-        action_embeddings = self.action_encoder(action)
-        x = self.ln(action_embeddings)
-
-        # Apply the decoder blocks
-        for i, block in enumerate(self.blocks):
-            hs = tree.map(lambda x, i=i: x[:, :, i], hstates)
-            x, hs_new = block.recurrent(x=x, obs_rep=obs_rep, hstates=hs, step_count=step_count)
-            updated_hstates = tree.map(
-                lambda x, y, j=i: x.at[:, :, j].set(y), updated_hstates, hs_new
-            )
-
-        logit = self.head(x)
-
-        return logit, updated_hstates
+    @classmethod
+    def _parameter_properties(cls, dtype: Optional[Any], num_classes: Any = None) -> Any:
+        td_properties = super()._parameter_properties(dtype, num_classes=num_classes)
+        del td_properties["bijector"]
+        return td_properties
 
 
-class SableNetwork(nn.Module):
-    """Sable network module."""
+class MaskedEpsGreedyDistribution(tfd.Categorical):
+    """Computes an epsilon-greedy distribution for each action choice. There are two
+    components in the distribution:
 
-    n_agents: int
-    n_agents_per_chunk: int
-    action_dim: int
-    net_config: SableNetworkConfig
-    memory_config: DictConfig
-    action_space_type: str = _DISCRETE
+    1. A uniform component, where every action that is NOT masked out gets an even weighting.
+    2. A greedy component, where the action with the highest corresponding q-value that is
+    NOT masked out gets a probability of one.
 
-    def setup(self) -> None:
-        if self.action_space_type not in [_DISCRETE, _CONTINUOUS]:
-            raise ValueError(f"Invalid action space type: {self.action_space_type}")
+    Combining these two distributions per action choice in a ratio of eps:1-eps gives
+    the final distribution. This distribution can be sampled using mode() for a purely
+    greedy strategy, and sampled normally using sample() for an epsilon-greedy strategy.
+    """
 
-        assert (
-            self.memory_config.decay_scaling_factor >= 0
-            and self.memory_config.decay_scaling_factor <= 1
-        ), "Decay scaling factor should be between 0 and 1"
+    def __init__(self, q_values: chex.Array, epsilon: float, mask: chex.Array):
+        # keep q values available if we need to use them to learn with later
+        self.q_values = q_values
 
-        # Decay kappa for each head
-        self.decay_kappas = 1 - jnp.exp(
-            jnp.linspace(jnp.log(1 / 32), jnp.log(1 / 512), self.net_config.n_head)
-        )
-        self.decay_kappas = self.decay_kappas * self.memory_config.decay_scaling_factor
-        self.decay_kappas = self.decay_kappas[None, :, None, None, None]
+        # UNIFORM PART (eps %)
+        # generate uniform probabilities across all allowable actions at most granular level
+        masked_uniform_action_probs = mask.astype(int)
+        # get num avail actions to generate probabilities for choosing
+        n_available_actions = jnp.sum(masked_uniform_action_probs, axis=-1)[..., jnp.newaxis]
+        # divide with sum along axis to get uniform per action choice
+        masked_uniform_action_probs = masked_uniform_action_probs / n_available_actions
 
-        self.encoder = Encoder(
-            self.net_config,
-            self.memory_config,
-            self.n_agents_per_chunk,
-        )
-        self.decoder = Decoder(
-            self.net_config,
-            self.memory_config,
-            self.n_agents_per_chunk,
-            self.action_dim,
-            self.action_space_type,
+        # GREEDY PART (1-eps %)
+        # set masked actions to value not chosen by argmax
+        masked_q_vals = jnp.where(
+            mask,
+            q_values,
+            jnp.finfo(jnp.float32).min,
         )
 
-        # Set the actor and trainer functions
-        self.train_encoder_fn = partial(
-            train_encoder_fn,
-            chunk_size=self.memory_config.chunk_size,
-        )
-        self.act_encoder_fn = partial(
-            act_encoder_fn,
-            chunk_size=self.n_agents_per_chunk,
-        )
-        if self.action_space_type == _CONTINUOUS:
-            self.train_decoder_fn = partial(
-                continuous_train_decoder_fn,
-                n_agents=self.n_agents,
-                chunk_size=self.memory_config.chunk_size,
-                action_dim=self.action_dim,
-            )
-            self.autoregressive_act = partial(
-                continuous_autoregressive_act, action_dim=self.action_dim
-            )
-        else:
-            self.train_decoder_fn = partial(
-                discrete_train_decoder_fn,
-                n_agents=self.n_agents,
-                chunk_size=self.memory_config.chunk_size,
-            )
-            self.autoregressive_act = discrete_autoregressive_act  # type: ignore
+        # greedy argmax over action-value dim
+        greedy_actions = jnp.argmax(masked_q_vals, axis=-1)
+        # get one-hot so that shapes are equal again and ready to be made into a prob
+        greedy_actions = jax.nn.one_hot(greedy_actions, q_values.shape[-1])
+        # consistency check
+        chex.assert_equal_shape([greedy_actions, masked_q_vals, q_values])
 
-    def __call__(
-        self,
-        observation: Observation,
-        action: chex.Array,
-        hstates: HiddenStates,
-        dones: chex.Array,
-        rng_key: Optional[chex.PRNGKey] = None,
-    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        """Training phase."""
-        obs, legal_actions, step_count = (
-            observation.agents_view,
-            observation.action_mask,
-            observation.step_count,
-        )
-        value, obs_rep, _ = self.train_encoder_fn(
-            encoder=self.encoder, obs=obs, hstate=hstates[0], dones=dones, step_count=step_count
+        mixed_eps_greedy_probs = (
+            epsilon * masked_uniform_action_probs + (1 - epsilon) * greedy_actions
         )
 
-        action_log, entropy = self.train_decoder_fn(
-            decoder=self.decoder,
-            obs_rep=obs_rep,
-            action=action,
-            legal_actions=legal_actions,
-            hstates=hstates[1:],
-            dones=dones,
-            step_count=step_count,
-            rng_key=rng_key,
-        )
+        super().__init__(probs=mixed_eps_greedy_probs)
 
-        value = jnp.squeeze(value, axis=-1)
-        return value, action_log, entropy
+    @classmethod
+    def _parameter_properties(cls, dtype: Optional[Any], num_classes: Any = None) -> Any:
+        td_properties = super()._parameter_properties(dtype, num_classes=num_classes)
+        return td_properties
 
-    def get_actions(
-        self,
-        observation: Observation,
-        hstates: HiddenStates,
-        key: chex.PRNGKey,
-    ) -> Tuple[chex.Array, chex.Array, chex.Array, HiddenStates]:
-        """Inference phase."""
-        obs, legal_actions, step_count = (
-            observation.agents_view,
-            observation.action_mask,
-            observation.step_count,
-        )
 
-        # Decay the hidden states: each timestep we decay the hidden states once
-        decayed_hstates = tree.map(lambda x: x * self.decay_kappas, hstates)
+class IdentityTransformation(tfd.TransformedDistribution):
+    """A distribution transformed using the `Identity()` bijector.
 
-        value, obs_rep, updated_enc_hs = self.act_encoder_fn(
-            encoder=self.encoder,
-            obs=obs,
-            decayed_hstate=decayed_hstates[0],
-            step_count=step_count,
-        )
+    We transform this distribution with the `Identity()` bijector to enable us to call
+    `pi.entropy(seed)` and keep the API identical to the TanhTransformedDistribution.
+    """
 
-        output_actions, output_actions_log, updated_dec_hs = self.autoregressive_act(
-            decoder=self.decoder,
-            obs_rep=obs_rep,
-            legal_actions=legal_actions,
-            hstates=decayed_hstates[1:],
-            step_count=step_count,
-            key=key,
-        )
+    def __init__(self, distribution: tfd.Distribution) -> None:
+        """Initialises the IdentityTransformation."""
+        super().__init__(distribution=distribution, bijector=tfb.Identity())
 
-        updated_hs = HiddenStates(
-            encoder=updated_enc_hs,
-            decoder_self_retn=updated_dec_hs[0],
-            decoder_cross_retn=updated_dec_hs[1],
-        )
+    def entropy(self, seed: chex.PRNGKey = None) -> chex.Array:
+        """Computes the entropy of the distribution."""
+        return self.distribution.entropy()
 
-        value = jnp.squeeze(value, axis=-1)
-        return output_actions, output_actions_log, value, updated_hs
+    @classmethod
+    def _parameter_properties(cls, dtype: Optional[Any], num_classes: Any = None) -> Any:
+        td_properties = super()._parameter_properties(dtype, num_classes=num_classes)
+        del td_properties["bijector"]
+        return td_properties
