@@ -14,7 +14,7 @@
 
 from functools import partial
 from typing import Optional, Tuple
-from jax.nn import softmax
+
 import chex
 import jax.numpy as jnp
 from flax import linen as nn
@@ -82,12 +82,10 @@ class EncodeBlock(nn.Module):
 
 class Encoder(nn.Module):
     """Multi-block encoder consisting of multiple `EncoderBlock` modules."""
+
     net_config: SableNetworkConfig
     memory_config: DictConfig
     n_agents: int
-    num_atoms: int = 101
-    v_min: float = -20.0
-    v_max: float = 20.0
 
     def setup(self) -> None:
         self.ln = nn.RMSNorm()
@@ -102,12 +100,13 @@ class Encoder(nn.Module):
             ],
         )
         self.head = nn.Sequential(
-            nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
-            nn.relu,
-            nn.RMSNorm(),
-            nn.Dense(self.num_atoms, kernel_init=orthogonal(0.01)),
+            [
+                nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
+                nn.gelu,
+                nn.RMSNorm(),
+                nn.Dense(1, kernel_init=orthogonal(0.01)),
+            ],
         )
-        self.support = jnp.linspace(self.v_min, self.v_max, self.num_atoms)
 
         self.blocks = [
             EncodeBlock(
@@ -133,10 +132,9 @@ class Encoder(nn.Module):
             obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
-        logits = self.head(obs_rep)
-        probabilities = softmax(logits, axis=-1)
-        value = jnp.expand_dims(jnp.sum(probabilities * self.support, axis=-1), axis=-1)
-        return logits, value, obs_rep, updated_hstate
+        value = self.head(obs_rep)
+
+        return value, obs_rep, updated_hstate
 
     def recurrent(
         self, obs: chex.Array, hstate: chex.Array, step_count: chex.Array
@@ -153,10 +151,9 @@ class Encoder(nn.Module):
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
         # Compute the value function
-        logits = self.head(obs_rep)
-        probabilities = softmax(logits, axis=-1)
-        value = jnp.expand_dims(jnp.sum(probabilities * self.support, axis=-1), axis=-1)
-        return logits, value, obs_rep, updated_hstate
+        value = self.head(obs_rep)
+
+        return value, obs_rep, updated_hstate
 
 
 class DecodeBlock(nn.Module):
@@ -485,9 +482,8 @@ class SableNetwork(nn.Module):
         value = jnp.squeeze(value, axis=-1)
         return output_actions, output_actions_log, value, updated_hs
     
-
-    # Assistant code
-    class Encoder(nn.Module):
+# Assistant code
+class Encoder(nn.Module):
     """Multi-block encoder with dynamic residual connection in value head."""
 
     net_config: SableNetworkConfig
