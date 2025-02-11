@@ -1,4 +1,3 @@
-
 # Copyright 2022 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,6 +50,7 @@ from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
+
 def get_learner_fn(
     env: MarlEnv,
     apply_fns: Tuple[ActorApply, LearnerApply],
@@ -58,54 +58,6 @@ def get_learner_fn(
     config: DictConfig,
 ) -> LearnerFn[LearnerState]:
     """Get the learner function."""
-
-
-    def mse_value_loss(value_pred: chex.Array, value_targets: chex.Array, old_value: chex.Array) -> chex.Array:
-        """Compute the clipped MSE loss for value prediction."""
-        value_pred_clipped = old_value + (value_pred - old_value).clip(-config.system.clip_eps, config.system.clip_eps)
-        value_losses = jnp.square(value_pred - value_targets)
-        value_losses_clipped = jnp.square(value_pred_clipped - value_targets)
-        return 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
-
-
-    def categorical_value_loss(value_logits: chex.Array, value_targets: chex.Array) -> chex.Array:
-        """Compute the categorical distributional loss for value prediction.
-        
-        If value_targets is provided as a distribution (i.e. with more than one element in the last dimension),
-        it is converted to a scalar by taking the expectation with respect to the support.
-        """
-        v_min = config.system.v_min
-        v_max = config.system.v_max
-        n_atoms = config.system.n_atoms
-
-        # If value_targets is not scalar per sample, compute its expectation.
-        if value_targets.ndim > 1:
-            if value_targets.shape[-1] != 1:
-                # Compute expectation over the provided distribution.
-                support = jnp.linspace(v_min, v_max, value_targets.shape[-1])
-                value_targets = jnp.sum(value_targets * support, axis=-1)
-            else:
-                value_targets = jnp.squeeze(value_targets, axis=-1)
-
-        log_probs = jax.nn.log_softmax(value_logits, axis=-1)
-        delta_z = (v_max - v_min) / (n_atoms - 1)
-
-        # Project the scalar targets onto the support.
-        target = jnp.clip(value_targets, v_min, v_max)
-        b = (target - v_min) / delta_z
-        l = jnp.floor(b).astype(jnp.int32)
-        u = jnp.ceil(b).astype(jnp.int32)
-        l = jnp.clip(l, 0, n_atoms - 1)
-        u = jnp.clip(u, 0, n_atoms - 1)
-        offset_upper = b - l
-        offset_lower = 1.0 - offset_upper
-
-        batch_size = target.shape[0]
-        m_prob = jnp.zeros((batch_size, n_atoms))
-        m_prob = m_prob.at[jnp.arange(batch_size), l].add(offset_lower)
-        m_prob = m_prob.at[jnp.arange(batch_size), u].add(offset_upper)
-
-        return -jnp.sum(m_prob * log_probs, axis=-1).mean()
 
     # Get apply functions for executing and training the network.
     sable_action_select_fn, sable_apply_fn = apply_fns
@@ -257,9 +209,6 @@ def get_learner_fn(
                     actor_loss = -jnp.minimum(actor_loss1, actor_loss2)
                     actor_loss = actor_loss.mean()
                     entropy = entropy.mean()
-
-                    value_loss = categorical_value_loss(value, value_targets)
-                    # value_loss = value_loss.mean()
 
                     # Clipped MSE loss
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
