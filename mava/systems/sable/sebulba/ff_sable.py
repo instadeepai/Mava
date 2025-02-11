@@ -16,10 +16,10 @@ import copy
 import queue
 import threading
 import warnings
-from functools import partial
 from collections import defaultdict
+from functools import partial
 from queue import Queue
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 import chex
 import hydra
@@ -29,7 +29,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 from colorama import Fore, Style
-from flax.core.frozen_dict import FrozenDict
+from flax.core.frozen_dict import FrozenDict as Params
 from jax import tree
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
@@ -37,23 +37,17 @@ from jax.sharding import Mesh, NamedSharding, PartitionSpec, Sharding
 from numpy.typing import NDArray
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
-from flax.core.frozen_dict import FrozenDict as Params
 
-from mava.evaluator import ActorState, EvalActFn, get_sebulba_eval_fn as get_eval_fn, get_num_eval_envs
+from mava.evaluator import ActorState, EvalActFn, get_num_eval_envs
+from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
 from mava.networks import SableNetwork
-
-
 from mava.networks.utils.sable import get_init_hidden_state
-from mava.systems.sable.types import (
-    ActorApply,
-    LearnerApply,
-    Transition,
-    SebulbaLearnerState as LearnerState
-)
+from mava.systems.sable.types import ActorApply, LearnerApply, Transition
+from mava.systems.sable.types import SebulbaLearnerState as LearnerState
 from mava.types import (
     Action,
-    Observation,
     Metrics,
+    Observation,
     SebulbaLearnerFn,
 )
 from mava.utils import make_env as environments
@@ -105,12 +99,12 @@ def rollout(
         key: chex.PRNGKey,
     ) -> Tuple:
         """Get action and value."""
-        #todo should we just create a new hstate here?
+        # todo should we just create a new hstate here?
         action, log_prob, value, _ = apply_fns(  # type: ignore
-                params,
-                observation=observation,
-                key=key,
-            )
+            params,
+            observation=observation,
+            key=key,
+        )
         return action, log_prob, value
 
     timestep = env.reset(seed=seeds)
@@ -140,10 +134,10 @@ def rollout(
                     timestep = env.step(cpu_action)
 
                 dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
-                
+
                 info = tree.map(
-                lambda x: jnp.repeat(x[..., jnp.newaxis], config.system.num_agents, axis=-1),
-                timestep.extras["episode_metrics"],
+                    lambda x: jnp.repeat(x[..., jnp.newaxis], config.system.num_agents, axis=-1),
+                    timestep.extras["episode_metrics"],
                 )
 
                 # Append data to storage
@@ -188,7 +182,7 @@ def get_learner_step_fn(
     def _update_step(
         learner_state: LearnerState,
         traj_batch: Transition,
-    ) -> Tuple[LearnerState, Tuple]:
+    ) -> Tuple[LearnerState, Metrics]:
         """A single update of the network.
 
         This function calculates advantages and targets based on the trajectories
@@ -321,7 +315,7 @@ def get_learner_step_fn(
 
             params, opt_states, traj_batch, advantages, targets, key = update_state
             key, shuffle_key, agent_shuffle_key, entropy_key = jax.random.split(key, 4)
-            
+
             # Shuffle minibatches
             batch_size = config.system.rollout_length * num_learner_envs
             permutation = jax.random.permutation(shuffle_key, batch_size)
@@ -433,8 +427,8 @@ def learner_setup(
     key: chex.PRNGKey, config: DictConfig, learner_devices: List
 ) -> Tuple[
     SebulbaLearnerFn[LearnerState, Transition],
-    callable,
-    callable,
+    Callable,
+    Callable,
     LearnerState,
     Sharding,
 ]:
@@ -464,8 +458,8 @@ def learner_setup(
         err = "Number of agents should be divisible by chunk size"
         assert config.system.num_agents % config.network.memory_config.chunk_size == 0, err
     else:
-        config.network.memory_config.chunk_size = config.system.num_agents 
-    
+        config.network.memory_config.chunk_size = config.system.num_agents
+
     # Set positional encoding to False, since ff-sable does not use temporal dependencies.
     config.network.memory_config.timestep_positional_encoding = False
 
@@ -473,7 +467,7 @@ def learner_setup(
 
     # Define network.
     sable_network = SableNetwork(
-        n_agents=config.system.num_agents ,
+        n_agents=config.system.num_agents,
         n_agents_per_chunk=config.network.memory_config.chunk_size,
         action_dim=config.system.num_actions,
         net_config=config.network.net_config,
@@ -510,10 +504,14 @@ def learner_setup(
 
     # Create fake hstates
     minibatch_size = (
-        config.arch.num_envs * config.system.rollout_length // (config.system.num_minibatches * len(learner_devices))
+        config.arch.num_envs
+        * config.system.rollout_length
+        // (config.system.num_minibatches * len(learner_devices))
     )
     dummy_rollout_hs = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
-    dummy_actor_hs = get_init_hidden_state(config.network.net_config, config.arch.num_envs // len(learner_devices))
+    dummy_actor_hs = get_init_hidden_state(
+        config.network.net_config, config.arch.num_envs // len(learner_devices)
+    )
     dummy_trainer_hs = get_init_hidden_state(config.network.net_config, minibatch_size)
 
     # Pack apply and update functions.
@@ -583,7 +581,9 @@ def run_experiment(_config: DictConfig) -> float:
     np_rng = np.random.default_rng(config.system.seed)
 
     # Setup learner.
-    learn, apply_fns, eval_apply_fns, learner_state, learner_sharding = learner_setup(key, config, learner_devices)
+    learn, apply_fns, eval_apply_fns, learner_state, learner_sharding = learner_setup(
+        key, config, learner_devices
+    )
 
     # Setup evaluator.
     def make_ff_sable_act_fn(actor_apply_fn: ActorApply) -> EvalActFn:
@@ -598,6 +598,7 @@ def run_experiment(_config: DictConfig) -> float:
             return output_action, {}
 
         return eval_act_fn
+
     eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
     eval_hs = get_init_hidden_state(config.network.net_config, eval_batch_size)
     sable_execution_fn = partial(eval_apply_fns, hstates=eval_hs)
