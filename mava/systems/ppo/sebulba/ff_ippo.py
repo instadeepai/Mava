@@ -524,10 +524,6 @@ def learner_setup(
 
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
-
-    print("\n\n\n")
-    print("sanity check")
-    print("\n\n\n")
     
     _config.logger.system_name = "ff_ippo_sebulba"
     config = copy.deepcopy(_config)
