@@ -133,11 +133,10 @@ class Encoder(nn.Module):
             obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
-        # TODO: Create a function to compute the value function
         logits = self.head(obs_rep)
         probabilities = softmax(logits, axis=-1)
         value = jnp.expand_dims(jnp.sum(probabilities * self.support, axis=-1), axis=-1)
-        return value, obs_rep, updated_hstate
+        return logits, value, obs_rep, updated_hstate
 
     def recurrent(
         self, obs: chex.Array, hstate: chex.Array, step_count: chex.Array
@@ -154,11 +153,10 @@ class Encoder(nn.Module):
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
         # Compute the value function
-        # TODO: Create a function to compute the value function
         logits = self.head(obs_rep)
         probabilities = softmax(logits, axis=-1)
         value = jnp.expand_dims(jnp.sum(probabilities * self.support, axis=-1), axis=-1)
-        return value, obs_rep, updated_hstate
+        return logits, value, obs_rep, updated_hstate
 
 
 class DecodeBlock(nn.Module):

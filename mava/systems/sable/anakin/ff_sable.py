@@ -49,45 +49,6 @@ from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
-def projection_distribution(next_dist: chex.Array,
-                            rewards: chex.Array,
-                            dones: chex.Array,
-                            gamma: float,
-                            support: chex.Array,
-                            v_min: float,
-                            v_max: float) -> chex.Array:
-    """
-    Projects the Bellman-updated distribution onto the fixed support.
-    
-    Args:
-        next_dist: [B, num_atoms] probability distribution for the next state.
-        rewards: [B] immediate rewards.
-        dones: [B] done flags (0. or 1.).
-        gamma: discount factor.
-        support: [num_atoms] fixed support values.
-        v_min: minimum value of the support.
-        v_max: maximum value of the support.
-    
-    Returns:
-        A projected distribution with shape [B, num_atoms].
-    """
-    num_atoms = support.shape[0]
-    delta_z = (v_max - v_min) / (num_atoms - 1)
-    # Compute Tz = rewards + gamma * z (for non-terminal states)
-    Tz = rewards[:, None] + gamma * support[None, :] * (1.0 - dones[:, None])
-    Tz = jnp.clip(Tz, v_min, v_max)
-    b = (Tz - v_min) / delta_z
-    l = jnp.floor(b).astype(jnp.int32)
-    u = jnp.ceil(b).astype(jnp.int32)
-    l = jnp.clip(l, 0, num_atoms - 1)
-    u = jnp.clip(u, 0, num_atoms - 1)
-    # Distribute the probability mass.
-    offset = jnp.linspace(0, (Tz.shape[0] - 1) * num_atoms, Tz.shape[0]).astype(jnp.int32)[:, None]
-    m = jnp.zeros((Tz.shape[0], num_atoms))
-    m = m.at[jnp.ravel(offset + l)].add(jnp.ravel(next_dist * (u - b)))
-    m = m.at[jnp.ravel(offset + u)].add(jnp.ravel(next_dist * (b - l)))
-    return m
-
 
 def get_learner_fn(
     env: MarlEnv,
@@ -240,37 +201,13 @@ def get_learner_fn(
                     actor_loss = actor_loss.mean()
                     entropy = entropy.mean()
 
-                    # === Distributional Value Loss ===
-                    # 1. Compute the predicted distribution from logits.
-                    pred_dist = jax.nn.softmax(value, axis=-1)
-
-                    # 2. Get the next state logits and compute the next distribution.
-                    #    (Ensure that traj_batch contains 'next_obs' and 'reward' fields.)
-                    next_value_logits, _, _ = sable_apply_fn(
-                        params,
-                        observation=traj_batch.next_obs,  # next observation must be provided in your transition
-                        action=traj_batch.action,         # action can be ignored if not used by the value head
-                        dones=traj_batch.done,
-                        rng_key=rng_key,
+                    # Clipped MSE loss
+                    value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
+                        -config.system.clip_eps, config.system.clip_eps
                     )
-                    next_dist = jax.nn.softmax(next_value_logits, axis=-1)
-
-                    # 3. Project the next state distribution onto the fixed support.
-                    target_dist = projection_distribution(
-                        next_dist=next_dist,
-                        rewards=traj_batch.reward,  # immediate rewards from the transition
-                        dones=traj_batch.done,
-                        gamma=config.system.gamma,  # discount factor
-                        support=config.support,     # the fixed support vector (make sure this is in your config)
-                        v_min=config.system.v_min,  # minimum value of the support
-                        v_max=config.system.v_max,  # maximum value of the support
-                    )
-
-                    # 4. Compute the cross-entropy loss between the projected target distribution
-                    #    and the predicted distribution.
-                    log_pred = jax.nn.log_softmax(value, axis=-1)
-                    value_loss = -jnp.sum(target_dist * log_pred, axis=-1).mean()
-
+                    value_losses = jnp.square(value - value_targets)
+                    value_losses_clipped = jnp.square(value_pred_clipped - value_targets)
+                    value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
                     total_loss = (
                         actor_loss
