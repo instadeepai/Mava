@@ -32,7 +32,7 @@ from mava.networks.utils.sable import (
     discrete_train_decoder_fn,
     train_encoder_fn,
 )
-from mava.systems.sable.types import HiddenStates, SableNetworkConfig
+from mava.systems.sable.types import SableNetworkConfig
 from mava.types import Observation
 from mava.utils.network_utils import _CONTINUOUS, _DISCRETE
 
@@ -413,7 +413,7 @@ class SableNetwork(nn.Module):
         self,
         observation: Observation,
         action: chex.Array,
-        hstates: HiddenStates,
+        hstate: chex.Array,
         dones: chex.Array,
         rng_key: Optional[chex.PRNGKey] = None,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
@@ -424,20 +424,16 @@ class SableNetwork(nn.Module):
             observation.step_count,
         )
         value, obs_rep, _ = self.train_encoder_fn(
-            encoder=self.encoder, obs=obs, hstate=hstates[0], dones=dones, step_count=step_count
+            encoder=self.encoder, obs=obs, hstate=hstate, dones=dones, step_count=step_count
         )
-
-        # Zero the hiddenstates and behave like there is a reset at each timestep.
-        zeroed_dec_hs = tree.map(lambda x: jnp.zeros_like(x), hstates[1:])
-        decoder_trainer_dones = tree.map(lambda x: jnp.ones_like(x, dtype=bool), dones)
 
         action_log, entropy = self.train_decoder_fn(
             decoder=self.decoder,
             obs_rep=obs_rep,
             action=action,
             legal_actions=legal_actions,
-            hstates=zeroed_dec_hs,
-            dones=decoder_trainer_dones,
+            hstates=(jnp.zeros_like(hstate), jnp.zeros_like(hstate)),
+            dones=dones,
             step_count=step_count,
             rng_key=rng_key,
         )
@@ -448,9 +444,9 @@ class SableNetwork(nn.Module):
     def get_actions(
         self,
         observation: Observation,
-        hstates: HiddenStates,
+        hstate: chex.Array,
         key: chex.PRNGKey,
-    ) -> Tuple[chex.Array, chex.Array, chex.Array, HiddenStates]:
+    ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array]:
         """Inference phase."""
         obs, legal_actions, step_count = (
             observation.agents_view,
@@ -459,32 +455,23 @@ class SableNetwork(nn.Module):
         )
 
         # Decay the hidden states: each timestep we decay the hidden states once
-        decayed_hstates = tree.map(lambda x: x * self.decay_kappas, hstates)
+        decayed_hstate = tree.map(lambda x: x * self.decay_kappas, hstate)
 
         value, obs_rep, updated_enc_hs = self.act_encoder_fn(
             encoder=self.encoder,
             obs=obs,
-            decayed_hstate=decayed_hstates[0],
+            decayed_hstate=decayed_hstate,
             step_count=step_count,
         )
 
-        # Manually set decoder hstates to zeros
-        zeroed_dec_hs = tree.map(lambda x: jnp.zeros_like(x), hstates[1:])
-
-        output_actions, output_actions_log, updated_dec_hs = self.autoregressive_act(
+        output_actions, output_actions_log, _ = self.autoregressive_act(
             decoder=self.decoder,
             obs_rep=obs_rep,
             legal_actions=legal_actions,
-            hstates=zeroed_dec_hs,
+            hstates=(jnp.zeros_like(hstate), jnp.zeros_like(hstate)),
             step_count=step_count,
             key=key,
         )
 
-        updated_hs = HiddenStates(
-            encoder=updated_enc_hs,
-            decoder_self_retn=updated_dec_hs[0],
-            decoder_cross_retn=updated_dec_hs[1],
-        )
-
         value = jnp.squeeze(value, axis=-1)
-        return output_actions, output_actions_log, value, updated_hs
+        return output_actions, output_actions_log, value, updated_enc_hs

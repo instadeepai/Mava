@@ -36,7 +36,6 @@ from mava.networks.utils.sable import get_init_hidden_state
 from mava.systems.ppo.types import PPOTransition as Transition
 from mava.systems.sable.types import (
     ActorApply,
-    HiddenStates,
     LearnerApply,
 )
 from mava.systems.sable.types import RecLearnerState as LearnerState
@@ -88,17 +87,17 @@ def get_learner_fn(
             learner_state: LearnerState, _: Any
         ) -> Tuple[LearnerState, Tuple[Transition, Metrics]]:
             """Step the environment."""
-            params, opt_states, key, env_state, last_timestep, hstates = learner_state
+            params, opt_states, key, env_state, last_timestep, hstate = learner_state
 
             # Select action
             key, policy_key = jax.random.split(key)
 
             # Apply the actor network to get the action, log_prob, value and updated hstates.
             last_obs = last_timestep.observation
-            action, log_prob, value, hstates = sable_action_select_fn(  # type: ignore
+            action, log_prob, value, hstate = sable_action_select_fn(  # type: ignore
                 params,
                 last_obs,
-                hstates,
+                hstate,
                 policy_key,
             )
 
@@ -108,17 +107,17 @@ def get_learner_fn(
             # Reset hidden state if done.
             done = timestep.last()
             done = jnp.expand_dims(done, (1, 2, 3, 4))
-            hstates = tree.map(lambda hs: jnp.where(done, jnp.zeros_like(hs), hs), hstates)
+            hstate = tree.map(lambda hs: jnp.where(done, jnp.zeros_like(hs), hs), hstate)
 
             prev_done = last_timestep.last().repeat(env.num_agents).reshape(num_envs, -1)
             transition = Transition(
                 prev_done, action, value, timestep.reward, log_prob, last_timestep.observation
             )
-            learner_state = LearnerState(params, opt_states, key, env_state, timestep, hstates)
+            learner_state = LearnerState(params, opt_states, key, env_state, timestep, hstate)
             return learner_state, (transition, timestep.extras["episode_metrics"])
 
         # Copy old hidden states: to be used in the training loop
-        prev_hstates = tree.map(lambda x: jnp.copy(x), learner_state.hstates)
+        prev_hstate = tree.map(lambda x: jnp.copy(x), learner_state.hstate)
 
         # Step environment for rollout length
         learner_state, (traj_batch, episode_metrics) = jax.lax.scan(
@@ -126,10 +125,10 @@ def get_learner_fn(
         )
 
         # Calculate advantage
-        params, opt_states, key, env_state, last_timestep, updated_hstates = learner_state
+        params, opt_states, key, env_state, last_timestep, updated_hstate = learner_state
         key, last_val_key = jax.random.split(key)
         _, _, last_val, _ = sable_action_select_fn(  # type: ignore
-            params, last_timestep.observation, updated_hstates, last_val_key
+            params, last_timestep.observation, updated_hstate, last_val_key
         )
         last_done = last_timestep.last().repeat(env.num_agents).reshape(num_envs, -1)
 
@@ -172,14 +171,14 @@ def get_learner_fn(
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
                 params, opt_state, key = train_state
-                traj_batch, advantages, targets, prev_hstates = batch_info
+                traj_batch, advantages, targets, prev_hstate = batch_info
 
                 def _loss_fn(
                     params: Params,
                     traj_batch: Transition,
                     gae: chex.Array,
                     value_targets: chex.Array,
-                    prev_hstates: HiddenStates,
+                    prev_hstate: chex.Array,
                     rng_key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate Sable loss."""
@@ -188,7 +187,7 @@ def get_learner_fn(
                         params,
                         traj_batch.obs,
                         traj_batch.action,
-                        prev_hstates,
+                        prev_hstate,
                         traj_batch.done,
                         rng_key,
                     )
@@ -233,7 +232,7 @@ def get_learner_fn(
                     traj_batch,
                     advantages,
                     targets,
-                    prev_hstates,
+                    prev_hstate,
                     entropy_key,
                 )
 
@@ -257,7 +256,7 @@ def get_learner_fn(
 
                 return (new_params, new_opt_state, key), loss_info
 
-            (params, opt_states, traj_batch, advantages, targets, key, prev_hstates) = update_state
+            (params, opt_states, traj_batch, advantages, targets, key, prev_hstate) = update_state
 
             # Shuffle minibatches
             key, batch_shuffle_key, agent_shuffle_key, entropy_key = jax.random.split(key, 4)
@@ -269,7 +268,7 @@ def get_learner_fn(
             batch = tree.map(lambda x: jnp.take(x, batch_perm, axis=1), batch)
 
             # Shuffle hidden states
-            prev_hstates = tree.map(lambda x: jnp.take(x, batch_perm, axis=0), prev_hstates)
+            prev_hstate = tree.map(lambda x: jnp.take(x, batch_perm, axis=0), prev_hstate)
 
             # Shuffle agents
             agent_perm = jax.random.permutation(agent_shuffle_key, config.system.num_agents)
@@ -285,7 +284,7 @@ def get_learner_fn(
             )
             prev_hs_minibatch = tree.map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
-                prev_hstates,
+                prev_hstate,
             )
 
             # UPDATE MINIBATCHES
@@ -295,10 +294,10 @@ def get_learner_fn(
                 (*minibatches, prev_hs_minibatch),
             )
 
-            update_state = (params, opt_states, traj_batch, advantages, targets, key, prev_hstates)
+            update_state = (params, opt_states, traj_batch, advantages, targets, key, prev_hstate)
             return update_state, loss_info
 
-        update_state = (params, opt_states, traj_batch, advantages, targets, key, prev_hstates)
+        update_state = (params, opt_states, traj_batch, advantages, targets, key, prev_hstate)
 
         # Update epochs
         update_state, loss_info = jax.lax.scan(
@@ -312,7 +311,7 @@ def get_learner_fn(
             key,
             env_state,
             last_timestep,
-            updated_hstates,
+            updated_hstate,
         )
         return learner_state, (episode_metrics, loss_info)
 
@@ -434,7 +433,7 @@ def learner_setup(
     timesteps = tree.map(reshape_states, timesteps)
 
     # Initialise hidden state.
-    init_hstates = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
+    init_hstate = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
 
     # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
@@ -443,12 +442,12 @@ def learner_setup(
             **config.logger.checkpointing.load_args,  # Other checkpoint args
         )
         # Restore the learner state from the checkpoint
-        restored_params, restored_hstates = loaded_checkpoint.restore_params(
-            input_params=params, restore_hstates=True, THiddenState=HiddenStates
+        restored_params, restored_hstate = loaded_checkpoint.restore_params(
+            input_params=params, restore_hstates=True, THiddenState=chex.Array
         )
         # Update the params and hidden states
         params = restored_params
-        init_hstates = restored_hstates if restored_hstates else init_hstates
+        init_hstate = restored_hstate if restored_hstate else init_hstate
 
     # Define params to be replicated across devices and batches.
     key, step_keys = jax.random.split(key)
@@ -457,11 +456,11 @@ def learner_setup(
     # Duplicate learner for update_batch_size.
     broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
     replicate_learner = tree.map(broadcast, replicate_learner)
-    init_hstates = tree.map(broadcast, init_hstates)
+    init_hstate = tree.map(broadcast, init_hstate)
 
     # Duplicate learner across devices.
     replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())
-    init_hstates = flax.jax_utils.replicate(init_hstates, devices=jax.devices())
+    init_hstate = flax.jax_utils.replicate(init_hstate, devices=jax.devices())
 
     # Initialise learner state.
     params, opt_state, step_keys = replicate_learner
@@ -472,7 +471,7 @@ def learner_setup(
         key=step_keys,
         env_state=env_states,
         timestep=timesteps,
-        hstates=init_hstates,
+        hstate=init_hstate,
     )
 
     return learn, apply_fns[0], init_learner_state
@@ -480,7 +479,7 @@ def learner_setup(
 
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
-    _config.logger.system_name = "rec_sable_dec_reset"
+    _config.logger.system_name = "rec_sable_only_enc_hstate"
     config = copy.deepcopy(_config)
 
     n_devices = len(jax.devices())

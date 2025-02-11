@@ -29,14 +29,6 @@ class SableNetworkConfig(NamedTuple):
     embed_dim: int
 
 
-class HiddenStates(NamedTuple):
-    """Hidden states for the encoder and decoder."""
-
-    encoder: Array
-    decoder_self_retn: Array
-    decoder_cross_retn: Array
-
-
 class RecLearnerState(NamedTuple):
     """State of the learner for Memory Sable"""
 
@@ -45,7 +37,7 @@ class RecLearnerState(NamedTuple):
     key: PRNGKey
     env_state: Array
     timestep: TimeStep
-    hstates: HiddenStates
+    hstate: Array
 
 
 class FFLearnerState(NamedTuple):
@@ -59,9 +51,9 @@ class FFLearnerState(NamedTuple):
 
 
 ActorApply = Callable[
-    [FrozenDict, Array, Array, HiddenStates, PRNGKey],
-    Tuple[Array, Array, Array, Array, HiddenStates],
+    [FrozenDict, Array, Array, Array, PRNGKey],
+    Tuple[Array, Array, Array, Array, Array],
 ]
 LearnerApply = Callable[
-    [FrozenDict, Array, Array, Array, HiddenStates, Array, PRNGKey], Tuple[Array, Array, Array]
+    [FrozenDict, Array, Array, Array, Array, Array, PRNGKey], Tuple[Array, Array, Array]
 ]

@@ -395,9 +395,9 @@ def learner_setup(
     # Using dummy hstates, since we are not updating the hstates during training.
     apply_fns = (
         partial(
-            sable_network.apply, method="get_actions", hstates=dummy_actor_hs
+            sable_network.apply, method="get_actions", hstate=dummy_actor_hs
         ),  # Execution function
-        partial(sable_network.apply, hstates=dummy_trainer_hs),  # Training function
+        partial(sable_network.apply, hstate=dummy_trainer_hs),  # Training function
     )
     eval_apply_fn = partial(sable_network.apply, method="get_actions")
 
@@ -493,7 +493,7 @@ def run_experiment(_config: DictConfig) -> float:
     # memory over time.
     eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
     eval_hs = get_init_hidden_state(config.network.net_config, eval_batch_size)
-    sable_execution_fn = partial(sable_execution_fn, hstates=eval_hs)
+    sable_execution_fn = partial(sable_execution_fn, hstate=eval_hs)
     eval_act_fn = make_ff_sable_act_fn(sable_execution_fn)
     # Create evaluator
     evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
