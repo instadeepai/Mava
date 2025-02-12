@@ -131,6 +131,7 @@ class UoeWrapper(gymnasium.Wrapper):
         else:
             reward = np.array(reward)
 
+        self.step_count += 1
         info["step_count"] = self.step_count
         return agents_view, reward, terminated, truncated, info
 

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Tuple
 
 from chex import Array, PRNGKey
 from flax.core.frozen_dict import FrozenDict
@@ -67,7 +67,6 @@ class Transition(NamedTuple):
     reward: Array
     log_prob: Array
     obs: Array
-    info: Dict
 
 
 class SebulbaLearnerState(NamedTuple):
