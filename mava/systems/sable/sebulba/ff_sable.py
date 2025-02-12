@@ -292,8 +292,7 @@ def get_learner_step_fn(
                 grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
                 loss_info, grads = grad_fn(params, traj_batch, advantages, targets, entropy_key)
 
-                # Compute the parallel mean (pmean) over the batch.
-                # This pmean could be a regular mean as the batch axis is on the same device.
+                # Compute the parallel mean (pmean) over the learner devices.
                 grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="learner_devices")
 
                 # Update params and optimiser state
