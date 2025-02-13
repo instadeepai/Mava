@@ -80,7 +80,6 @@ class EncodeBlock(nn.Module):
         output = self.ln2(x + self.ffn(x))
         return output, updated_hstate
 
-
 class AttentionValueHead(nn.Module):
     """Attention-based value head that aggregates intermediate encoder representations per timestep."""
     embed_dim: int
@@ -185,7 +184,6 @@ class Encoder(nn.Module):
         stacked_reps = jnp.stack(rep_list, axis=2)
         value = self.value_head(stacked_reps)
         return value, obs_rep, updated_hstate
-
 
 class DecodeBlock(nn.Module):
     """Sable decoder block."""

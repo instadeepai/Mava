@@ -1,4 +1,3 @@
-
 # Copyright 2022 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,6 +50,7 @@ from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
+
 def get_learner_fn(
     env: MarlEnv,
     apply_fns: Tuple[ActorApply, LearnerApply],
@@ -59,6 +59,13 @@ def get_learner_fn(
 ) -> LearnerFn[LearnerState]:
     """Get the learner function."""
 
+<<<<<<< HEAD
+=======
+    # Get apply functions for executing and training the network.
+    sable_action_select_fn, sable_apply_fn = apply_fns
+    num_envs = config.arch.num_envs
+
+>>>>>>> b6c4fc081e67836bfc86e32f841933343392c5f4
     def _update_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, Tuple]:
         """A single update of the network.
 
@@ -206,8 +213,11 @@ def get_learner_fn(
                     actor_loss = actor_loss.mean()
                     entropy = entropy.mean()
 
+<<<<<<< HEAD
                     value_loss = value_loss.mean()
 
+=======
+>>>>>>> b6c4fc081e67836bfc86e32f841933343392c5f4
                     # Clipped MSE loss
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
                         -config.system.clip_eps, config.system.clip_eps
