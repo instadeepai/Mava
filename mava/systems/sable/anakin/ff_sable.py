@@ -399,7 +399,7 @@ def learner_setup(
         ),  # Execution function
         partial(sable_network.apply, hstates=dummy_trainer_hs),  # Training function
     )
-    eval_apply_fn = partial(sable_network.apply, method="get_actions")
+    eval_apply_fn = partial(sable_network.apply, method="get_inference_actions", config=config)
 
     # Get batched iterated update and replicate it to pmap it over cores.
     learn = get_learner_fn(env, apply_fns, optim.update, config)
@@ -476,7 +476,7 @@ def run_experiment(_config: DictConfig) -> float:
         def eval_act_fn(
             params: Params, timestep: TimeStep, key: chex.PRNGKey, actor_state: ActorState
         ) -> Tuple[Action, Dict]:
-            output_action, _, _, _ = actor_apply_fn(  # type: ignore
+            output_action = actor_apply_fn(  # type: ignore
                 params,
                 observation=timestep.observation,
                 key=key,

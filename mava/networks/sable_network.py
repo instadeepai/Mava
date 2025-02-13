@@ -30,6 +30,7 @@ from mava.networks.utils.sable import (
     continuous_train_decoder_fn,
     discrete_autoregressive_act,
     discrete_train_decoder_fn,
+    inference_autoregressive_act,
     train_encoder_fn,
 )
 from mava.systems.sable.types import HiddenStates, SableNetworkConfig
@@ -481,3 +482,37 @@ class SableNetwork(nn.Module):
 
         value = jnp.squeeze(value, axis=-1)
         return output_actions, output_actions_log, value, updated_hs
+
+    def get_inference_actions(
+        self,
+        observation: Observation,
+        hstates: HiddenStates,
+        key: chex.PRNGKey,
+        config,
+    ) -> Tuple[chex.Array, chex.Array, chex.Array, HiddenStates]:
+        obs, legal_actions, step_count = (
+            observation.agents_view,
+            observation.action_mask,
+            observation.step_count,
+        )
+
+        # Decay the hidden states: each timestep we decay the hidden states once
+        decayed_hstates = tree.map(lambda x: x * self.decay_kappas, hstates)
+
+        value, obs_rep, updated_enc_hs = self.act_encoder_fn(
+            encoder=self.encoder,
+            obs=obs,
+            decayed_hstate=decayed_hstates[0],
+            step_count=step_count,
+        )
+
+        output_actions, updated_dec_hs = inference_autoregressive_act(
+            decoder=self.decoder,
+            obs_rep=obs_rep,
+            legal_actions=legal_actions,
+            hstates=decayed_hstates[1:],
+            step_count=step_count,
+            key=key,
+            config=config,
+        )
+        return output_actions

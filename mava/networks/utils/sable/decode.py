@@ -153,6 +153,54 @@ def discrete_autoregressive_act(
     return output_actions, output_action_log, hstates
 
 
+def inference_autoregressive_act(
+    decoder: nn.Module,
+    obs_rep: chex.Array,
+    hstates: chex.Array,
+    legal_actions: chex.Array,
+    step_count: chex.Array,
+    key: chex.PRNGKey,
+    config,
+) -> Tuple[chex.Array, chex.Array, chex.Array]:
+    B, N, A = legal_actions.shape
+
+    shifted_actions = jnp.zeros((B, N, A + 1))
+    shifted_actions = shifted_actions.at[:, 0, 0].set(1)
+
+    output_action = jnp.zeros((B, N, 1))
+
+    # Apply the decoder autoregressively
+    for i in range(N):
+        logit, hstates = decoder.recurrent(
+            action=shifted_actions[:, i : i + 1, :],
+            obs_rep=obs_rep[:, i : i + 1, :],
+            hstates=hstates,
+            step_count=step_count[:, i : i + 1],
+        )
+        masked_logits = jnp.where(
+            legal_actions[:, i : i + 1, :],
+            logit,
+            jnp.finfo(jnp.float32).min,
+        )
+        distribution = distrax.Categorical(logits=masked_logits)
+
+        key, sample_key = jax.random.split(key)
+        if config.arch.evaluation_greedy:
+            action = distribution.mode()
+        else:
+            action = distribution.sample(seed=sample_key)
+
+        output_action = output_action.at[:, i, :].set(action)
+
+        # Adds all except the last action to shifted_actions, as it is out of range.
+        shifted_actions = shifted_actions.at[:, i + 1, 1:].set(
+            jax.nn.one_hot(action[:, 0], A), mode="drop"
+        )
+    output_actions = output_action.astype(jnp.int32)
+    output_actions = jnp.squeeze(output_actions, axis=-1)
+    return output_actions, hstates
+
+
 def continuous_train_decoder_fn(
     decoder: nn.Module,
     obs_rep: chex.Array,

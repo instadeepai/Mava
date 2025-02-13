@@ -18,6 +18,7 @@ from mava.networks.utils.sable.decode import (
     continuous_train_decoder_fn,
     discrete_autoregressive_act,
     discrete_train_decoder_fn,
+    inference_autoregressive_act,
 )
 from mava.networks.utils.sable.encode import (
     act_encoder_fn,
