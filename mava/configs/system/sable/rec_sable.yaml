@@ -21,6 +21,3 @@ ent_coef: 0.01 # Entropy regularisation term for loss function.
 vf_coef: 0.5 # Critic weight in
 max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
 decay_learning_rates: False # Whether learning rates should be linearly decayed during training.
-v_min: -20.0 #  Minimum value for the value function.
-v_max: 20.0 # Maximum value for the value function.
-n_atoms: 101 # Number of atoms for the value function.

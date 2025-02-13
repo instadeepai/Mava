@@ -14,11 +14,12 @@
 
 from functools import partial
 from typing import Optional, Tuple
-from jax.nn import softmax
+
 import chex
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
+from flax.linen.initializers import normal  # ensure normal initializer is imported
 from jax import tree
 from omegaconf import DictConfig
 
@@ -80,14 +81,43 @@ class EncodeBlock(nn.Module):
         return output, updated_hstate
 
 
+class AttentionValueHead(nn.Module):
+    """Attention-based value head that aggregates intermediate encoder representations per timestep."""
+    embed_dim: int
+    n_blocks: int  # number of representations to attend over, i.e. num_blocks+1
+
+    def setup(self):
+        # Learned query vector for attention; shape (1, 1, 1, embed_dim) to be broadcasted over (batch, chunk, 1, embed_dim)
+        self.value_query = self.param("value_query", normal(stddev=1.0), (1, 1, 1, self.embed_dim))
+        # A projection MLP for final value computation; input shape (batch, chunk, embed_dim) -> (batch, chunk, 1)
+        self.proj = nn.Sequential(
+            [
+                nn.Dense(self.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
+                nn.gelu,
+                nn.Dense(1, kernel_init=orthogonal(0.01)),
+            ]
+        )
+
+    def __call__(self, block_outputs: chex.Array) -> chex.Array:
+        # block_outputs: shape (batch, chunk, n_blocks, embed_dim)
+        # Broadcast the query to match batch and timestep dimensions: shape -> (batch, chunk, 1, embed_dim)
+        batch_size, chunk_size = block_outputs.shape[0], block_outputs.shape[1]
+        query = jnp.tile(self.value_query, (batch_size, chunk_size, 1, 1))
+        # Compute attention scores: (batch, chunk, 1, n_blocks)
+        attn_scores = jnp.matmul(query, jnp.swapaxes(block_outputs, -1, -2))
+        attn_weights = nn.softmax(attn_scores, axis=-1)
+        # Weighted sum: (batch, chunk, 1, embed_dim)
+        aggregated = jnp.matmul(attn_weights, block_outputs)
+        # Remove the singleton dimension and project: final shape (batch, chunk, embed_dim)
+        aggregated = jnp.squeeze(aggregated, axis=2)
+        value = self.proj(aggregated)  # expected shape (batch, chunk, 1)
+        return value
+
 class Encoder(nn.Module):
-    """Multi-block encoder consisting of multiple `EncoderBlock` modules."""
+    """Multi-block encoder with an attention-based value head aggregating per-timestep intermediate representations."""
     net_config: SableNetworkConfig
     memory_config: DictConfig
     n_agents: int
-    num_atoms: int = 101
-    v_min: float = -20.0
-    v_max: float = 20.0
 
     def setup(self) -> None:
         self.ln = nn.RMSNorm()
@@ -101,13 +131,11 @@ class Encoder(nn.Module):
                 nn.gelu,
             ],
         )
-        self.head = nn.Sequential(
-            nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
-            nn.relu,
-            nn.RMSNorm(),
-            nn.Dense(self.num_atoms, kernel_init=orthogonal(0.01)),
+        # Use attention-based value head to aggregate initial obs encoding and each encoder block's output.
+        # Expecting each representation to have shape (batch, chunk, embed_dim), so stacking along new axis=2.
+        self.value_head = AttentionValueHead(
+            embed_dim=self.net_config.embed_dim, n_blocks=self.net_config.n_block + 1
         )
-        self.support = jnp.linspace(self.v_min, self.v_max, self.num_atoms)
 
         self.blocks = [
             EncodeBlock(
@@ -122,41 +150,41 @@ class Encoder(nn.Module):
     def __call__(
         self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        """Apply chunkwise encoding."""
+        """Apply chunkwise encoding and aggregate per-timestep representations via attention for value estimation."""
         updated_hstate = jnp.zeros_like(hstate)
-        obs_rep = self.obs_encoder(obs)
-
-        # Apply the encoder blocks
+        # obs is expected to be (batch, chunk, obs_dim)
+        obs_rep = self.obs_encoder(obs)  # (batch, chunk, embed_dim)
+        rep_list = [obs_rep]
+        
+        # Apply each encoder block; obs_rep remains shape (batch, chunk, embed_dim)
         for i, block in enumerate(self.blocks):
-            hs = hstate[:, :, i]  # Get the hidden state for the current block
-            # Apply the chunkwise encoder block
-            obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
+            hs = hstate[:, :, i]  # hidden state for current block (assumed shape compatible with block)
+            out, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
+            rep_list.append(out)  # each out is (batch, chunk, embed_dim)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
-
-        logits = self.head(obs_rep)
-        probabilities = softmax(logits, axis=-1)
-        value = jnp.expand_dims(jnp.sum(probabilities * self.support, axis=-1), axis=-1)
-        return logits, value, obs_rep, updated_hstate
+        
+        # Stack representations along new axis (block dimension): shape (batch, chunk, n_blocks, embed_dim)
+        stacked_reps = jnp.stack(rep_list, axis=2)
+        value = self.value_head(stacked_reps)  # expected shape (batch, chunk, 1)
+        return value, obs_rep, updated_hstate
 
     def recurrent(
         self, obs: chex.Array, hstate: chex.Array, step_count: chex.Array
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        """Apply recurrent encoding."""
+        """Apply recurrent encoding and use attention-based aggregation for value estimation per timestep."""
         updated_hstate = jnp.zeros_like(hstate)
-        obs_rep = self.obs_encoder(obs)
-
-        # Apply the encoder blocks
+        obs_rep = self.obs_encoder(obs)  # (batch, chunk, embed_dim)
+        rep_list = [obs_rep]
+        
         for i, block in enumerate(self.blocks):
-            hs = hstate[:, :, i]  # Get the hidden state for the current block
-            # Apply the recurrent encoder block
-            obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs, step_count)
+            hs = hstate[:, :, i]
+            out, hs_new = block.recurrent(self.ln(obs_rep), hs, step_count)
+            rep_list.append(out)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
-
-        # Compute the value function
-        logits = self.head(obs_rep)
-        probabilities = softmax(logits, axis=-1)
-        value = jnp.expand_dims(jnp.sum(probabilities * self.support, axis=-1), axis=-1)
-        return logits, value, obs_rep, updated_hstate
+        
+        stacked_reps = jnp.stack(rep_list, axis=2)
+        value = self.value_head(stacked_reps)
+        return value, obs_rep, updated_hstate
 
 
 class DecodeBlock(nn.Module):
