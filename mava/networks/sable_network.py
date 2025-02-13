@@ -342,7 +342,7 @@ class Decoder(nn.Module):
 
         return logit, updated_hstates
 
-
+import jax
 class SableNetwork(nn.Module):
     """Sable network module."""
 
@@ -423,6 +423,7 @@ class SableNetwork(nn.Module):
             observation.action_mask,
             observation.step_count,
         )
+        jax.debug.print("{x}", x= obs.shape)
         value, obs_rep, _ = self.train_encoder_fn(
             encoder=self.encoder, obs=obs, hstate=hstates[0], dones=dones, step_count=step_count
         )
@@ -453,7 +454,7 @@ class SableNetwork(nn.Module):
             observation.action_mask,
             observation.step_count,
         )
-
+        jax.debug.print("{x}", x= obs.shape)
         # Decay the hidden states: each timestep we decay the hidden states once
         decayed_hstates = tree.map(lambda x: x * self.decay_kappas, hstates)
 

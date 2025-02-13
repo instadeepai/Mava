@@ -455,8 +455,8 @@ def learner_setup(
     env = environments.make_gym_env(config, 1)
     # Get number of agents and actions.
     action_space = env.single_action_space
-    config.system.num_agents = len(action_space)
-    config.system.num_actions = int(action_space[0].n)
+    config.system.num_agents = env.num_agents
+    config.system.num_actions = env.action_dim
 
     devices = mesh_utils.create_device_mesh((len(learner_devices),), devices=learner_devices)
     mesh = Mesh(devices, axis_names=("learner_devices"))
@@ -470,9 +470,9 @@ def learner_setup(
     # B: Batch (dummy dimension size = 1)
     # A: Agent
     # Make dummy inputs to init recurrent Q network -> need shape (T, B, A, ...)
-    init_agents_view = jnp.array(env.single_observation_space.sample())
-    init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
-    init_obs = Observation(init_agents_view, init_action_mask)  # (A, ...)
+    init_agents_view = jnp.array(env.single_observation_space.generate_value().agents_view)
+    init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions), dtype = jnp.bool)
+    init_obs = Observation(init_agents_view, init_action_mask, env.single_observation_space.generate_value().step_count)  # (A, ...)
     # (B, T, A, ...)
     init_obs_batched = tree.map(lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs)
     dones = jnp.zeros((1, 1, 1), dtype=bool)  # (T, B, 1)
@@ -505,7 +505,7 @@ def learner_setup(
     opt_state = opt.init(params.online)
 
     # Create dummy transition Used to initialiwe the pipeline's Buffer
-    init_acts = env.single_action_space.sample()  # (A,)
+    init_acts = env.single_action_space.generate_value()  # (A,)
     init_transition = Transition(
         obs=init_obs,  # (A, ...)
         action=init_acts,

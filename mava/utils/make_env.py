@@ -290,3 +290,114 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, M
         return make_gigastep_env(config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")
+
+
+
+from gymnasium.spaces import Tuple as gTuple, Box, Discrete
+import jax.numpy as jnp
+import jax
+import numpy as np
+from jumanji.env import Environment
+
+class Jumanjicompatibility():
+    """A wrapper that converts a Jumanji `Environment` to one that follows the `gymnasium.Env` API."""
+    def __init__(
+        self,
+        env: Environment,
+        num_envs : int = 32,
+        backend: str = "cpu",
+    ):
+        self._env = env
+        self.num_envs = num_envs
+        self.backend = backend
+        self._state = None
+        self._key = jax.random.PRNGKey(np.random.randint(0, np.iinfo(np.uint32).max) )
+        self.backend = jax.devices(backend)[0]
+        
+        # Convert Jumanji observation and action specs to Gymnasium spaces
+        
+        sample_obs_shape = self._env.observation_spec.generate_value().agents_view.shape
+        
+        self.single_observation_space = self._env.observation_spec
+        
+        self.single_action_space = self._env.action_spec
+        self.num_agents = self._env.num_agents
+        self.action_dim = self._env.action_dim
+        
+        
+        self._reset = jax.vmap(jax.jit(env.reset), in_axes=0)
+        self._step  = jax.vmap(jax.jit(env.step), in_axes=(0, 0))
+        
+        self.jax2numpy = lambda tree : jax.tree_util.tree_map(lambda x: np.array(x) if isinstance(x, (jax.Array, jax.numpy.ndarray)) else x, tree)
+
+    def reset(
+        self,
+        seed: int= None,
+        options: dict = None,
+    ) -> Tuple:
+        """Resets the environment to an initial state and returns the first observation and info."""
+        self._key, *keys = jax.random.split(self._key, self.num_envs + 1)
+
+        self._state, timestep = self._reset(jnp.array(keys))
+        #timestep.extras = timestep.extras["episode_metrics"]
+        return self.jax2numpy(timestep)
+    
+    def step(self, action) -> Tuple:
+        self._state, timestep = self._step(self._state, action)
+        #timestep.extras = timestep.extras["episode_metrics"]
+        return timestep#self.jax2numpy(timestep)
+    
+    def close(self) -> None:
+        """Closes the environment."""
+        pass
+    
+def make_sebulba_jumanji_env(
+    config: DictConfig,
+    num_env: int,
+    add_global_state: bool = False,
+):
+    """
+    Create a gymnasium environment.
+    Args:
+        config (Dict): The configuration of the environment.
+        num_env (int) : The number of parallel envs to create.
+        add_global_state (bool): Whether to add the global state to the observation. Default False.
+    Returns:
+        Async environments.
+    """
+    env, _ = make_jumanji_env(config, add_global_state)
+    wrapped_env = Jumanjicompatibility(env, num_envs=num_env)
+    return wrapped_env
+
+def make_sebulba_jaxmarl_env(
+    config: DictConfig,
+    num_env: int,
+    add_global_state: bool = False,
+):
+    """
+    Create a gymnasium environment.
+    Args:
+        config (Dict): The configuration of the environment.
+        num_env (int) : The number of parallel envs to create.
+        add_global_state (bool): Whether to add the global state to the observation. Default False.
+    Returns:
+        Async environments.
+    """
+    env, _ = make_jaxmarl_env(config, add_global_state)
+    wrapped_env = Jumanjicompatibility(env, num_envs=num_env)
+    return wrapped_env
+    
+def make_gym_env(
+    config: DictConfig,
+    num_env: int,
+    add_global_state: bool = False,
+) -> GymToJumanji:
+    env_name = config.env.env_name
+    env_name = config.env.env_name
+
+    if env_name in _jumanji_registry:
+        return make_sebulba_jumanji_env(config,num_env, add_global_state)
+    elif env_name in _jaxmarl_registry:
+        return make_sebulba_jaxmarl_env(config, num_env, add_global_state)
+    else:
+        raise ValueError(f"{env_name} is not a supported environment.")
