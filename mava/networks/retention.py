@@ -222,6 +222,7 @@ class MultiScaleRetention(nn.Module):
     memory_config: DictConfig
     masked: bool = True
     decay_scaling_factor: float = 1.0
+    use_pos_enc: bool = True
 
     def setup(self) -> None:
         assert self.embed_dim % self.n_head == 0, "embed_dim must be divisible by n_head"
@@ -275,7 +276,7 @@ class MultiScaleRetention(nn.Module):
         B, C, _ = value.shape
 
         # Positional encoding of the current step
-        if self.memory_config.timestep_positional_encoding:
+        if self.memory_config.timestep_positional_encoding and self.use_pos_enc:
             key, query, value = self.pe(key, query, value, step_count)
 
         ret_output = jnp.zeros((B, C, self.embed_dim), dtype=value.dtype)
@@ -301,7 +302,7 @@ class MultiScaleRetention(nn.Module):
         B, S, _ = value_n.shape
 
         # Positional encoding of the current step if enabled
-        if self.memory_config.timestep_positional_encoding:
+        if self.memory_config.timestep_positional_encoding and self.use_pos_enc:
             key_n, query_n, value_n = self.pe(key_n, query_n, value_n, step_count)
 
         ret_output = jnp.zeros((B, S, self.embed_dim), dtype=value_n.dtype)

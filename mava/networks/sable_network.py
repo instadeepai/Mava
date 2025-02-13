@@ -55,6 +55,7 @@ class EncodeBlock(nn.Module):
             masked=False,  # Full retention for the encoder
             memory_config=self.memory_config,
             decay_scaling_factor=self.memory_config.decay_scaling_factor,
+            use_pos_enc=True,
         )
 
         self.ffn = SwiGLU(self.net_config.embed_dim, self.net_config.embed_dim)
@@ -173,6 +174,7 @@ class DecodeBlock(nn.Module):
             masked=True,  # Masked retention for the decoder
             memory_config=self.memory_config,
             decay_scaling_factor=self.memory_config.decay_scaling_factor,
+            use_pos_enc=False,
         )
         self.retn2 = MultiScaleRetention(
             embed_dim=self.net_config.embed_dim,
@@ -181,6 +183,7 @@ class DecodeBlock(nn.Module):
             masked=True,  # Masked retention for the decoder
             memory_config=self.memory_config,
             decay_scaling_factor=self.memory_config.decay_scaling_factor,
+            use_pos_enc=False,
         )
 
         self.ffn = SwiGLU(self.net_config.embed_dim, self.net_config.embed_dim)
