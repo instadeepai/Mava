@@ -46,6 +46,7 @@ class RecLearnerState(NamedTuple):
     env_state: Array
     timestep: TimeStep
     hstates: HiddenStates
+    scale: Array
 
 
 class FFLearnerState(NamedTuple):

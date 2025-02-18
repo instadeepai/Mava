@@ -61,6 +61,7 @@ def act_encoder_fn(
     decayed_hstate: chex.Array,
     step_count: chex.Array,
     chunk_size: int,
+    scale: chex.Array,
 ) -> Tuple[chex.Array, chex.Array, chex.Array]:
     """Chunkwise encoding for ff-Sable and for discrete action spaces."""
     B, C = obs.shape[:2]
@@ -76,7 +77,7 @@ def act_encoder_fn(
         chunk_obs = obs[:, start_idx:end_idx]
         chunk_step_count = step_count[:, start_idx:end_idx]
         chunk_v_loc, chunk_obs_rep, decayed_hstate = encoder.recurrent(
-            chunk_obs, decayed_hstate, chunk_step_count
+            chunk_obs, decayed_hstate, chunk_step_count, scale
         )
         v_loc = v_loc.at[:, start_idx:end_idx].set(chunk_v_loc)
         obs_rep = obs_rep.at[:, start_idx:end_idx].set(chunk_obs_rep)

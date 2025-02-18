@@ -85,7 +85,7 @@ class SimpleRetention(nn.Module):
         else:
             decay_matrix = self.get_decay_matrix(dones)
             xi = self.get_xi(dones)
-            chunk_decay = self.decay_kappa ** (C // self.n_agents)
+            chunk_decay = jnp.exp(self.decay_kappa * (C // self.n_agents))
             delta = ~jnp.any(dones[:, :: self.n_agents], axis=1)[:, jnp.newaxis, jnp.newaxis]
             next_hstate = (
                 k_proj @ (v_proj * decay_matrix[:, -1].reshape((B, C, 1)))
@@ -100,7 +100,7 @@ class SimpleRetention(nn.Module):
         return ret, next_hstate
 
     def recurrent(
-        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array
+        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array, scale: Array
     ) -> Tuple[Array, Array]:
         """Recurrent representation of the retention mechanism."""
         # Apply projection to q_proj, k_proj, v_proj
@@ -109,7 +109,10 @@ class SimpleRetention(nn.Module):
         v_proj = value_n @ self.w_v
 
         # Apply the retention mechanism and update the hidden state
-        updated_hstate = hstate + (k_proj.transpose(0, -1, -2) @ v_proj)
+        # NOTE (Ruan): This is still not exaclty like the paper. 
+        # the challenge is how to handle cases where we are batching over agents like in the 
+        # encoder since we then have a `num_agents` sequence length.
+        updated_hstate = hstate + (k_proj.transpose(0, -1, -2) @ v_proj) / jnp.sqrt(scale)
         ret = q_proj @ updated_hstate
 
         return ret, updated_hstate
@@ -177,9 +180,11 @@ class SimpleRetention(nn.Module):
         m = jnp.arange(T)[jnp.newaxis, ...]
 
         # Decay based on difference in timestep indices.
-        decay_matrix = (self.decay_kappa ** (n - m)) * (n >= m)
-        # Replace NaN values with 0
-        decay_matrix = jnp.nan_to_num(decay_matrix)
+        decay_matrix = (self.decay_kappa * (n - m)) * (n >= m)
+        decay_matrix = jnp.exp(decay_matrix)
+
+        # Zero out upper-triangular values (excluding the main diagonal)
+        decay_matrix = decay_matrix * jnp.tril(jnp.ones((T, T)))
 
         # Adjust for batch size
         decay_matrix = jnp.broadcast_to(decay_matrix, (B, T, T))
@@ -204,7 +209,7 @@ class SimpleRetention(nn.Module):
         # Fill 'xi' with decaying values up until the first done step
         for i in range(T):
             before_first_done = i < first_dones
-            xi_i = (self.decay_kappa ** (i + 1)) * before_first_done
+            xi_i = jnp.exp(self.decay_kappa * (i + 1)) * before_first_done
             xi = xi.at[:, i, :].set(xi_i)
 
         # Repeat the decay matrix 'xi' for all agents
@@ -231,7 +236,7 @@ class MultiScaleRetention(nn.Module):
         self.decay_kappas = 1 - jnp.exp(
             jnp.linspace(jnp.log(1 / 32), jnp.log(1 / 512), self.n_head)
         )
-        self.decay_kappas = self.decay_kappas * self.decay_scaling_factor
+        self.decay_kappas = jnp.log(self.decay_kappas * self.decay_scaling_factor)
 
         # Initialise the weights and group norm
         self.w_g = self.param(
@@ -295,7 +300,7 @@ class MultiScaleRetention(nn.Module):
         return output, hstate
 
     def recurrent(
-        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array, step_count: Array
+        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array, step_count: Array, scale: Array,
     ) -> Tuple[Array, Array]:
         """Recurrent representation of the multi-scale retention mechanism"""
         B, S, _ = value_n.shape
@@ -307,7 +312,7 @@ class MultiScaleRetention(nn.Module):
         ret_output = jnp.zeros((B, S, self.embed_dim), dtype=value_n.dtype)
         for head in range(self.n_head):
             y, new_hs = self.retention_heads[head].recurrent(
-                key_n, query_n, value_n, hstate[:, head]
+                key_n, query_n, value_n, hstate[:, head], scale[:, head]
             )
             ret_output = ret_output.at[
                 :, :, self.head_size * head : self.head_size * (head + 1)
