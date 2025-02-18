@@ -62,7 +62,6 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_sebulba_config, check_total_timesteps
 from mava.utils.jax_utils import switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
-from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
 from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
 from mava.utils.training import make_learning_rate
@@ -111,6 +110,7 @@ def rollout(
         key: chex.PRNGKey,
     ) -> Tuple:
         """Get action and value."""
+        # actor_policy = actor_apply_fn(params.actor_params, observation)
 
         batched_observation = tree.map(lambda x: x[jnp.newaxis, :], observation)
         ac_in = (
@@ -128,6 +128,7 @@ def rollout(
         log_prob = actor_policy.log_prob(action)
         # It may be faster to calculate the values in the learner as
         # then we won't need to pass critic params to actors.
+        # value = critic_apply_fn(params.critic_params, observation).squeeze()
 
         hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
         return action, log_prob, value, hstates
@@ -193,10 +194,10 @@ def rollout(
 
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
-        # Send trajectories to learner
+        # send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
             try:
-                rollout_queue.put(traj, (actor_timings, episode_metrics), (timestep, hstates))
+                rollout_queue.put(traj, timestep, (actor_timings, episode_metrics), hstates)
             except queue.Full:
                 err = "Waited too long to add to the rollout queue, killing the actor thread"
                 warnings.warn(err, stacklevel=2)
@@ -233,6 +234,28 @@ def get_learner_step_fn(
             traj_batch (PPOTransition): the batch of data to learn with.
         """
 
+        def _calculate_gae(
+            traj_batch: RNNPPOTransition, last_val: chex.Array, last_done: chex.Array
+        ) -> Tuple[chex.Array, chex.Array]:
+            gamma, gae_lambda = config.system.gamma, config.system.gae_lambda
+
+            def _get_advantages(
+                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
+            ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
+                gae, next_value, next_done = carry
+                done, value, reward = transition.done, transition.value, transition.reward
+                delta = reward + gamma * next_value * (1 - next_done) - value
+                gae = delta + gamma * gae_lambda * (1 - next_done) * gae
+                return (gae, value, done), gae
+
+            _, advantages = jax.lax.scan(
+                _get_advantages,
+                (jnp.zeros_like(last_val), last_val, last_done),
+                traj_batch,
+                reverse=True,
+                unroll=16,
+            )
+            return advantages, advantages + traj_batch.value
 
         # Add a batch dimension to the observation.
         (
@@ -255,17 +278,14 @@ def get_learner_step_fn(
         _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
-        # Calculate advantage
-        advantages, targets = calculate_gae(
-            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
-        )
+        advantages, targets = _calculate_gae(traj_batch, last_val, last_done)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple[Tuple, Metrics]:
             """Update the network for a single epoch."""
 
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
-                # Unpack train state and batch info
+                # UNPACK TRAIN STATE AND BATCH INFO
                 params, opt_states, key = train_state
                 traj_batch, advantages, targets = batch_info
 
@@ -276,7 +296,7 @@ def get_learner_step_fn(
                     key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
-                    # Rerun Network
+                    # RERUN NETWORK
 
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, actor_policy = actor_apply_fn(
@@ -309,13 +329,13 @@ def get_learner_step_fn(
                     targets: chex.Array,
                 ) -> Tuple:
                     """Calculate the critic loss."""
-                    # Rerun Network
+                    # RERUN NETWORK
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, value = critic_apply_fn(
                         critic_params, traj_batch.hstates.critic_hidden_state[0], obs_and_done
                     )
 
-                    # Calculate Value Loss
+                    # CALCULATE VALUE LOSS
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
                         -config.system.clip_eps, config.system.clip_eps
                     )
@@ -335,7 +355,7 @@ def get_learner_step_fn(
 
                 # Calculate critic loss
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
-                value_loss_info, critic_grads = critic_grad_fn(
+                critic_loss_info, critic_grads = critic_grad_fn(
                     params.critic_params, traj_batch, targets
                 )
 
@@ -349,8 +369,8 @@ def get_learner_step_fn(
                 )
 
                 # pmean over learner devices.
-                critic_grads, value_loss_info = jax.lax.pmean(
-                    (critic_grads, value_loss_info), axis_name="learner_devices"
+                critic_grads, critic_loss_info = jax.lax.pmean(
+                    (critic_grads, critic_loss_info), axis_name="learner_devices"
                 )
 
                 # Update actor params and optimiser state
@@ -370,8 +390,8 @@ def get_learner_step_fn(
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
                 # Pack loss info
                 actor_total_loss, (actor_loss, entropy) = actor_loss_info
-                value_loss, (value_loss) = value_loss_info
-                total_loss = value_loss + actor_total_loss
+                critic_total_loss, (value_loss) = critic_loss_info
+                total_loss = critic_total_loss + actor_total_loss
                 loss_info = {
                     "total_loss": total_loss,
                     "value_loss": value_loss,
@@ -384,19 +404,20 @@ def get_learner_step_fn(
 
             key = jnp.squeeze(key, axis=0)  # Remove the learner_devices axis
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
-            key = jnp.expand_dims(key, axis=0)  # Add the learner_devices axis for shape consitency
+            key = jnp.expand_dims(key, axis=0)  # add the learner_devices axis for shape consitency
 
             # Shuffle minibatches
+            # batch_size = config.system.rollout_length * num_learner_envs
+            # permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
 
             num_recurrent_chunks = (
                 config.system.rollout_length // config.system.recurrent_chunk_size
             )
-            batch_size = num_learner_envs * num_recurrent_chunks
             batch = tree.map(
                 lambda x: x.reshape(
                     config.system.recurrent_chunk_size,
-                    batch_size,
+                    num_learner_envs * num_recurrent_chunks,
                     *x.shape[2:],
                 ),
                 batch,
@@ -488,7 +509,7 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, rollout_time, ep_metrics, (timestep, hstates) = pipeline.get(block=True)
+                    traj_batch, timestep, rollout_time, ep_metrics, hstates = pipeline.get(block=True)  # type: ignore
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
@@ -528,7 +549,7 @@ def learner_setup(
 ]:
     """Initialise learner_fn, network and learner state."""
 
-    # Create temporory envoirnments.
+    # create temporory envoirnments.
     env = environments.make_gym_env(config, config.arch.num_envs, add_global_state=True)
 
     # Get number of agents and actions.
@@ -597,7 +618,7 @@ def learner_setup(
         (config.arch.num_envs, config.system.num_agents), config.network.hidden_state_dim
     )
 
-    # Initialise params and optimiser state.
+    # initialise params and optimiser state.
     actor_params = actor_network.init(actor_key, init_policy_hstate, init_x)
     actor_opt_state = actor_optim.init(actor_params)
     critic_params = critic_network.init(critic_key, init_critic_hstate, init_x)
@@ -611,7 +632,7 @@ def learner_setup(
     apply_fns = (actor_network.apply, critic_network.apply)
     update_fns = (actor_optim.update, critic_optim.update)
 
-    # Defines how the learner state is sharded: params, opt and key = replicated, timestep = sharded
+    # defines how the learner state is sharded: params, opt and key = replicated, timestep = sharded
     learn_state_spec = RNNLearnerState(
         model_spec, model_spec, data_spec, None, data_spec, data_spec, data_spec
     )
@@ -726,7 +747,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Executor setup and launch.
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
-    # The rollout queue/ the pipe between actor and learner
+    # the rollout queue/ the pipe between actor and learner
     pipe_lifetime = ThreadLifetime()
     pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding, pipe_lifetime)
     pipe.start()
