@@ -15,8 +15,6 @@ COPY . .
 
 RUN uv pip install -e .
 
-RUN uv pip install Rtree==1.3.0
-
 ARG USE_CUDA=false
 RUN if [ "$USE_CUDA" = true ] ; \
     then uv pip install jax[cuda12]==0.4.30 ; \
