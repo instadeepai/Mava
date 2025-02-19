@@ -87,23 +87,37 @@ class SimpleRetention(nn.Module):
             xi = self.get_xi(dones)
             chunk_decay = jnp.exp(self.decay_kappa * (C // self.n_agents))
             delta = ~jnp.any(dones[:, :: self.n_agents], axis=1)[:, jnp.newaxis, jnp.newaxis]
-            next_hstate = (
-                k_proj @ (v_proj * decay_matrix[:, -1].reshape((B, C, 1)))
-            ) + hstate * chunk_decay * delta
+            decay_matrix_slice = decay_matrix[:, -1]
+            # NOTE (Ruan): might have to be done masked sum.
+            decay_matrix_norm_factor = jnp.sum(decay_matrix_slice, axis=-1, keepdims=True)
+            decay_matrix_slice_normed = decay_matrix_slice / decay_matrix_norm_factor
+            
+            kv = k_proj @ (v_proj * decay_matrix_slice_normed.reshape((B, C, 1)))
+            next_hstate = kv + hstate * chunk_decay * delta
+            kv_scale = jnp.clip(jnp.abs(next_hstate).sum(axis=-2, keepdims=True).max(axis=-1, keepdims=True), min=1.0)
 
         # Compute the inner chunk and cross chunk
         cross_chunk = (q_proj @ hstate) * xi
-        inner_chunk = ((q_proj @ k_proj) * decay_matrix) @ v_proj
+        qk_mat = q_proj @ k_proj
+        mask = decay_matrix / jnp.sqrt(decay_matrix.sum(axis=-1, keepdims=True))
+        qk_mat = qk_mat * mask
+        inner_scale = jnp.clip(jnp.abs(qk_mat).sum(axis=-1, keepdims=True), min=1.0)
+        inner_chunk = (qk_mat / inner_scale) @ v_proj
+
+        # Since for 1 chunk kv_scale is just cross scale.
+        all_scale = jnp.maximum(inner_scale, kv_scale)
+        align_inner_scale = all_scale / inner_scale
+        align_cross_scale = all_scale / kv_scale
 
         # Compute the final retention
-        ret = inner_chunk + cross_chunk
+        ret = inner_chunk / align_inner_scale + cross_chunk / align_cross_scale
         return ret, next_hstate
 
     def recurrent(
         self, key_n: Array, query_n: Array, value_n: Array, hstate: Array, scale: Array
     ) -> Tuple[Array, Array]:
         """Recurrent representation of the retention mechanism."""
-        # Apply projection to q_proj, k_proj, v_proj
+        # Apply projection to q_proj, k_proj, v_proj (B, S, ...)
         q_proj = query_n @ self.w_q
         k_proj = key_n @ self.w_k
         v_proj = value_n @ self.w_v
@@ -114,6 +128,15 @@ class SimpleRetention(nn.Module):
         # encoder since we then have a `num_agents` sequence length.
         updated_hstate = hstate + (k_proj.transpose(0, -1, -2) @ v_proj) / jnp.sqrt(scale)
         ret = q_proj @ updated_hstate
+
+        # # An attempt to match the paper codebase and to address the challenge.
+        # # it doesn't work though.
+        # k_expanded = jnp.expand_dims(k_proj, axis=-1)
+        # v_expanded = jnp.expand_dims(v_proj, axis=-2)
+        # interim_hstate = jnp.expand_dims(hstate, axis=1)
+        # interim_updated_hstate = interim_hstate + k_expanded * v_expanded / jnp.sqrt(scale[..., None])
+        # _ret = (q_proj[..., None] * interim_updated_hstate).sum(axis=-2)
+        # _updated_hstate = interim_updated_hstate.sum(axis=1)
 
         return ret, updated_hstate
 
@@ -291,6 +314,8 @@ class MultiScaleRetention(nn.Module):
             ].set(y)
             hstate = hstate.at[:, head, :, :].set(new_hs)
 
+        # NOTE (Ruan): I think the reshape inside the groupnorm call is wrong. Since
+        # it removes the heads dim. 
         ret_output = self.group_norm(ret_output.reshape(-1, self.head_size)).reshape(
             ret_output.shape
         )
@@ -319,6 +344,8 @@ class MultiScaleRetention(nn.Module):
             ].set(y)
             hstate = hstate.at[:, head, :, :].set(new_hs)
 
+        # NOTE (Ruan): I think the reshape inside the groupnorm call is wrong. Since
+        # it removes the heads dim. 
         ret_output = self.group_norm(ret_output.reshape(-1, self.head_size)).reshape(
             ret_output.shape
         )
