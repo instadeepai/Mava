@@ -79,10 +79,47 @@ class EncodeBlock(nn.Module):
         output = self.ln2(x + self.ffn(x))
         return output, updated_hstate
 
+class TimeConditionedValueHead(nn.Module):
+    """A value head that conditions on the step_count.
+    
+    This module embeds the (possibly multi-timestep) step_count by taking only the last timestep 
+    (if needed) and computes a gating modulation of the encoder features before producing a scalar value.
+    """
+    embed_dim: int
 
+    def setup(self):
+        self.time_mlp = nn.Sequential([
+            nn.Dense(self.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
+            nn.gelu,
+            nn.Dense(self.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
+        ])
+        self.value_mlp = nn.Sequential([
+            nn.Dense(self.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
+            nn.gelu,
+            nn.RMSNorm(),
+            nn.Dense(1, kernel_init=orthogonal(0.01)),
+        ])
+
+    def __call__(self, features: chex.Array, step_count: chex.Array) -> chex.Array:
+        # Ensure step_count has shape (batch, 1)
+        if step_count.ndim == 1:
+            step_count = step_count[:, None]
+        elif step_count.shape[-1] != 1:
+            # If step_count has trailing dimension > 1, take only the last timestep
+            step_count = step_count[..., -1:]
+        # Embed the temporal information and compute a gating signal
+        time_emb = self.time_mlp(step_count)  # shape: (B, embed_dim)
+        gate = nn.sigmoid(time_emb)  # gating vector in (0,1), shape: (B, embed_dim)
+        # Expand gate dimensions to match features shape, assuming features shape is [B, ... , embed_dim]
+        while gate.ndim < features.ndim:
+            gate = jnp.expand_dims(gate, axis=1)
+        modulated_features = features * gate  # Broadcasting multiplication
+        value = self.value_mlp(modulated_features)
+        return value
+
+# Overriding Encoder to use the new TimeConditionedValueHead
 class Encoder(nn.Module):
-    """Multi-block encoder consisting of multiple `EncoderBlock` modules."""
-
+    """Multi-block encoder with a time-conditioned value head."""
     net_config: SableNetworkConfig
     memory_config: DictConfig
     n_agents: int
@@ -90,23 +127,17 @@ class Encoder(nn.Module):
     def setup(self) -> None:
         self.ln = nn.RMSNorm()
 
-        self.obs_encoder = nn.Sequential(
-            [
-                nn.RMSNorm(),
-                nn.Dense(
-                    self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2)), use_bias=False
-                ),
-                nn.gelu,
-            ],
-        )
-        self.head = nn.Sequential(
-            [
-                nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
-                nn.gelu,
-                nn.RMSNorm(),
-                nn.Dense(1, kernel_init=orthogonal(0.01)),
-            ],
-        )
+        self.obs_encoder = nn.Sequential([
+            nn.RMSNorm(),
+            nn.Dense(
+                self.net_config.embed_dim, 
+                kernel_init=orthogonal(jnp.sqrt(2)), 
+                use_bias=False
+            ),
+            nn.gelu,
+        ])
+        # Replace the original sequential head with our TimeConditionedValueHead
+        self.head = TimeConditionedValueHead(embed_dim=self.net_config.embed_dim)
 
         self.blocks = [
             EncodeBlock(
@@ -118,43 +149,33 @@ class Encoder(nn.Module):
             for block_id in range(self.net_config.n_block)
         ]
 
-    def __call__(
-        self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array
-    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        """Apply chunkwise encoding."""
+    def __call__(self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
+        """Apply chunkwise encoding with a time-conditioned value head."""
         updated_hstate = jnp.zeros_like(hstate)
         obs_rep = self.obs_encoder(obs)
 
         # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
-            hs = hstate[:, :, i]  # Get the hidden state for the current block
-            # Apply the chunkwise encoder block
+            hs = hstate[:, :, i]  # Hidden state for the current block
             obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
-        value = self.head(obs_rep)
-
+        # Compute the value using the time-conditioned head
+        value = self.head(obs_rep, step_count)
         return value, obs_rep, updated_hstate
 
-    def recurrent(
-        self, obs: chex.Array, hstate: chex.Array, step_count: chex.Array
-    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        """Apply recurrent encoding."""
+    def recurrent(self, obs: chex.Array, hstate: chex.Array, step_count: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
+        """Apply recurrent encoding with a time-conditioned value head."""
         updated_hstate = jnp.zeros_like(hstate)
         obs_rep = self.obs_encoder(obs)
 
-        # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
-            hs = hstate[:, :, i]  # Get the hidden state for the current block
-            # Apply the recurrent encoder block
+            hs = hstate[:, :, i]
             obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
-        # Compute the value function
-        value = self.head(obs_rep)
-
+        value = self.head(obs_rep, step_count)
         return value, obs_rep, updated_hstate
-
 
 class DecodeBlock(nn.Module):
     """Sable decoder block."""
