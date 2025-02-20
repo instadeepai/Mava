@@ -275,8 +275,12 @@ def get_learner_fn(
             agent_perm = jax.random.permutation(agent_shuffle_key, config.system.num_agents)
             batch = tree.map(lambda x: jnp.take(x, agent_perm, axis=2), batch)
 
-            # Concatenate time and agents
-            batch = tree.map(concat_time_and_agents, batch)
+            # Swap batch and time axes
+            def swap_batch_and_time(x: chex.Array) -> chex.Array:
+                x = jnp.moveaxis(x, 0, 1)
+                return x
+
+            batch = tree.map(swap_batch_and_time, batch)
 
             # Split into minibatches
             minibatches = tree.map(

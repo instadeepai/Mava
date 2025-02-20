@@ -21,6 +21,7 @@ from chex import Array
 from omegaconf import DictConfig
 
 from mava.networks.utils.sable import PositionalEncoding
+from einops import rearrange
 
 # General shapes legend:
 # B: batch size
@@ -67,29 +68,39 @@ class SimpleRetention(nn.Module):
         self, key: Array, query: Array, value: Array, hstate: Array, dones: Array
     ) -> Tuple[Array, Array]:
         """Chunkwise (default) representation of the retention mechanism."""
-        B, C, _ = value.shape
 
+        B, T, A, _ = value.shape
+        
+        ##########################################################################################################
+        ##########################################################################################################
+        
+        # First axial retention
+        # attending over agents
+        key = rearrange(key, "B T A E -> (B T) A E")
+        query = rearrange(query, "B T A E -> (B T) A E")
+        value = rearrange(value, "B T A E -> (B T) A E")
+        
+        BT, C, _ = key.shape
+        
         # Apply projection to q_proj, k_proj, v_proj
         q_proj = query @ self.w_q
         k_proj = key @ self.w_k
         v_proj = value @ self.w_v
         k_proj = k_proj.transpose(0, -1, -2)
 
-        # Compute next hidden state
-        if self.memory_config.type == "ff_sable":
-            # No decay matrix or xi for FF Sable since we don't have temporal dependencies.
-            decay_matrix = jnp.ones((B, C, C))
-            decay_matrix = self._causal_mask(decay_matrix)
-            xi = jnp.ones((B, C, 1))
-            next_hstate = (k_proj @ v_proj) + hstate
+        E = q_proj.shape[-1]
+
+        # No decay matrix or xi for FF Sable since we don't have temporal dependencies.
+        if self.masked:
+            decay_matrix = jnp.tril(jnp.ones((C, C)))[jnp.newaxis, ...]
         else:
-            decay_matrix = self.get_decay_matrix(dones)
-            xi = self.get_xi(dones)
-            chunk_decay = self.decay_kappa ** (C // self.n_agents)
-            delta = ~jnp.any(dones[:, :: self.n_agents], axis=1)[:, jnp.newaxis, jnp.newaxis]
-            next_hstate = (
-                k_proj @ (v_proj * decay_matrix[:, -1].reshape((B, C, 1)))
-            ) + hstate * chunk_decay * delta
+            decay_matrix = jnp.ones((BT, C, C))
+        # TODO: unsure if this should be only ones or not since we are over agents. 
+        # decay_matrix = self._causal_mask(decay_matrix)
+        xi = jnp.ones((BT, C, 1))
+        hstate = hstate[:, None, ...].repeat(T, axis=1)
+        hstate = rearrange(hstate, "B T A E -> (B T) A E")
+        next_hstate = (k_proj @ v_proj) + hstate
 
         # Compute the inner chunk and cross chunk
         cross_chunk = (q_proj @ hstate) * xi
@@ -97,6 +108,44 @@ class SimpleRetention(nn.Module):
 
         # Compute the final retention
         ret = inner_chunk + cross_chunk
+        ret = rearrange(ret, "(B T) A E -> B T A E", B=B, T=T, A=A, E=E)
+        next_hstate = rearrange(next_hstate, "(B T) E1 E2 -> B T E1 E2", B=B, T=T, E1=E, E2=E).sum(axis=1)
+
+        ##########################################################################################################
+        ##########################################################################################################
+
+        # Second axial retention
+        # attending over time.
+        hstate = next_hstate
+        k_proj = q_proj = v_proj = rearrange(ret, "B T A E -> (B A) T E")
+        
+        BA, C, E = k_proj.shape
+        
+        # # Apply projection to q_proj, k_proj, v_proj
+        # q_proj = query @ self.w_q
+        # k_proj = key @ self.w_k
+        # v_proj = value @ self.w_v
+        k_proj = k_proj.transpose(0, -1, -2)
+
+        _dones = rearrange(dones, "B T A -> (B A) T")
+        decay_matrix = self.get_decay_matrix(_dones)
+        xi = self.get_xi(_dones)
+        chunk_decay = self.decay_kappa ** (C // self.n_agents)
+        # delta = ~jnp.any(dones[:, :: self.n_agents], axis=1)[:, jnp.newaxis, jnp.newaxis]
+        hstate = hstate[:, None, ...].repeat(A, axis=1)
+        hstate = rearrange(hstate, "B T A E -> (B A) T E")
+        next_hstate = (
+            k_proj @ (v_proj * decay_matrix[:, -1].reshape((BA, C, 1)))
+        ) + hstate * chunk_decay # * delta
+
+        # Compute the inner chunk and cross chunk
+        cross_chunk = (q_proj @ hstate) * xi
+        inner_chunk = ((q_proj @ k_proj) * decay_matrix) @ v_proj
+
+        # Compute the final retention
+        ret = inner_chunk + cross_chunk
+        ret = rearrange(ret, "(B A) T E -> B T A E", B=B, A=A, T=T, E=E)
+
         return ret, next_hstate
 
     def recurrent(
@@ -117,17 +166,18 @@ class SimpleRetention(nn.Module):
     def get_decay_matrix(self, dones: Array) -> Array:
         """Get the decay matrix for the full sequence based on the dones and retention type."""
         # Extract done information at the timestep level
-        timestep_dones = dones[:, :: self.n_agents]  # B, T
+        # NOTE: Assuming the agents share a done.
+        timestep_dones = dones  # B, T
 
         # B, T, T
         timestep_mask = self._get_decay_matrix_mask_timestep(timestep_dones)
         decay_matrix = self._get_default_decay_matrix(timestep_dones)
         decay_matrix *= timestep_mask
 
-        # B, T, T ->  B, T * N, T * N
-        decay_matrix = jnp.repeat(
-            jnp.repeat(decay_matrix, self.n_agents, axis=1), self.n_agents, axis=2
-        )
+        # # B, T, T ->  B, T * N, T * N
+        # decay_matrix = jnp.repeat(
+        #     jnp.repeat(decay_matrix, self.n_agents, axis=1), self.n_agents, axis=2
+        # )
 
         # Apply a causal mask over agents if full self-retention is disabled
         # This converts it from a blocked decay matrix to a causal decay matrix
@@ -189,7 +239,8 @@ class SimpleRetention(nn.Module):
     def get_xi(self, dones: Array) -> Array:
         """Computes a decaying matrix 'xi', which decays over time until the first done signal."""
         # Get done status for each timestep by slicing out the agent dimension
-        timestep_dones = dones[:, :: self.n_agents]
+        # NOTE: Assuming the agents share a done.
+        timestep_dones = dones  # B, T
         B, T = timestep_dones.shape
 
         # Compute the first done step for each sequence,
@@ -208,7 +259,7 @@ class SimpleRetention(nn.Module):
             xi = xi.at[:, i, :].set(xi_i)
 
         # Repeat the decay matrix 'xi' for all agents
-        xi = jnp.repeat(xi, self.n_agents, axis=1)
+        # xi = jnp.repeat(xi, self.n_agents, axis=1)
 
         return xi
 
@@ -272,13 +323,14 @@ class MultiScaleRetention(nn.Module):
         step_count: Array,
     ) -> Tuple[Array, Array]:
         """Chunkwise (default) representation of the multi-scale retention mechanism"""
-        B, C, _ = value.shape
+        B, T, A, _ = value.shape
 
         # Positional encoding of the current step
+        # TODO (Ruan): Fix PE later so that we only encode time since agents are one-hot encoded.
         if self.memory_config.timestep_positional_encoding:
             key, query, value = self.pe(key, query, value, step_count)
 
-        ret_output = jnp.zeros((B, C, self.embed_dim), dtype=value.dtype)
+        ret_output = jnp.zeros((B, T, A, self.embed_dim), dtype=value.dtype)
         for head in range(self.n_head):
             y, new_hs = self.retention_heads[head](key, query, value, hstate[:, head], dones)
             ret_output = ret_output.at[
