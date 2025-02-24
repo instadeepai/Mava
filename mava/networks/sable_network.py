@@ -16,6 +16,7 @@ from functools import partial
 from typing import Optional, Tuple
 
 import chex
+import jax.random
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
@@ -79,65 +80,59 @@ class EncodeBlock(nn.Module):
         output = self.ln2(x + self.ffn(x))
         return output, updated_hstate
 
-class TimeConditionedValueHead(nn.Module):
-    """A value head that conditions on the step_count.
+
+class StochasticDepthValueHead(nn.Module):
+    """A value head with a residual linear branch and a stochastically dropped nonlinear branch.
     
-    This module embeds the (possibly multi-timestep) step_count by taking only the last timestep 
-    (if needed) and computes a gating modulation of the encoder features before producing a scalar value.
+    During training, if a dropout RNG key is available, the nonlinear branch is randomly dropped with probability p (and scaled by 1/(1-p) when kept).
+    If no dropout key is provided, the nonlinear branch is always used.
     """
     embed_dim: int
+    drop_prob: float = 0.2  # probability of dropping the nonlinear branch
 
     def setup(self):
-        self.time_mlp = nn.Sequential([
+        self.linear = nn.Dense(1, kernel_init=orthogonal(0.01))
+        # Nonlinear branch: a small MLP
+        self.nonlin = nn.Sequential([
             nn.Dense(self.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
-            nn.gelu,
-            nn.Dense(self.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
-        ])
-        self.value_mlp = nn.Sequential([
-            nn.Dense(self.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
-            nn.gelu,
-            nn.RMSNorm(),
+            nn.relu,
             nn.Dense(1, kernel_init=orthogonal(0.01)),
         ])
 
-    def __call__(self, features: chex.Array, step_count: chex.Array) -> chex.Array:
-        # Ensure step_count has shape (batch, 1)
-        if step_count.ndim == 1:
-            step_count = step_count[:, None]
-        elif step_count.shape[-1] != 1:
-            # If step_count has trailing dimension > 1, take only the last timestep
-            step_count = step_count[..., -1:]
-        # Embed the temporal information and compute a gating signal
-        time_emb = self.time_mlp(step_count)  # shape: (B, embed_dim)
-        gate = nn.sigmoid(time_emb)  # gating vector in (0,1), shape: (B, embed_dim)
-        # Expand gate dimensions to match features shape, assuming features shape is [B, ... , embed_dim]
-        while gate.ndim < features.ndim:
-            gate = jnp.expand_dims(gate, axis=1)
-        modulated_features = features * gate  # Broadcasting multiplication
-        value = self.value_mlp(modulated_features)
-        return value
+    def __call__(self, x: chex.Array, deterministic: bool = False) -> chex.Array:
+        residual = self.linear(x)
+        nonlin = self.nonlin(x)
+        # Only apply stochastic depth if not deterministic and a dropout RNG is available.
+        if not deterministic and self.has_rng('dropout'):
+            rng = self.make_rng('dropout')
+            mask_shape = nonlin.shape[:-1] + (1,)
+            keep_mask = jax.random.bernoulli(rng, p=1.0 - self.drop_prob, shape=mask_shape)
+            nonlin = nonlin * keep_mask / (1.0 - self.drop_prob)
+        # If no dropout RNG is provided, always use the full nonlinear branch.
+        return residual + nonlin
 
-# Overriding Encoder to use the new TimeConditionedValueHead
+# Overwriting the Encoder class to integrate the new StochasticDepthValueHead.
 class Encoder(nn.Module):
-    """Multi-block encoder with a time-conditioned value head."""
+    """Multi-block encoder consisting of multiple `EncoderBlock` modules with a stochastically dropped value head."""
     net_config: SableNetworkConfig
     memory_config: DictConfig
     n_agents: int
+    drop_prob: float = 0.2  # Drop probability for the stochastic depth branch
 
     def setup(self) -> None:
         self.ln = nn.RMSNorm()
 
-        self.obs_encoder = nn.Sequential([
-            nn.RMSNorm(),
-            nn.Dense(
-                self.net_config.embed_dim, 
-                kernel_init=orthogonal(jnp.sqrt(2)), 
-                use_bias=False
-            ),
-            nn.gelu,
-        ])
-        # Replace the original sequential head with our TimeConditionedValueHead
-        self.head = TimeConditionedValueHead(embed_dim=self.net_config.embed_dim)
+        self.obs_encoder = nn.Sequential(
+            [
+                nn.RMSNorm(),
+                nn.Dense(
+                    self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2)), use_bias=False
+                ),
+                nn.gelu,
+            ],
+        )
+        # Using the new StochasticDepthValueHead instead of the previous head.
+        self.head = StochasticDepthValueHead(embed_dim=self.net_config.embed_dim, drop_prob=self.drop_prob)
 
         self.blocks = [
             EncodeBlock(
@@ -149,33 +144,42 @@ class Encoder(nn.Module):
             for block_id in range(self.net_config.n_block)
         ]
 
-    def __call__(self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        """Apply chunkwise encoding with a time-conditioned value head."""
+    def __call__(
+        self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array
+    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
+        """Apply chunkwise encoding."""
         updated_hstate = jnp.zeros_like(hstate)
         obs_rep = self.obs_encoder(obs)
 
         # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
-            hs = hstate[:, :, i]  # Hidden state for the current block
+            hs = hstate[:, :, i]  # Get the hidden state for the current block
             obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
-        # Compute the value using the time-conditioned head
-        value = self.head(obs_rep, step_count)
+        # When applying head, if a dropout RNG is provided upstream, it will be used.
+        value = self.head(obs_rep, deterministic=False)
+
         return value, obs_rep, updated_hstate
 
-    def recurrent(self, obs: chex.Array, hstate: chex.Array, step_count: chex.Array) -> Tuple[chex.Array, chex.Array, chex.Array]:
-        """Apply recurrent encoding with a time-conditioned value head."""
+    def recurrent(
+        self, obs: chex.Array, hstate: chex.Array, step_count: chex.Array, deterministic: bool = True
+    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
+        """Apply recurrent encoding."""
         updated_hstate = jnp.zeros_like(hstate)
         obs_rep = self.obs_encoder(obs)
 
+        # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
-            hs = hstate[:, :, i]
+            hs = hstate[:, :, i]  # Get the hidden state for the current block
             obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
-        value = self.head(obs_rep, step_count)
+        # Compute the value function using deterministic inference.
+        value = self.head(obs_rep, deterministic=deterministic)
+
         return value, obs_rep, updated_hstate
+
 
 class DecodeBlock(nn.Module):
     """Sable decoder block."""
