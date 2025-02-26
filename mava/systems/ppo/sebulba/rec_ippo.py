@@ -110,10 +110,7 @@ def rollout(
         """Get action and value."""
 
         batched_observation = tree.map(lambda x: x[jnp.newaxis, :], observation)
-        ac_in = (
-            batched_observation,
-            dones[jnp.newaxis, :],
-        )
+        ac_in = (batched_observation, dones[jnp.newaxis, :])
         policy_hidden_state, actor_policy = actor_apply_fn(
             params.actor_params, hstates.policy_hidden_state, ac_in
         )
@@ -121,8 +118,9 @@ def rollout(
             params.critic_params, hstates.critic_hidden_state, ac_in
         )
 
-        action = actor_policy.sample(seed=key)
-        log_prob = actor_policy.log_prob(action)
+        action = actor_policy.sample(seed=key).squeeze(0)
+        log_prob = actor_policy.log_prob(action).squeeze(0)
+        value = value.squeeze(0)
 
         hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
         return action, log_prob, value, hstates
@@ -150,20 +148,15 @@ def rollout(
                 with RecordTimeTo(actor_timings["get_params_time"]):
                     params = params_source.get()  # Get the latest parameters from the learner
 
-                last_obs = tree.map(move_to_device, timestep.observation)
+                last_obs = move_to_device(timestep.observation)
                 last_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
-                last_dones = tree.map(move_to_device, last_dones)
+                last_dones = move_to_device(last_dones)
 
                 # Sample action from the policy and squeeze out the batch dimension.
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
                     action, log_prob, value, hstates = act_fn(
                         params, last_obs, last_dones, last_hstates, act_key
-                    )
-                    value, action, log_prob = (
-                        value.squeeze(0),
-                        action.squeeze(0),
-                        log_prob.squeeze(0),
                     )
                     cpu_action = jax.device_get(action)
 
@@ -183,7 +176,7 @@ def rollout(
                         last_hstates,
                     )
                 )
-                last_hstates = copy.deepcopy(hstates)
+                last_hstates = hstates
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
         # Send trajectories to learner
@@ -238,10 +231,7 @@ def get_learner_step_fn(
         ) = learner_state
 
         batched_last_observation = tree.map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
-        ac_in = (
-            batched_last_observation,
-            last_done[jnp.newaxis, :],
-        )
+        ac_in = (batched_last_observation, last_done[jnp.newaxis, :])
 
         # Run the network.
         _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
