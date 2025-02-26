@@ -30,6 +30,29 @@ from einops import rearrange
 # C: chunk size - T * N in a chunk
 # T: number of timesteps
 
+def _get_decay_matrices(
+    dones: Array, decay_kappa: float, n_agents: int, memory_config_type: str, masked: bool, bsz: int, seq_len: int
+) -> Tuple[Array, Array]:
+    """Chunkwise (default) representation of the retention mechanism."""
+    B = bsz
+    C = seq_len
+
+    # Compute next hidden state
+    if memory_config_type == "ff_sable":
+        # No decay matrix or xi for FF Sable since we don't have temporal dependencies.
+        decay_matrix = jnp.ones((B, C, C))
+        decay_matrix = _causal_mask(decay_matrix, masked)
+        xi = jnp.ones((B, C, 1))
+
+        return decay_matrix, xi
+    else:
+        decay_matrix = get_decay_matrix(dones, n_agents, masked, decay_kappa)
+        xi = get_xi(dones, n_agents, decay_kappa)
+        chunk_decay = jnp.exp(decay_kappa * (C // n_agents))
+        delta = ~jnp.any(dones[:, :: n_agents], axis=1)[:, jnp.newaxis, jnp.newaxis]
+    
+        return decay_matrix, xi, chunk_decay, delta
+
 def get_decay_matrix(dones: Array, n_agents: int, masked: bool, decay_kappa: float) -> Array:
     """Get the decay matrix for the full sequence based on the dones and retention type."""
     # Extract done information at the timestep level
@@ -319,6 +342,8 @@ class MultiScaleRetention(nn.Module):
     ) -> Tuple[Array, Array]:
         """Chunkwise (default) representation of the multi-scale retention mechanism"""
 
+        del scale
+        
         # Positional encoding of the current step
         if self.memory_config.timestep_positional_encoding:
             key, query, value = self.pe(key, query, value, step_count)
@@ -338,43 +363,26 @@ class MultiScaleRetention(nn.Module):
         decay_matrix, xi, chunk_decay, delta = get_decay_matrices(
             dones, self.decay_kappas, self.n_agents, self.masked
         )
-        
-        decay_matrix_scale = jnp.sqrt(decay_matrix.sum(axis=-1, keepdims=True))
 
-        qk_mat = q_proj @ k_proj_t * (decay_matrix / decay_matrix_scale)
-        inner_scale = jnp.clip(jnp.abs(qk_mat).sum(axis=-1, keepdims=True), min=1.0)
-        qk_mat = qk_mat / inner_scale
+        qk_mat = q_proj @ k_proj_t * decay_matrix
+        qk_mat = qk_mat
         inner_output = qk_mat @ v_proj
 
         # reduce kv to one chunk
-        # original mistake
-        # value_inner_decay = decay_matrix[:, :, :, :, -1] / decay_matrix[:, :, :, :, -1].sum(axis=-1, keepdims=True)
-        # select last row not last column now 
-        value_inner_decay = decay_matrix[:, :, :, -1, :] / decay_matrix[:, :, :, -1, :].sum(axis=-1, keepdims=True)
+        value_inner_decay = decay_matrix[:, :, :, -1, :]
         value_inner_decay = value_inner_decay[..., jnp.newaxis]
         kv = k_proj_t @ (v_proj * value_inner_decay)
 
         kv_recurrent = []
-        cross_scale = []
-
-        kv_scale = scale
-
         for i in range(num_chunks):
-            kv_recurrent.append(hstate / kv_scale)
-            cross_scale.append(kv_scale)
+            kv_recurrent.append(hstate)
             hstate = hstate * chunk_decay[jnp.newaxis, :, jnp.newaxis, jnp.newaxis] * delta[:, i][..., jnp.newaxis] + kv[:, i] 
-            kv_scale = jnp.clip(jnp.abs(hstate).sum(axis=-2, keepdims=True).max(axis=-1, keepdims=True), min=1.0)
 
         kv_recurrent = jnp.stack(kv_recurrent, axis=1)
-        cross_scale = jnp.stack(cross_scale, axis=1)
-
-        all_scale = jnp.maximum(inner_scale, cross_scale)
-        align_inner_scale = all_scale / inner_scale
-        align_cross_scale = all_scale / cross_scale
-
+        
         cross_output = (q_proj * xi) @ kv_recurrent
 
-        ret_output = inner_output / align_inner_scale + cross_output / align_cross_scale
+        ret_output = inner_output + cross_output
         
         ret_output = rearrange(ret_output, "B nC nh Cs n -> B (nC Cs) (nh n)", nh=self.n_head)
         ret_output = self.group_norm(ret_output.reshape(-1, self.head_size)).reshape(
@@ -390,6 +398,8 @@ class MultiScaleRetention(nn.Module):
     ) -> Tuple[Array, Array]:
         """Recurrent representation of the multi-scale retention mechanism"""
 
+        del scale
+        
         # Positional encoding of the current step if enabled
         if self.memory_config.timestep_positional_encoding:
             key_n, query_n, value_n = self.pe(key_n, query_n, value_n, step_count)
@@ -413,7 +423,7 @@ class MultiScaleRetention(nn.Module):
         # ret = q_proj @ updated_hstate
         
         kv = k_proj * v_proj
-        updated_hstate = hstate + kv / jnp.sqrt(scale)
+        updated_hstate = hstate + kv #/ jnp.sqrt(scale)
         ret = (q_proj * updated_hstate).sum(axis=-1)
         ret_output = self.group_norm(ret.reshape(-1, self.head_size)).reshape(
             B, 1, self.embed_dim

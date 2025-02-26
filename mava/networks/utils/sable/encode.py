@@ -31,26 +31,15 @@ def train_encoder_fn(
     dones: chex.Array,
     step_count: chex.Array,
     chunk_size: int,
+    scale: chex.Array,
 ) -> Tuple[chex.Array, chex.Array, chex.Array]:
     """Chunkwise encoding for discrete action spaces."""
-    B, S = obs.shape[:2]
-    v_loc = jnp.zeros((B, S, 1))
-    obs_rep = jnp.zeros((B, S, encoder.net_config.embed_dim))
-
+    _, S = obs.shape[:2]
     # Apply the encoder per chunk
     num_chunks = S // chunk_size
-    for chunk_id in range(0, num_chunks):
-        start_idx = chunk_id * chunk_size
-        end_idx = (chunk_id + 1) * chunk_size
-        # Chunk obs, dones, and step_count
-        chunk_obs = obs[:, start_idx:end_idx]
-        chunk_dones = dones[:, start_idx:end_idx]
-        chunk_step_count = step_count[:, start_idx:end_idx]
-        chunk_v_loc, chunk_obs_rep, hstate = encoder(
-            chunk_obs, hstate, chunk_dones, chunk_step_count
-        )
-        v_loc = v_loc.at[:, start_idx:end_idx].set(chunk_v_loc)
-        obs_rep = obs_rep.at[:, start_idx:end_idx].set(chunk_obs_rep)
+    v_loc, obs_rep, hstate = encoder(
+        obs, hstate, dones, step_count, num_chunks, scale,
+    )
 
     return v_loc, obs_rep, hstate
 
@@ -65,21 +54,14 @@ def act_encoder_fn(
 ) -> Tuple[chex.Array, chex.Array, chex.Array]:
     """Chunkwise encoding for ff-Sable and for discrete action spaces."""
     B, C = obs.shape[:2]
-    v_loc = jnp.zeros((B, C, 1))
-    obs_rep = jnp.zeros((B, C, encoder.net_config.embed_dim))
-
     # Apply the encoder per chunk
     num_chunks = C // chunk_size
-    for chunk_id in range(0, num_chunks):
-        start_idx = chunk_id * chunk_size
-        end_idx = (chunk_id + 1) * chunk_size
-        # Chunk obs and step_count
-        chunk_obs = obs[:, start_idx:end_idx]
-        chunk_step_count = step_count[:, start_idx:end_idx]
-        chunk_v_loc, chunk_obs_rep, decayed_hstate = encoder.recurrent(
-            chunk_obs, decayed_hstate, chunk_step_count, scale
-        )
-        v_loc = v_loc.at[:, start_idx:end_idx].set(chunk_v_loc)
-        obs_rep = obs_rep.at[:, start_idx:end_idx].set(chunk_obs_rep)
+    # Create dones since they can just be false inside the act call.
+    dones = jnp.zeros((B, C), dtype=bool)
+
+    v_loc, obs_rep, decayed_hstate = encoder(
+        obs, decayed_hstate, dones, step_count, num_chunks, scale,
+    )
+
 
     return v_loc, obs_rep, decayed_hstate

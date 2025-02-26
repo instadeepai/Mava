@@ -19,7 +19,7 @@ import chex
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
-from jax import tree
+from jax import tree, tree_util
 from omegaconf import DictConfig
 
 from mava.networks.retention import MultiScaleRetention
@@ -32,7 +32,7 @@ from mava.networks.utils.sable import (
     discrete_train_decoder_fn,
     train_encoder_fn,
 )
-from mava.systems.sable.types import HiddenStates, SableNetworkConfig
+from mava.systems.sable.types import HiddenStates, SableNetworkConfig, Scale
 from mava.types import Observation
 from mava.utils.network_utils import _CONTINUOUS, _DISCRETE
 
@@ -60,11 +60,11 @@ class EncodeBlock(nn.Module):
         self.ffn = SwiGLU(self.net_config.embed_dim, self.net_config.embed_dim)
 
     def __call__(
-        self, x: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array
+        self, x: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array, num_chunks: int, scale: chex.Array,
     ) -> chex.Array:
         """Applies Chunkwise MultiScaleRetention."""
         ret, updated_hstate = self.retn(
-            key=x, query=x, value=x, hstate=hstate, dones=dones, step_count=step_count
+            key=x, query=x, value=x, hstate=hstate, dones=dones, step_count=step_count, num_chunks=num_chunks, scale=scale,
         )
         x = self.ln1(x + ret)
         output = self.ln2(x + self.ffn(x))
@@ -119,7 +119,7 @@ class Encoder(nn.Module):
         ]
 
     def __call__(
-        self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array
+        self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array, num_chunks: int, scale: chex.Array,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         """Apply chunkwise encoding."""
         updated_hstate = jnp.zeros_like(hstate)
@@ -128,8 +128,9 @@ class Encoder(nn.Module):
         # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
             hs = hstate[:, :, i]  # Get the hidden state for the current block
+            scale = scale[:, :, 0]
             # Apply the chunkwise encoder block
-            obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
+            obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count, num_chunks, scale)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
         value = self.head(obs_rep)
@@ -146,7 +147,7 @@ class Encoder(nn.Module):
         # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
             hs = hstate[:, :, i]  # Get the hidden state for the current block
-            scale = scale[:, :, i]
+            scale = scale[:, :, 0]
             # Apply the recurrent encoder block
             obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs, step_count, scale)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
@@ -193,13 +194,16 @@ class DecodeBlock(nn.Module):
         hstates: Tuple[chex.Array, chex.Array],
         dones: chex.Array,
         step_count: chex.Array,
+        num_chunks: int,
+        scale: chex.Array,
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Applies Chunkwise MultiScaleRetention."""
         hs1, hs2 = hstates
+        scale1, scale2 = scale
 
         # Apply the self-retention over actions
         ret, hs1_new = self.retn1(
-            key=x, query=x, value=x, hstate=hs1, dones=dones, step_count=step_count
+            key=x, query=x, value=x, hstate=hs1, dones=dones, step_count=step_count, num_chunks=num_chunks, scale=scale1,
         )
         ret = self.ln1(x + ret)
 
@@ -211,6 +215,8 @@ class DecodeBlock(nn.Module):
             hstate=hs2,
             dones=dones,
             step_count=step_count,
+            num_chunks=num_chunks,
+            scale=scale2,
         )
         y = self.ln2(obs_rep + ret2)
         output = self.ln3(y + self.ffn(y))
@@ -227,16 +233,17 @@ class DecodeBlock(nn.Module):
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Applies Recurrent MultiScaleRetention."""
         hs1, hs2 = hstates
+        scale1, scale2 = scale
 
         # Apply the self-retention over actions
         ret, hs1_new = self.retn1.recurrent(
-            key_n=x, query_n=x, value_n=x, hstate=hs1, step_count=step_count, scale=scale
+            key_n=x, query_n=x, value_n=x, hstate=hs1, step_count=step_count, scale=scale1
         )
         ret = self.ln1(x + ret)
 
         # Apply the cross-retention over obs x action
         ret2, hs2_new = self.retn2.recurrent(
-            key_n=ret, query_n=obs_rep, value_n=ret, hstate=hs2, step_count=step_count, scale=scale,
+            key_n=ret, query_n=obs_rep, value_n=ret, hstate=hs2, step_count=step_count, scale=scale2,
         )
         y = self.ln2(obs_rep + ret2)
         output = self.ln3(y + self.ffn(y))
@@ -302,6 +309,8 @@ class Decoder(nn.Module):
         hstates: Tuple[chex.Array, chex.Array],
         dones: chex.Array,
         step_count: chex.Array,
+        num_chunks: int,
+        scale: chex.Array,
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Apply chunkwise decoding."""
         updated_hstates = tree.map(jnp.zeros_like, hstates)
@@ -311,7 +320,8 @@ class Decoder(nn.Module):
         # Apply the decoder blocks
         for i, block in enumerate(self.blocks):
             hs = tree.map(lambda x, j=i: x[:, :, j], hstates)
-            x, hs_new = block(x=x, obs_rep=obs_rep, hstates=hs, dones=dones, step_count=step_count)
+            scale = tree.map(lambda x, j=i: x[:, :, 0], scale)
+            x, hs_new = block(x=x, obs_rep=obs_rep, hstates=hs, dones=dones, step_count=step_count, num_chunks=num_chunks, scale=scale)
             updated_hstates = tree.map(
                 lambda x, y, j=i: x.at[:, :, j].set(y), updated_hstates, hs_new
             )
@@ -336,7 +346,7 @@ class Decoder(nn.Module):
         # Apply the decoder blocks
         for i, block in enumerate(self.blocks):
             hs = tree.map(lambda x, i=i: x[:, :, i], hstates)
-            scale = scale[:, :, i]
+            scale = tree.map(lambda x, i=i: x[:, :, 0], scale)
             x, hs_new = block.recurrent(x=x, obs_rep=obs_rep, hstates=hs, step_count=step_count, scale=scale)
             updated_hstates = tree.map(
                 lambda x, y, j=i: x.at[:, :, j].set(y), updated_hstates, hs_new
@@ -413,22 +423,24 @@ class SableNetwork(nn.Module):
             )
             self.autoregressive_act = discrete_autoregressive_act  # type: ignore
 
+    # TODO: There should be a different scale for each retention. Similar to the hidden states.
     def __call__(
         self,
         observation: Observation,
         action: chex.Array,
-        hstates: HiddenStates,
+        hstates_and_scale: HiddenStates,
         dones: chex.Array,
         rng_key: Optional[chex.PRNGKey] = None,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         """Training phase."""
+        hstates, scale = hstates_and_scale
         obs, legal_actions, step_count = (
             observation.agents_view,
             observation.action_mask,
             observation.step_count,
         )
         value, obs_rep, _ = self.train_encoder_fn(
-            encoder=self.encoder, obs=obs, hstate=hstates[0], dones=dones, step_count=step_count
+            encoder=self.encoder, obs=obs, hstate=hstates[0], dones=dones, step_count=step_count, scale=scale[0],
         )
 
         action_log, entropy = self.train_decoder_fn(
@@ -440,6 +452,7 @@ class SableNetwork(nn.Module):
             dones=dones,
             step_count=step_count,
             rng_key=rng_key,
+            scale=scale[1:],
         )
 
         value = jnp.squeeze(value, axis=-1)
@@ -461,16 +474,26 @@ class SableNetwork(nn.Module):
         )
 
         # Decay the hidden states: each timestep we decay the hidden states once
-        updated_scale = prev_scale * jnp.exp(self.decay_kappas) + 1.0
-        scale_factor = jnp.sqrt(prev_scale) * jnp.exp(self.decay_kappas) / jnp.sqrt(updated_scale)
-        decayed_hstates = tree.map(lambda x: x * scale_factor, hstates)
+        updated_scale = tree.map(lambda x: x * jnp.exp(self.decay_kappas) + 1, prev_scale)
+        scale_factors = tree.map(lambda x, y: jnp.sqrt(x) * jnp.exp(self.decay_kappas) / jnp.sqrt(y), prev_scale, updated_scale)
+        
+        # Old code.
+        # scale_factors = jnp.sqrt(prev_scale) * jnp.exp(self.decay_kappas) / jnp.sqrt(updated_scale)
+        # decayed_hstates = tree.map(lambda x, y: x * y, hstates, scale_factors)
+
+        # New code.
+        # Need to operate over leaves this since the pytrees have different definitions
+        h_leaves, h_treedef = tree_util.tree_flatten(hstates)
+        s_leaves, _ = tree_util.tree_flatten(scale_factors)
+        decayed_leaves = [h * s for h, s in zip(h_leaves, s_leaves)]
+        decayed_hstates = tree_util.tree_unflatten(h_treedef, decayed_leaves)
 
         value, obs_rep, updated_enc_hs = self.act_encoder_fn(
             encoder=self.encoder,
             obs=obs,
             decayed_hstate=decayed_hstates[0],
             step_count=step_count,
-            scale=updated_scale,
+            scale=updated_scale[0],
         )
 
         output_actions, output_actions_log, updated_dec_hs = self.autoregressive_act(
@@ -480,13 +503,18 @@ class SableNetwork(nn.Module):
             hstates=decayed_hstates[1:],
             step_count=step_count,
             key=key,
-            scale=updated_scale,
+            scale=updated_scale[1:],
         )
 
         updated_hs = HiddenStates(
             encoder=updated_enc_hs,
             decoder_self_retn=updated_dec_hs[0],
             decoder_cross_retn=updated_dec_hs[1],
+        )
+        updated_scale = Scale(
+            encoder=updated_scale[0],
+            decoder_self_retn=updated_scale[1],
+            decoder_cross_retn=updated_scale[2],
         )
 
         value = jnp.squeeze(value, axis=-1)

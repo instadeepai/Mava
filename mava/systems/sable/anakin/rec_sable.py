@@ -32,7 +32,7 @@ from rich.pretty import pprint
 
 from mava.evaluator import ActorState, EvalActFn, get_eval_fn, get_num_eval_envs
 from mava.networks import SableNetwork
-from mava.networks.utils.sable import get_init_hidden_state
+from mava.networks.utils.sable import get_init_hidden_state, get_init_scale
 from mava.systems.ppo.types import PPOTransition as Transition
 from mava.systems.sable.types import (
     ActorApply,
@@ -108,8 +108,13 @@ def get_learner_fn(
             # Reset hidden state if done.
             done = timestep.last()
             done = jnp.expand_dims(done, (1, 2, 3, 4))
+
+            # Comment out to never reset the hstates
             hstates = tree.map(lambda hs: jnp.where(done, jnp.zeros_like(hs), hs), hstates)
-            scale = jnp.where(done, jnp.ones_like(scale), scale)
+            scale = tree.map(lambda s: jnp.where(done, jnp.ones_like(s), s), scale)
+
+            # jax.debug.print("Enc hstate mean {x}, max {y}, std {z}", x=hstates[0].mean(), y=hstates[0].max(), z=hstates[0].std())
+            # jax.debug.print("Enc scale mean {x}, max {y}, std {z}", x=scale[0].mean(), y=scale[0].max(), z=scale[0].std())
 
             prev_done = last_timestep.last().repeat(env.num_agents).reshape(num_envs, -1)
             transition = Transition(
@@ -120,6 +125,7 @@ def get_learner_fn(
 
         # Copy old hidden states: to be used in the training loop
         prev_hstates = tree.map(lambda x: jnp.copy(x), learner_state.hstates)
+        prev_scale = tree.map(lambda x: jnp.copy(x), learner_state.scale)
 
         # Step environment for rollout length
         learner_state, (traj_batch, episode_metrics) = jax.lax.scan(
@@ -173,7 +179,7 @@ def get_learner_fn(
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
                 params, opt_state, key = train_state
-                traj_batch, advantages, targets, prev_hstates = batch_info
+                traj_batch, advantages, targets, prev_hstates, prev_scale = batch_info
 
                 def _loss_fn(
                     params: Params,
@@ -182,6 +188,7 @@ def get_learner_fn(
                     value_targets: chex.Array,
                     prev_hstates: HiddenStates,
                     rng_key: chex.PRNGKey,
+                    prev_scale: chex.Array,
                 ) -> Tuple:
                     """Calculate Sable loss."""
                     # Rerun network
@@ -189,10 +196,45 @@ def get_learner_fn(
                         params,
                         traj_batch.obs,
                         traj_batch.action,
-                        prev_hstates,
+                        (prev_hstates, prev_scale),
+                        # jnp.zeros_like(traj_batch.done, dtype=bool), # just a hack to not reset hstates
                         traj_batch.done,
                         rng_key,
                     )
+
+                    ################################################################################################
+                    # # TEST chunkwise / recurrent equivalence.
+                    # def undo_time_agent_merge(x: chex.Array) -> chex.Array:
+                    #     """Undo the time and agent merge."""
+                    #     x = jnp.reshape(x, (x.shape[0], config.system.rollout_length, config.system.num_agents, -1))
+                    #     return x
+                    
+                    # test_hs = copy.deepcopy(prev_hstates)
+                    # test_scale = copy.deepcopy(prev_scale)
+                    # reshaped_obs = tree.map(undo_time_agent_merge, traj_batch.obs)
+                    # reshaped_dones = traj_batch.done.reshape(config.arch.num_envs, config.system.rollout_length, config.system.num_agents)
+                    # reshaped_dones = jnp.any(reshaped_dones, axis=-1)
+
+                    # output_action_log = jnp.zeros((config.arch.num_envs, config.system.rollout_length, config.system.num_agents))
+                    # output_values = jnp.zeros((config.arch.num_envs, config.system.rollout_length, config.system.num_agents))
+
+                    # for i in range(config.system.rollout_length):
+                    #     step_obs = tree.map(lambda x: x[:, i], reshaped_obs)
+                    #     step_obs = step_obs._replace(step_count = step_obs.step_count.squeeze())
+                    #     _, _output_action_log, _output_values, test_hs, test_scale = sable_action_select_fn(  # type: ignore
+                    #         params,
+                    #         step_obs,
+                    #         (test_hs, test_scale),
+                    #         rng_key,
+                    #     )
+
+                    #     output_action_log = output_action_log.at[:, i].set(_output_action_log)
+                    #     output_values = output_values.at[:, i].set(_output_values)
+
+                    #     # Reset states if relevant
+                    #     test_hs = tree.map(lambda x: jnp.where(reshaped_dones[:, i][:, None, None, None, None], jnp.zeros_like(x), x), test_hs)
+                    #     test_scale = tree.map(lambda x: jnp.where(reshaped_dones[:, i][:, None, None, None, None], jnp.ones_like(x), x), test_scale)
+                    ################################################################################################
 
                     # Calculate actor loss
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -236,6 +278,7 @@ def get_learner_fn(
                     targets,
                     prev_hstates,
                     entropy_key,
+                    prev_scale,
                 )
 
                 # Compute the parallel mean (pmean) over the batch.
@@ -258,7 +301,7 @@ def get_learner_fn(
 
                 return (new_params, new_opt_state, key), loss_info
 
-            (params, opt_states, traj_batch, advantages, targets, key, prev_hstates) = update_state
+            (params, opt_states, traj_batch, advantages, targets, key, prev_hstates, prev_scale) = update_state
 
             # Shuffle minibatches
             key, batch_shuffle_key, agent_shuffle_key, entropy_key = jax.random.split(key, 4)
@@ -288,25 +331,29 @@ def get_learner_fn(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 prev_hstates,
             )
+            prev_scale_minibatch = tree.map(
+                lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
+                prev_scale,
+            )
 
             # UPDATE MINIBATCHES
             (params, opt_states, entropy_key), loss_info = jax.lax.scan(
                 _update_minibatch,
                 (params, opt_states, entropy_key),
-                (*minibatches, prev_hs_minibatch),
+                (*minibatches, prev_hs_minibatch, prev_scale_minibatch),
             )
 
-            update_state = (params, opt_states, traj_batch, advantages, targets, key, prev_hstates)
+            update_state = (params, opt_states, traj_batch, advantages, targets, key, prev_hstates, prev_scale)
             return update_state, loss_info
 
-        update_state = (params, opt_states, traj_batch, advantages, targets, key, prev_hstates)
+        update_state = (params, opt_states, traj_batch, advantages, targets, key, prev_hstates, prev_scale)
 
         # Update epochs
         update_state, loss_info = jax.lax.scan(
             _update_epoch, update_state, None, config.system.ppo_epochs
         )
 
-        params, opt_states, traj_batch, advantages, targets, key, _ = update_state
+        params, opt_states, traj_batch, advantages, targets, key, _, _ = update_state
         learner_state = LearnerState(
             params,
             opt_states,
@@ -400,7 +447,8 @@ def learner_setup(
     init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs)  # Add batch dim
     init_hs = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
     init_hs = tree.map(lambda x: x[0, jnp.newaxis], init_hs)
-    init_scale = jnp.ones((1, config.network.net_config.n_head, 1, 1, 1))
+    init_scale = get_init_scale(config.network.net_config, config.arch.num_envs)
+    init_scale = tree.map(lambda x: x[0, jnp.newaxis], init_scale)
 
     # Initialise params and optimiser state.
     params = sable_network.init(
@@ -438,6 +486,7 @@ def learner_setup(
 
     # Initialise hidden state.
     init_hstates = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
+    init_scale = get_init_scale(config.network.net_config, config.arch.num_envs)
 
     # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
@@ -461,7 +510,6 @@ def learner_setup(
     broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
     replicate_learner = tree.map(broadcast, replicate_learner)
     init_hstates = tree.map(broadcast, init_hstates)
-    init_scale = jnp.ones((config.arch.num_envs, config.network.net_config.n_head, 1, 1, 1))
     init_scale = tree.map(broadcast, init_scale)
 
     # Duplicate learner across devices.
@@ -561,7 +609,7 @@ def run_experiment(_config: DictConfig) -> float:
     eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
     eval_hs = get_init_hidden_state(config.network.net_config, eval_batch_size)
     eval_hs = flax.jax_utils.replicate(eval_hs, devices=jax.devices())
-    eval_scale = jnp.ones((eval_batch_size, config.network.net_config.n_head, 1, 1, 1))
+    eval_scale = get_init_scale(config.network.net_config, eval_batch_size)
     eval_scale = flax.jax_utils.replicate(eval_scale, devices=jax.devices())
 
     # Run experiment for a total number of evaluations.
@@ -619,10 +667,12 @@ def run_experiment(_config: DictConfig) -> float:
         eval_batch_size = get_num_eval_envs(config, absolute_metric=True)
         abs_hs = get_init_hidden_state(config.network.net_config, eval_batch_size)
         abs_hs = tree.map(lambda x: x[jnp.newaxis], abs_hs)
+        abs_scale = get_init_scale(config.network.net_config, eval_batch_size)
+        abs_scale = tree.map(lambda x: x[jnp.newaxis], abs_scale)
         abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=True)
         eval_keys = jax.random.split(key, n_devices)
 
-        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {"hidden_state": abs_hs})
+        eval_metrics = abs_metric_evaluator(best_params, eval_keys, {"hidden_state": abs_hs, "scale": abs_scale})
 
         t = int(steps_per_rollout * (eval_step + 1))
         logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
