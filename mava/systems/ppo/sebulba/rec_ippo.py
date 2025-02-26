@@ -61,6 +61,7 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_sebulba_config, check_total_timesteps
 from mava.utils.jax_utils import switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
 from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
 from mava.utils.training import make_learning_rate
@@ -169,7 +170,7 @@ def rollout(
                 # Step environment
                 with RecordTimeTo(actor_timings["env_step_time"]):
                     timestep = env.step(cpu_action)
-
+                
                 # Append data to storage
                 traj.append(
                     RNNPPOTransition(
@@ -225,29 +226,6 @@ def get_learner_step_fn(
             traj_batch (PPOTransition): the batch of data to learn with.
         """
 
-        def _calculate_gae(
-            traj_batch: RNNPPOTransition, last_val: chex.Array, last_done: chex.Array
-        ) -> Tuple[chex.Array, chex.Array]:
-            gamma, gae_lambda = config.system.gamma, config.system.gae_lambda
-
-            def _get_advantages(
-                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
-            ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
-                gae, next_value, next_done = carry
-                done, value, reward = transition.done, transition.value, transition.reward
-                delta = reward + gamma * next_value * (1 - next_done) - value
-                gae = delta + gamma * gae_lambda * (1 - next_done) * gae
-                return (gae, value, done), gae
-
-            _, advantages = jax.lax.scan(
-                _get_advantages,
-                (jnp.zeros_like(last_val), last_val, last_done),
-                traj_batch,
-                reverse=True,
-                unroll=16,
-            )
-            return advantages, advantages + traj_batch.value
-
         # Add a batch dimension to the observation.
         (
             params,
@@ -269,8 +247,10 @@ def get_learner_step_fn(
         _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
-        advantages, targets = _calculate_gae(traj_batch, last_val, last_done)
-
+        # Calculate advantage
+        advantages, targets = calculate_gae(
+            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+        )
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple[Tuple, Metrics]:
             """Update the network for a single epoch."""
 
@@ -500,21 +480,15 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, rollout_time, ep_metrics, (timestep, hstates) = pipeline.get(  # type: ignore
-                        block=True
-                    )
+                    traj_batch, rollout_time, ep_metrics, (timestep, hstates) = pipeline.get(block=True)
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
                 # an additional timestep which it can use to bootstrap.
                 learner_state = learner_state._replace(timestep=timestep)
-                learner_state = learner_state._replace(
-                    dones=timestep.last()
-                    .repeat(config.system.num_agents)
-                    .reshape(config.arch.num_envs, -1)
-                )
-                learner_state = learner_state._replace(hstates=hstates)  # type: ignore
-
+                learner_state = learner_state._replace(dones=timestep.last().repeat(config.system.num_agents).reshape(config.arch.num_envs, -1))
+                learner_state = learner_state._replace(hstates=hstates)
+                
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
                     learner_state, train_metrics = learn_fn(learner_state, traj_batch)
