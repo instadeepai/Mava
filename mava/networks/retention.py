@@ -18,6 +18,7 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 from chex import Array
+from einops import rearrange
 from omegaconf import DictConfig
 
 from mava.networks.utils.sable import PositionalEncoding
@@ -30,187 +31,185 @@ from mava.networks.utils.sable import PositionalEncoding
 # T: number of timesteps
 
 
-class SimpleRetention(nn.Module):
-    """Simple retention mechanism for Sable.
+def get_decay_matrix(dones: Array, n_agents: int, masked: bool, decay_kappa: float) -> Array:
+    """Get the decay matrix for the full sequence based on the dones and retention type."""
+    # Extract done information at the timestep level
+    timestep_dones = dones[:, ::n_agents]  # B, T
 
-    Note:
-        This retention mechanism implementation is based on the following code:
-        https://github.com/Jamie-Stirling/RetNet/blob/main/src/retention.py
+    # B, T, T
+    timestep_mask = _get_decay_matrix_mask_timestep(timestep_dones)
+    decay_matrix = _get_default_decay_matrix(timestep_dones, decay_kappa)
+    decay_matrix *= timestep_mask
+
+    # B, T, T ->  B, T * N, T * N
+    decay_matrix = jnp.repeat(jnp.repeat(decay_matrix, n_agents, axis=1), n_agents, axis=2)
+
+    # Apply a causal mask over agents if full self-retention is disabled
+    # This converts it from a blocked decay matrix to a causal decay matrix
+    decay_matrix = _causal_mask(decay_matrix, masked)
+
+    return decay_matrix
+
+
+def _causal_mask(matrix: Array, masked: bool) -> Array:
+    """Applies a causal mask to the input matrix if `masked` is True."""
+    if masked:
+        mask_agents = jnp.tril(jnp.ones((matrix.shape[1], matrix.shape[1])))
+        matrix = mask_agents[None, :, :] * matrix
+    return matrix
+
+
+def _get_decay_matrix_mask_timestep(ts_dones: Array) -> Array:
+    """Generates a mask over the timesteps based on the done status of agents.
+
+    If there is a termination on timestep t, then the decay matrix should be
+    restarted from index (t, t). See the section Adapting the decay matrix for MARL
+    for a full explanation: https://arxiv.org/pdf/2410.01706
     """
+    # Get the shape of the input: batch size and number of timesteps
+    B, T = ts_dones.shape
 
-    embed_dim: int
-    head_size: int
-    n_agents: int
-    masked: bool
-    decay_kappa: float  # this is gamma in the original retention implementation
-    memory_config: DictConfig
+    # Initialise the mask
+    timestep_mask = jnp.zeros((B, T, T), dtype=bool)
+    all_false = jnp.zeros((B, T, T), dtype=bool)
 
-    def setup(self) -> None:
-        # Initialise the weights
-        self.w_q = self.param(
-            "w_q",
-            nn.initializers.normal(stddev=1 / self.embed_dim),
-            (self.embed_dim, self.head_size),
-        )
-        self.w_k = self.param(
-            "w_k",
-            nn.initializers.normal(stddev=1 / self.embed_dim),
-            (self.embed_dim, self.head_size),
-        )
-        self.w_v = self.param(
-            "w_v",
-            nn.initializers.normal(stddev=1 / self.embed_dim),
-            (self.embed_dim, self.head_size),
-        )
+    # Iterate over the timesteps and apply the mask
+    for i in range(T):
+        done_this_step = ts_dones[:, i, jnp.newaxis, jnp.newaxis]
+        ts_done_xs = all_false.at[:, i:, :].set(done_this_step)
+        ts_done_ys = all_false.at[:, :, :i].set(done_this_step)
 
-    def __call__(
-        self, key: Array, query: Array, value: Array, hstate: Array, dones: Array
-    ) -> Tuple[Array, Array]:
-        """Chunkwise (default) representation of the retention mechanism."""
-        B, C, _ = value.shape
+        # Combine the x and y masks to get the mask for the current timestep.
+        timestep_mask |= ts_done_xs & ts_done_ys
 
-        # Apply projection to q_proj, k_proj, v_proj
-        q_proj = query @ self.w_q
-        k_proj = key @ self.w_k
-        v_proj = value @ self.w_v
-        k_proj = k_proj.transpose(0, -1, -2)
+    return ~timestep_mask
 
-        # Compute next hidden state
-        if self.memory_config.type == "ff_sable":
-            # No decay matrix or xi for FF Sable since we don't have temporal dependencies.
-            decay_matrix = jnp.ones((B, C, C))
-            decay_matrix = self._causal_mask(decay_matrix)
-            xi = jnp.ones((B, C, 1))
-            next_hstate = (k_proj @ v_proj) + hstate
-        else:
-            decay_matrix = self.get_decay_matrix(dones)
-            xi = self.get_xi(dones)
-            chunk_decay = self.decay_kappa ** (C // self.n_agents)
-            delta = ~jnp.any(dones[:, :: self.n_agents], axis=1)[:, jnp.newaxis, jnp.newaxis]
-            next_hstate = (
-                k_proj @ (v_proj * decay_matrix[:, -1].reshape((B, C, 1)))
-            ) + hstate * chunk_decay * delta
 
-        # Compute the inner chunk and cross chunk
-        cross_chunk = (q_proj @ hstate) * xi
-        inner_chunk = ((q_proj @ k_proj) * decay_matrix) @ v_proj
+def _get_default_decay_matrix(dones: Array, decay_kappa: float) -> Array:
+    """Compute the decay matrix without taking into account the timestep-based masking."""
+    # Get the shape of the input: batch size and number of timesteps
+    B, T = dones.shape
 
-        # Compute the final retention
-        ret = inner_chunk + cross_chunk
-        return ret, next_hstate
+    # Create the n and m matrices
+    n = jnp.arange(T)[:, jnp.newaxis, ...]
+    m = jnp.arange(T)[jnp.newaxis, ...]
 
-    def recurrent(
-        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array
-    ) -> Tuple[Array, Array]:
-        """Recurrent representation of the retention mechanism."""
-        # Apply projection to q_proj, k_proj, v_proj
-        q_proj = query_n @ self.w_q
-        k_proj = key_n @ self.w_k
-        v_proj = value_n @ self.w_v
+    # Decay based on difference in timestep indices.
+    decay_matrix = (decay_kappa ** (n - m)) * (n >= m)
+    # Replace NaN values with 0
+    decay_matrix = jnp.nan_to_num(decay_matrix)
 
-        # Apply the retention mechanism and update the hidden state
-        updated_hstate = hstate + (k_proj.transpose(0, -1, -2) @ v_proj)
-        ret = q_proj @ updated_hstate
+    # Adjust for batch size
+    decay_matrix = jnp.broadcast_to(decay_matrix, (B, T, T))
 
-        return ret, updated_hstate
+    return decay_matrix
 
-    def get_decay_matrix(self, dones: Array) -> Array:
-        """Get the decay matrix for the full sequence based on the dones and retention type."""
-        # Extract done information at the timestep level
-        timestep_dones = dones[:, :: self.n_agents]  # B, T
 
-        # B, T, T
-        timestep_mask = self._get_decay_matrix_mask_timestep(timestep_dones)
-        decay_matrix = self._get_default_decay_matrix(timestep_dones)
-        decay_matrix *= timestep_mask
+def get_xi(dones: Array, n_agents: int, decay_kappa: float) -> Array:
+    """Computes a decaying matrix 'xi', which decays over time until the first done signal."""
+    # Get done status for each timestep by slicing out the agent dimension
+    timestep_dones = dones[:, ::n_agents]
+    B, T = timestep_dones.shape
 
-        # B, T, T ->  B, T * N, T * N
-        decay_matrix = jnp.repeat(
-            jnp.repeat(decay_matrix, self.n_agents, axis=1), self.n_agents, axis=2
-        )
+    # Compute the first done step for each sequence,
+    # or set it to sequence length if no dones exist
+    first_dones = jnp.where(
+        ~jnp.any(timestep_dones, axis=1, keepdims=True),
+        jnp.full((B, 1), T),
+        jnp.argmax(timestep_dones, axis=1, keepdims=True),
+    )
 
-        # Apply a causal mask over agents if full self-retention is disabled
-        # This converts it from a blocked decay matrix to a causal decay matrix
-        decay_matrix = self._causal_mask(decay_matrix)
+    xi = jnp.zeros((B, T, 1))
+    # Fill 'xi' with decaying values up until the first done step
+    for i in range(T):
+        before_first_done = i < first_dones
+        xi_i = (decay_kappa ** (i + 1)) * before_first_done
+        xi = xi.at[:, i, :].set(xi_i)
 
-        return decay_matrix
+    # Repeat the decay matrix 'xi' for all agents
+    xi = jnp.repeat(xi, n_agents, axis=1)
 
-    def _causal_mask(self, matrix: Array) -> Array:
-        """Applies a causal mask to the input matrix if `masked` is True."""
-        if self.masked:
-            mask_agents = jnp.tril(jnp.ones((matrix.shape[1], matrix.shape[1])))
-            matrix = mask_agents[None, :, :] * matrix
-        return matrix
+    return xi
 
-    def _get_decay_matrix_mask_timestep(self, ts_dones: Array) -> Array:
-        """Generates a mask over the timesteps based on the done status of agents.
 
-        If there is a termination on timestep t, then the decay matrix should be
-        restarted from index (t, t). See the section Adapting the decay matrix for MARL
-        for a full explanation: https://arxiv.org/pdf/2410.01706
-        """
-        # Get the shape of the input: batch size and number of timesteps
-        B, T = ts_dones.shape
+def get_decay_matrices(
+    dones: Array,
+    decay_kappas: Array,  # shape: (n_head,)
+    n_agents: int,
+    masked: bool,
+) -> Tuple[Array, Array, Array, Array]:
+    """
+    Compute decay matrices, xi, and delta arrays for multi-head inputs assuming a single chunk.
 
-        # Initialise the mask
-        timestep_mask = jnp.zeros((B, T, T), dtype=bool)
-        all_false = jnp.zeros((B, T, T), dtype=bool)
+    Args:
+        dones: Dones array of shape (B, C) where C = T * n_agents.
+        decay_kappas: Array of decay kappas (one per head), shape (n_head,).
+        n_agents: Number of agents.
+        masked: Whether to apply causal masking.
 
-        # Iterate over the timesteps and apply the mask
-        for i in range(T):
-            done_this_step = ts_dones[:, i, jnp.newaxis, jnp.newaxis]
-            ts_done_xs = all_false.at[:, i:, :].set(done_this_step)
-            ts_done_ys = all_false.at[:, :, :i].set(done_this_step)
+    Returns:
+        decay_matrix: Array of shape (B, n_head, C, C)
+        xi: Array of shape (B, n_head, C, 1)
+        chunk_decay: Array of shape (n_head,) computed as exp(decay_kappa * T) per head.
+        delta: Array of shape (B, n_head, 1) indicating per-head done mask.
+    """
+    B, C = dones.shape
+    n_head = decay_kappas.shape[0]
+    # In the single chunk, the number of timesteps is:
+    T = C // n_agents
 
-            # Combine the x and y masks to get the mask for the current timestep.
-            timestep_mask |= ts_done_xs & ts_done_ys
+    decay_matrices_list = []
+    xi_list = []
+    chunk_decay_list = []
+    delta_list = []
 
-        return ~timestep_mask
+    for h in range(n_head):
+        head_decay_kappa = decay_kappas[h]
+        # Compute the scalar chunk_decay for this head (matching the SimpleRetention version)
+        head_chunk_decay = head_decay_kappa**T
+        chunk_decay_list.append(head_chunk_decay)
 
-    def _get_default_decay_matrix(self, dones: Array) -> Array:
-        """Compute the decay matrix without taking into account the timestep-based masking."""
-        # Get the shape of the input: batch size and number of timesteps
-        B, T = dones.shape
+        # Compute the decay matrix for this head.
+        dm = get_decay_matrix(dones, n_agents, masked, head_decay_kappa)  # shape: (B, C, C)
+        decay_matrices_list.append(dm)
 
-        # Create the n and m matrices
-        n = jnp.arange(T)[:, jnp.newaxis, ...]
-        m = jnp.arange(T)[jnp.newaxis, ...]
+        # Compute xi for this head.
+        xi_h = get_xi(dones, n_agents, head_decay_kappa)  # shape: (B, C, 1)
+        xi_list.append(xi_h)
 
-        # Decay based on difference in timestep indices.
-        decay_matrix = (self.decay_kappa ** (n - m)) * (n >= m)
-        # Replace NaN values with 0
-        decay_matrix = jnp.nan_to_num(decay_matrix)
+        # Compute delta for this head.
+        # Extract one done per timestep: shape (B, T)
+        timestep_dones = dones[:, ::n_agents]
+        # delta is True (or 1) if no done occurred during the timesteps.
+        delta_h = ~jnp.any(timestep_dones, axis=1)  # shape: (B,)
+        delta_h = delta_h[:, None]  # shape: (B, 1)
+        delta_list.append(delta_h)
 
-        # Adjust for batch size
-        decay_matrix = jnp.broadcast_to(decay_matrix, (B, T, T))
+    # Stack over the head dimension.
+    decay_matrix = jnp.stack(decay_matrices_list, axis=1)  # (B, n_head, C, C)
+    xi = jnp.stack(xi_list, axis=1)  # (B, n_head, C, 1)
+    chunk_decay = jnp.stack(chunk_decay_list, axis=0)  # (n_head,)
+    delta = jnp.stack(delta_list, axis=1)  # (B, n_head, 1)
 
-        return decay_matrix
+    return decay_matrix, xi, chunk_decay, delta
 
-    def get_xi(self, dones: Array) -> Array:
-        """Computes a decaying matrix 'xi', which decays over time until the first done signal."""
-        # Get done status for each timestep by slicing out the agent dimension
-        timestep_dones = dones[:, :: self.n_agents]
-        B, T = timestep_dones.shape
 
-        # Compute the first done step for each sequence,
-        # or set it to sequence length if no dones exist
-        first_dones = jnp.where(
-            ~jnp.any(timestep_dones, axis=1, keepdims=True),
-            jnp.full((B, 1), T),
-            jnp.argmax(timestep_dones, axis=1, keepdims=True),
-        )
+def reshape_qkv(
+    q_proj: Array, k_proj: Array, v_proj: Array, n_head: int
+) -> Tuple[Array, Array, Array]:
+    # split the embeddings over heads and the sequence over chunks
+    if n_head > 1:
+        q_proj = rearrange(q_proj, "B C (nh hs) -> B nh C hs", nh=n_head)
+        k_proj = rearrange(k_proj, "B C (nh hs) -> B nh C hs", nh=n_head)
+        v_proj = rearrange(v_proj, "B C (nh hs) -> B nh C hs", nh=n_head)
 
-        xi = jnp.zeros((B, T, 1))
-        # Fill 'xi' with decaying values up until the first done step
-        for i in range(T):
-            before_first_done = i < first_dones
-            xi_i = (self.decay_kappa ** (i + 1)) * before_first_done
-            xi = xi.at[:, i, :].set(xi_i)
+    # add dummy head dim
+    else:
+        q_proj = rearrange(q_proj, "B C hs -> B () C hs")
+        k_proj = rearrange(k_proj, "B C hs -> B () C hs")
+        v_proj = rearrange(v_proj, "B C hs -> B () C hs")
 
-        # Repeat the decay matrix 'xi' for all agents
-        xi = jnp.repeat(xi, self.n_agents, axis=1)
-
-        return xi
+    return q_proj, k_proj, v_proj
 
 
 class MultiScaleRetention(nn.Module):
@@ -244,20 +243,22 @@ class MultiScaleRetention(nn.Module):
             nn.initializers.normal(stddev=1 / self.embed_dim),
             (self.embed_dim, self.embed_dim),
         )
+        self.w_k = self.param(
+            "w_k",
+            nn.initializers.normal(stddev=1 / self.embed_dim),
+            (self.embed_dim, self.embed_dim),
+        )
+        self.w_q = self.param(
+            "w_q",
+            nn.initializers.normal(stddev=1 / self.embed_dim),
+            (self.embed_dim, self.embed_dim),
+        )
+        self.w_v = self.param(
+            "w_v",
+            nn.initializers.normal(stddev=1 / self.embed_dim),
+            (self.embed_dim, self.embed_dim),
+        )
         self.group_norm = nn.GroupNorm(num_groups=self.n_head)
-
-        # Initialise the retention mechanisms
-        self.retention_heads = [
-            SimpleRetention(
-                self.embed_dim,
-                self.head_size,
-                self.n_agents,
-                self.masked,
-                decay_kappa,
-                self.memory_config,
-            )
-            for decay_kappa in self.decay_kappas
-        ]
 
         # Create an instance of the positional encoding
         self.pe = PositionalEncoding(self.embed_dim)
@@ -278,13 +279,36 @@ class MultiScaleRetention(nn.Module):
         if self.memory_config.timestep_positional_encoding:
             key, query, value = self.pe(key, query, value, step_count)
 
-        ret_output = jnp.zeros((B, C, self.embed_dim), dtype=value.dtype)
-        for head in range(self.n_head):
-            y, new_hs = self.retention_heads[head](key, query, value, hstate[:, head], dones)
-            ret_output = ret_output.at[
-                :, :, self.head_size * head : self.head_size * (head + 1)
-            ].set(y)
-            hstate = hstate.at[:, head, :, :].set(new_hs)
+        q_proj = query @ self.w_q
+        k_proj = key @ self.w_k
+        v_proj = value @ self.w_v
+
+        q_proj, k_proj, v_proj = reshape_qkv(q_proj, k_proj, v_proj, self.n_head)
+        k_proj = k_proj.transpose(0, 1, -1, -2)
+
+        decay_matrix, xi, chunk_decay, delta = get_decay_matrices(
+            dones, self.decay_kappas, self.n_agents, self.masked
+        )
+
+        if self.memory_config.type == "ff_sable":
+            decay_matrix = jnp.ones_like(decay_matrix)
+            decay_matrix = jax.vmap(_causal_mask, in_axes=(1, None), out_axes=1)(
+                decay_matrix, self.masked
+            )
+            xi = jnp.ones_like(xi)
+            next_hstate = (k_proj @ v_proj) + hstate
+            del chunk_decay, delta
+        else:
+            next_hstate = (
+                k_proj @ (v_proj * decay_matrix[:, :, -1].reshape(B, self.n_head, C, 1))
+                + hstate * chunk_decay[None, :, None, None] * delta[..., None]
+            )
+
+        cross_chunk = (q_proj @ hstate) * xi
+        inner_chunk = ((q_proj @ k_proj) * decay_matrix) @ v_proj
+
+        ret = cross_chunk + inner_chunk
+        ret_output = rearrange(ret, "B nh C hs -> B C (nh hs)")
 
         ret_output = self.group_norm(ret_output.reshape(-1, self.head_size)).reshape(
             ret_output.shape
@@ -292,7 +316,7 @@ class MultiScaleRetention(nn.Module):
 
         x = key
         output = (jax.nn.swish(x @ self.w_g) * ret_output) @ self.w_o
-        return output, hstate
+        return output, next_hstate
 
     def recurrent(
         self, key_n: Array, query_n: Array, value_n: Array, hstate: Array, step_count: Array
@@ -304,15 +328,19 @@ class MultiScaleRetention(nn.Module):
         if self.memory_config.timestep_positional_encoding:
             key_n, query_n, value_n = self.pe(key_n, query_n, value_n, step_count)
 
-        ret_output = jnp.zeros((B, S, self.embed_dim), dtype=value_n.dtype)
-        for head in range(self.n_head):
-            y, new_hs = self.retention_heads[head].recurrent(
-                key_n, query_n, value_n, hstate[:, head]
-            )
-            ret_output = ret_output.at[
-                :, :, self.head_size * head : self.head_size * (head + 1)
-            ].set(y)
-            hstate = hstate.at[:, head, :, :].set(new_hs)
+        q_proj = query_n @ self.w_q
+        k_proj = key_n @ self.w_k
+        v_proj = value_n @ self.w_v
+
+        q_proj = rearrange(q_proj, "B S (n h) -> B h S n", h=self.n_head)
+        k_proj = rearrange(k_proj, "B S (n h) -> B h n S", h=self.n_head)
+        v_proj = rearrange(v_proj, "B S (n h) -> B h S n", h=self.n_head)
+
+        updated_hstate = hstate + (k_proj @ v_proj)
+        ret_output = q_proj @ updated_hstate
+
+        # Join heads again
+        ret_output = rearrange(ret_output, "B h S n -> B S (n h)", h=self.n_head)
 
         ret_output = self.group_norm(ret_output.reshape(-1, self.head_size)).reshape(
             ret_output.shape
@@ -320,4 +348,4 @@ class MultiScaleRetention(nn.Module):
 
         x = key_n
         output = (jax.nn.swish(x @ self.w_g) * ret_output) @ self.w_o
-        return output, hstate
+        return output, updated_hstate
