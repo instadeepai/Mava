@@ -80,9 +80,36 @@ class EncodeBlock(nn.Module):
         return output, updated_hstate
 
 
-class Encoder(nn.Module):
-    """Multi-block encoder consisting of multiple `EncoderBlock` modules."""
+class DualPathValueHead(nn.Module):
+    """A dual-path value head that computes both a linear and a non-linear value prediction,
+    blended via a learned gating mechanism.
+    
+    The final value is given by:
+         value = gate * linear_value + (1 - gate) * nonlinear_value,
+    where gate is computed from the latent features.
+    """
+    embed_dim: int
 
+    def setup(self):
+        self.linear = nn.Dense(1, kernel_init=orthogonal(0.01))
+        self.nonlinear = nn.Sequential([
+            nn.Dense(self.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
+            nn.relu,
+            nn.Dense(1, kernel_init=orthogonal(0.01))
+        ])
+        self.gate = nn.Dense(1, kernel_init=orthogonal(0.01))
+    
+    def __call__(self, x: chex.Array) -> chex.Array:
+        linear_value = self.linear(x)
+        nonlinear_value = self.nonlinear(x)
+        gate_value = nn.sigmoid(self.gate(x))
+        # Adaptive convex combination of the two predictions
+        value = gate_value * linear_value + (1 - gate_value) * nonlinear_value
+        return value
+
+# Overwriting the Encoder class with the new DualPathValueHead integration.
+class Encoder(nn.Module):
+    """Multi-block encoder with DualPathValueHead for improved value estimates."""
     net_config: SableNetworkConfig
     memory_config: DictConfig
     n_agents: int
@@ -99,14 +126,8 @@ class Encoder(nn.Module):
                 nn.gelu,
             ],
         )
-        self.head = nn.Sequential(
-            [
-                nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
-                nn.gelu,
-                nn.RMSNorm(),
-                nn.Dense(1, kernel_init=orthogonal(0.01)),
-            ],
-        )
+        # Updated head using the DualPathValueHead
+        self.head = DualPathValueHead(embed_dim=self.net_config.embed_dim)
 
         self.blocks = [
             EncodeBlock(
@@ -128,7 +149,6 @@ class Encoder(nn.Module):
         # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
             hs = hstate[:, :, i]  # Get the hidden state for the current block
-            # Apply the chunkwise encoder block
             obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
@@ -146,7 +166,6 @@ class Encoder(nn.Module):
         # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
             hs = hstate[:, :, i]  # Get the hidden state for the current block
-            # Apply the recurrent encoder block
             obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
