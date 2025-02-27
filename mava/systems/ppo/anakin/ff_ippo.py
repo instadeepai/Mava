@@ -13,11 +13,11 @@
 # limitations under the License.
 
 import copy
-import time
-from typing import Any, Dict, Tuple
+from typing import Any, List, Tuple
 
 import chex
 import flax
+import flax.linen as nn
 import hydra
 import jax
 import jax.numpy as jnp
@@ -32,7 +32,7 @@ from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
-from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn, MarlEnv, Metrics
+from mava.types import ExperimentOutput, LearnerFn, MarlEnv, Metrics
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_anakin_ppo_config, check_total_timesteps
@@ -43,8 +43,6 @@ from mava.utils.network_utils import get_action_head
 from mava.utils.sebulba import RecordTimeTo
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
-
-import flax.linen as nn
 
 
 def env_step_fn(
@@ -410,7 +408,7 @@ def run_experiment(config: DictConfig) -> float:
     # Run experiment for the specified number of evaluations
     max_episode_return = -jnp.inf
     best_params = None
-    learn_time = []
+    learn_time: List[float] = []
 
     for eval_step in range(config.arch.num_evaluation):
         # Train
