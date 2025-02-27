@@ -1,8 +1,9 @@
 brax==0.10.3
 colorama
 distrax
+einops
 flashbax~=0.1.0
-flax>=0.8.1
+flax>=0.8.1,<=0.10.3
 gigastep @ git+https://github.com/mlech26l/gigastep
 gymnasium
 hydra-core==1.3.2
