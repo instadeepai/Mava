@@ -60,11 +60,22 @@ class EncodeBlock(nn.Module):
         self.ffn = SwiGLU(self.net_config.embed_dim, self.net_config.embed_dim)
 
     def __call__(
-        self, x: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array
+        self,
+        x: chex.Array,
+        hstate: chex.Array,
+        dones: chex.Array,
+        step_count: chex.Array,
+        num_chunks: int,
     ) -> chex.Array:
         """Applies Chunkwise MultiScaleRetention."""
         ret, updated_hstate = self.retn(
-            key=x, query=x, value=x, hstate=hstate, dones=dones, step_count=step_count
+            key=x,
+            query=x,
+            value=x,
+            hstate=hstate,
+            dones=dones,
+            step_count=step_count,
+            num_chunks=num_chunks,
         )
         x = self.ln1(x + ret)
         output = self.ln2(x + self.ffn(x))
@@ -119,7 +130,12 @@ class Encoder(nn.Module):
         ]
 
     def __call__(
-        self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array
+        self,
+        obs: chex.Array,
+        hstate: chex.Array,
+        dones: chex.Array,
+        step_count: chex.Array,
+        num_chunks: int,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         """Apply chunkwise encoding."""
         updated_hstate = jnp.zeros_like(hstate)
@@ -129,7 +145,7 @@ class Encoder(nn.Module):
         for i, block in enumerate(self.blocks):
             hs = hstate[:, :, i]  # Get the hidden state for the current block
             # Apply the chunkwise encoder block
-            obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
+            obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count, num_chunks)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
         value = self.head(obs_rep)
@@ -192,13 +208,20 @@ class DecodeBlock(nn.Module):
         hstates: Tuple[chex.Array, chex.Array],
         dones: chex.Array,
         step_count: chex.Array,
+        num_chunks: int,
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Applies Chunkwise MultiScaleRetention."""
         hs1, hs2 = hstates
 
         # Apply the self-retention over actions
         ret, hs1_new = self.retn1(
-            key=x, query=x, value=x, hstate=hs1, dones=dones, step_count=step_count
+            key=x,
+            query=x,
+            value=x,
+            hstate=hs1,
+            dones=dones,
+            step_count=step_count,
+            num_chunks=num_chunks,
         )
         ret = self.ln1(x + ret)
 
@@ -210,6 +233,7 @@ class DecodeBlock(nn.Module):
             hstate=hs2,
             dones=dones,
             step_count=step_count,
+            num_chunks=num_chunks,
         )
         y = self.ln2(obs_rep + ret2)
         output = self.ln3(y + self.ffn(y))
@@ -300,6 +324,7 @@ class Decoder(nn.Module):
         hstates: Tuple[chex.Array, chex.Array],
         dones: chex.Array,
         step_count: chex.Array,
+        num_chunks: int,
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Apply chunkwise decoding."""
         updated_hstates = tree.map(jnp.zeros_like, hstates)
@@ -309,7 +334,14 @@ class Decoder(nn.Module):
         # Apply the decoder blocks
         for i, block in enumerate(self.blocks):
             hs = tree.map(lambda x, j=i: x[:, :, j], hstates)
-            x, hs_new = block(x=x, obs_rep=obs_rep, hstates=hs, dones=dones, step_count=step_count)
+            x, hs_new = block(
+                x=x,
+                obs_rep=obs_rep,
+                hstates=hs,
+                dones=dones,
+                step_count=step_count,
+                num_chunks=num_chunks,
+            )
             updated_hstates = tree.map(
                 lambda x, y, j=i: x.at[:, :, j].set(y), updated_hstates, hs_new
             )

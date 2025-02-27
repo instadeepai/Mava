@@ -141,76 +141,123 @@ def get_decay_matrices(
     masked: bool,
 ) -> Tuple[Array, Array, Array, Array]:
     """
-    Compute decay matrices, xi, and delta arrays for multi-head inputs assuming a single chunk.
+    Compute decay matrices, xi, and delta arrays for multi-head inputs with an added chunk
+        dimension.
 
     Args:
-        dones: Dones array of shape (B, C) where C = T * n_agents.
+        dones: Dones array of shape (B, nC, C) where C = T * n_agents and nC is the number of
+            chunks.
         decay_kappas: Array of decay kappas (one per head), shape (n_head,).
         n_agents: Number of agents.
         masked: Whether to apply causal masking.
 
     Returns:
-        decay_matrix: Array of shape (B, n_head, C, C)
-        xi: Array of shape (B, n_head, C, 1)
-        chunk_decay: Array of shape (n_head,) computed as decay_kappa ** T per head.
-        delta: Array of shape (B, n_head, 1) indicating per-head done mask.
+        decay_matrix: Array of shape (B, nC, n_head, C, C)
+        xi: Array of shape (B, nC, n_head, C, 1)
+        chunk_decay: Array of shape (nC, n_head) computed as exp(decay_kappa * T) per head
+            for each chunk.
+        delta: Array of shape (B, nC, n_head, 1, 1) indicating per-head done mask.
     """
-    B, C = dones.shape
+    B, nc, C = dones.shape
     n_head = decay_kappas.shape[0]
-    # In the single chunk, the number of timesteps is:
+    # Number of timesteps per chunk.
     T = C // n_agents
 
-    decay_matrices_list = []
-    xi_list = []
-    chunk_decay_list = []
-    delta_list = []
+    all_decay_matrices = []
+    all_xis = []
+    all_chunk_decays = []
+    all_deltas = []
 
     for h in range(n_head):
         head_decay_kappa = decay_kappas[h]
-        # Compute the scalar chunk_decay for this head (matching the SimpleRetention version)
+        head_decay_matrices = []
+        head_xis = []
+        head_chunk_decays = []
+        head_deltas = []
         head_chunk_decay = jnp.exp(head_decay_kappa * T)
-        chunk_decay_list.append(head_chunk_decay)
+        for c in range(nc):
+            chunk_dones = dones[:, c, :]
 
-        # Compute the decay matrix for this head.
-        dm = get_decay_matrix(dones, n_agents, masked, head_decay_kappa)  # shape: (B, C, C)
-        decay_matrices_list.append(dm)
+            # Save the same chunk decay for each chunk.
+            head_chunk_decays.append(head_chunk_decay)
 
-        # Compute xi for this head.
-        xi_h = get_xi(dones, n_agents, head_decay_kappa)  # shape: (B, C, 1)
-        xi_list.append(xi_h)
+            # Compute the decay matrix for this head and chunk.
+            dm = get_decay_matrix(
+                chunk_dones, n_agents, masked, head_decay_kappa
+            )  # shape: (B, C, C)
+            head_decay_matrices.append(dm)
 
-        # Compute delta for this head.
-        # delta is True (or 1) if no done occurred during the timesteps.
-        delta_h = ~jnp.any(dones[:, ::n_agents], axis=1)[
-            :, jnp.newaxis, jnp.newaxis
-        ]  # shape: (B, 1, 1)
-        delta_list.append(delta_h)
+            # Compute xi for this chunk.
+            xi_chunk = get_xi(chunk_dones, n_agents, head_decay_kappa)  # shape: (B, C, 1)
+            head_xis.append(xi_chunk)
 
-    # Stack over the head dimension.
-    decay_matrix = jnp.stack(decay_matrices_list, axis=1)  # (B, n_head, C, C)
-    xi = jnp.stack(xi_list, axis=1)  # (B, n_head, C, 1)
-    chunk_decay = jnp.stack(chunk_decay_list, axis=0)  # (B, n_head, 1, 1)
-    delta = jnp.stack(delta_list, axis=1)  # (B, n_head, 1, 1)
+            # Compute delta for this chunk.
+            delta_h = ~jnp.any(chunk_dones[:, ::n_agents], axis=1)[
+                :, jnp.newaxis, jnp.newaxis
+            ]  # shape: (B, 1, 1)
+            head_deltas.append(delta_h)
+
+        # Stack over chunks:
+        head_decay_chunks = jnp.stack(head_decay_matrices, axis=1)  # (B, nC, C, C)
+        head_xi_chunks = jnp.stack(head_xis, axis=1)  # (B, nC, C, 1)
+        head_delta = jnp.stack(head_deltas, axis=1)  # (B, nC, 1, 1)
+        head_chunk_decays = jnp.stack(head_chunk_decays, axis=0)  # (nC,)
+
+        all_decay_matrices.append(head_decay_chunks)
+        all_xis.append(head_xi_chunks)
+        all_chunk_decays.append(head_chunk_decays)
+        all_deltas.append(head_delta)
+
+    # Stack over head dimension:
+    decay_matrix = jnp.stack(all_decay_matrices, axis=2)  # (B, nC, n_head, C, C)
+    xi = jnp.stack(all_xis, axis=2)  # (B, nC, n_head, C, 1)
+    chunk_decay = jnp.stack(all_chunk_decays, axis=1)  # (nC, n_head)
+    delta = jnp.stack(all_deltas, axis=2)  # (B, nC, n_head, 1, 1)
 
     return decay_matrix, xi, chunk_decay, delta
 
 
 def reshape_qkv(
-    q_proj: Array, k_proj: Array, v_proj: Array, n_head: int
+    q_proj: Array, k_proj: Array, v_proj: Array, n_head: int, num_chunks: int
 ) -> Tuple[Array, Array, Array]:
-    # split the embeddings over heads and the sequence over chunks
-    if n_head > 1:
-        q_proj = rearrange(q_proj, "B C (nh hs) -> B nh C hs", nh=n_head)
-        k_proj = rearrange(k_proj, "B C (nh hs) -> B nh C hs", nh=n_head)
-        v_proj = rearrange(v_proj, "B C (nh hs) -> B nh C hs", nh=n_head)
+    # missing the case where n_head = 1 and num_chunks = 1
 
-    # add dummy head dim
-    else:
-        q_proj = rearrange(q_proj, "B C hs -> B () C hs")
-        k_proj = rearrange(k_proj, "B C hs -> B () C hs")
-        v_proj = rearrange(v_proj, "B C hs -> B () C hs")
+    # split the embeddings over heads and the sequence over chunks
+    if n_head > 1 and num_chunks > 1:
+        q_proj = rearrange(q_proj, "B (Cs nC) (nh hs) -> B nC nh Cs hs", nh=n_head, nC=num_chunks)
+        k_proj = rearrange(k_proj, "B (Cs nC) (nh hs) -> B nC nh Cs hs", nh=n_head, nC=num_chunks)
+        v_proj = rearrange(v_proj, "B (Cs nC) (nh hs) -> B nC nh Cs hs", nh=n_head, nC=num_chunks)
+
+    # add dummy chunk dim, split the embeddings over heads
+    elif n_head > 1 and num_chunks == 1:
+        q_proj = rearrange(q_proj, "B S (nh hs) -> B () nh S hs", nh=n_head)
+        k_proj = rearrange(k_proj, "B S (nh hs) -> B () nh S hs", nh=n_head)
+        v_proj = rearrange(v_proj, "B S (nh hs) -> B () nh S hs", nh=n_head)
+
+    # add dummy head dim, split the embeddings over chunks
+    elif num_chunks > 1 and n_head == 1:
+        q_proj = rearrange(q_proj, "B (Cs nC) n -> B nC () Cs n", nC=num_chunks)
+        k_proj = rearrange(k_proj, "B (Cs nC) n -> B nC () Cs n", nC=num_chunks)
+        v_proj = rearrange(v_proj, "B (Cs nC) n -> B nC () Cs n", nC=num_chunks)
+
+    elif num_chunks == 1 and n_head == 1:
+        q_proj = rearrange(q_proj, "B S n -> B () () S n")
+        k_proj = rearrange(k_proj, "B S n -> B () () S n")
+        v_proj = rearrange(v_proj, "B S n -> B () () S n")
 
     return q_proj, k_proj, v_proj
+
+
+def reshape_dones(dones: Array, num_chunks: int) -> Tuple[Array, Array]:
+    # split sequence over chunks
+    if num_chunks > 1:
+        dones = rearrange(dones, "B (nC Cs) -> B nC Cs")
+
+    # add a dummy chunk dim
+    else:
+        dones = rearrange(dones, "B S -> B () S")
+
+    return dones
 
 
 class MultiScaleRetention(nn.Module):
@@ -273,6 +320,7 @@ class MultiScaleRetention(nn.Module):
         hstate: Array,
         dones: Array,
         step_count: Array,
+        num_chunks: int,
     ) -> Tuple[Array, Array]:
         """Chunkwise (default) representation of the multi-scale retention mechanism"""
         B, C, _ = value.shape
@@ -285,31 +333,50 @@ class MultiScaleRetention(nn.Module):
         k_proj = key @ self.w_k
         v_proj = value @ self.w_v
 
-        q_proj, k_proj, v_proj = reshape_qkv(q_proj, k_proj, v_proj, self.n_head)
-        k_proj = k_proj.transpose(0, 1, -1, -2)
+        # (B, num_chunks, num_heads, chunk_size, head_size)
+        _q_proj, _k_proj, _v_proj = reshape_qkv(q_proj, k_proj, v_proj, self.n_head, num_chunks)
+        _k_proj = _k_proj.transpose(0, 1, 2, -1, -2)
 
-        decay_matrix, xi, chunk_decay, delta = get_decay_matrices(
+        dones = reshape_dones(dones, num_chunks)
+
+        _decay_matrix, _xi, _chunk_decay, _delta = get_decay_matrices(
             dones, self.decay_kappas, self.n_agents, self.masked
         )
 
-        if self.memory_config.type == "ff_sable":
-            decay_matrix = jnp.ones_like(decay_matrix)
-            decay_matrix = jax.vmap(_causal_mask, in_axes=(1, None), out_axes=1)(
-                decay_matrix, self.masked
-            )
-            xi = jnp.ones_like(xi)
-            next_hstate = (k_proj @ v_proj) + hstate
-            del chunk_decay, delta
-        else:
-            next_hstate = (
-                k_proj @ (v_proj * decay_matrix[:, :, -1].reshape(B, self.n_head, C, 1))
-                + hstate * chunk_decay[None, :, None, None] * delta
-            )
+        ret_outputs = []
+        for chunk in range(num_chunks):
+            decay_matrix = _decay_matrix[:, chunk]
+            xi = _xi[:, chunk]
+            chunk_decay = _chunk_decay[chunk]
+            delta = _delta[:, chunk]
+            q_proj = _q_proj[:, chunk]
+            k_proj = _k_proj[:, chunk]
+            v_proj = _v_proj[:, chunk]
 
-        cross_chunk = (q_proj @ hstate) * xi
-        inner_chunk = ((q_proj @ k_proj) * decay_matrix) @ v_proj
+            if self.memory_config.type == "ff_sable":
+                decay_matrix = jnp.ones_like(decay_matrix)
+                decay_matrix = jax.vmap(_causal_mask, in_axes=(1, None), out_axes=1)(
+                    decay_matrix, self.masked
+                )
+                xi = jnp.ones_like(xi)
+                next_hstate = (k_proj @ v_proj) + hstate
+                del chunk_decay, delta
+            else:
+                next_hstate = (
+                    k_proj @ (v_proj * decay_matrix[:, :, -1].reshape(B, self.n_head, C, 1))
+                    + hstate * chunk_decay[None, :, None, None] * delta
+                )
 
-        ret_output = cross_chunk + inner_chunk
+            cross_chunk = (q_proj @ hstate) * xi
+            inner_chunk = ((q_proj @ k_proj) * decay_matrix) @ v_proj
+
+            hstate = next_hstate
+
+            ret_output = cross_chunk + inner_chunk
+            ret_outputs.append(ret_output)
+
+        ret_output = jnp.stack(ret_outputs, axis=1)
+        ret_output = rearrange(ret_output, "B nC nh Cs hs -> B nh (nC Cs) hs", nh=self.n_head)
 
         # Joint heads again
         ret_output = rearrange(ret_output, "B nh C hs -> B C (nh hs)", nh=self.n_head)
@@ -319,7 +386,7 @@ class MultiScaleRetention(nn.Module):
 
         x = key
         output = (jax.nn.swish(x @ self.w_g) * ret_output) @ self.w_o
-        return output, next_hstate
+        return output, hstate
 
     def recurrent(
         self, key_n: Array, query_n: Array, value_n: Array, hstate: Array, step_count: Array
@@ -336,8 +403,14 @@ class MultiScaleRetention(nn.Module):
         k_proj = key_n @ self.w_k
         v_proj = value_n @ self.w_v
 
-        q_proj, k_proj, v_proj = reshape_qkv(q_proj, k_proj, v_proj, self.n_head)
-        k_proj = k_proj.transpose(0, 1, -1, -2)
+        # Never chunk in the recurrent case
+        q_proj, k_proj, v_proj = q_proj, k_proj, v_proj = reshape_qkv(
+            q_proj, k_proj, v_proj, self.n_head, 1
+        )
+        k_proj = k_proj.transpose(0, 1, 2, -1, -2)
+
+        # Remove chunk dim
+        q_proj, k_proj, v_proj = q_proj.squeeze(1), k_proj.squeeze(1), v_proj.squeeze(1)
 
         updated_hstate = hstate + (k_proj @ v_proj)
         ret_output = q_proj @ updated_hstate

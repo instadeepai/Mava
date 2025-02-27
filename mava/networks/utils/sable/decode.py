@@ -50,26 +50,35 @@ def discrete_train_decoder_fn(
     del rng_key
 
     shifted_actions = get_shifted_discrete_actions(action, legal_actions, n_agents=n_agents)
-    logit = jnp.zeros_like(legal_actions, dtype=jnp.float32)
+    # logit = jnp.zeros_like(legal_actions, dtype=jnp.float32)
 
     # Apply the decoder per chunk
     num_chunks = shifted_actions.shape[1] // chunk_size
-    for chunk_id in range(0, num_chunks):
-        start_idx = chunk_id * chunk_size
-        end_idx = (chunk_id + 1) * chunk_size
-        # Chunk obs_rep, shifted_actions, dones, and step_count
-        chunked_obs_rep = obs_rep[:, start_idx:end_idx]
-        chunk_shifted_actions = shifted_actions[:, start_idx:end_idx]
-        chunk_dones = dones[:, start_idx:end_idx]
-        chunk_step_count = step_count[:, start_idx:end_idx]
-        chunk_logit, hstates = decoder(
-            action=chunk_shifted_actions,
-            obs_rep=chunked_obs_rep,
-            hstates=hstates,
-            dones=chunk_dones,
-            step_count=chunk_step_count,
-        )
-        logit = logit.at[:, start_idx:end_idx].set(chunk_logit)
+    # for chunk_id in range(0, num_chunks):
+    #     start_idx = chunk_id * chunk_size
+    #     end_idx = (chunk_id + 1) * chunk_size
+    #     # Chunk obs_rep, shifted_actions, dones, and step_count
+    #     chunked_obs_rep = obs_rep[:, start_idx:end_idx]
+    #     chunk_shifted_actions = shifted_actions[:, start_idx:end_idx]
+    #     chunk_dones = dones[:, start_idx:end_idx]
+    #     chunk_step_count = step_count[:, start_idx:end_idx]
+    #     chunk_logit, hstates = decoder(
+    #         action=chunk_shifted_actions,
+    #         obs_rep=chunked_obs_rep,
+    #         hstates=hstates,
+    #         dones=chunk_dones,
+    #         step_count=chunk_step_count,
+    #     )
+    #     logit = logit.at[:, start_idx:end_idx].set(chunk_logit)
+
+    logit, hstates = decoder(
+        action=shifted_actions,
+        obs_rep=obs_rep,
+        hstates=hstates,
+        dones=dones,
+        step_count=step_count,
+        num_chunks=num_chunks,
+    )
 
     masked_logits = jnp.where(
         legal_actions,

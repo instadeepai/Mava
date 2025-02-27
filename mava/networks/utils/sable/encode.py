@@ -34,23 +34,24 @@ def train_encoder_fn(
 ) -> Tuple[chex.Array, chex.Array, chex.Array]:
     """Chunkwise encoding for discrete action spaces."""
     B, S = obs.shape[:2]
-    v_loc = jnp.zeros((B, S, 1))
-    obs_rep = jnp.zeros((B, S, encoder.net_config.embed_dim))
+    # v_loc = jnp.zeros((B, S, 1))
+    # obs_rep = jnp.zeros((B, S, encoder.net_config.embed_dim))
 
     # Apply the encoder per chunk
     num_chunks = S // chunk_size
-    for chunk_id in range(0, num_chunks):
-        start_idx = chunk_id * chunk_size
-        end_idx = (chunk_id + 1) * chunk_size
-        # Chunk obs, dones, and step_count
-        chunk_obs = obs[:, start_idx:end_idx]
-        chunk_dones = dones[:, start_idx:end_idx]
-        chunk_step_count = step_count[:, start_idx:end_idx]
-        chunk_v_loc, chunk_obs_rep, hstate = encoder(
-            chunk_obs, hstate, chunk_dones, chunk_step_count
-        )
-        v_loc = v_loc.at[:, start_idx:end_idx].set(chunk_v_loc)
-        obs_rep = obs_rep.at[:, start_idx:end_idx].set(chunk_obs_rep)
+    # for chunk_id in range(0, num_chunks):
+    #     start_idx = chunk_id * chunk_size
+    #     end_idx = (chunk_id + 1) * chunk_size
+    #     # Chunk obs, dones, and step_count
+    #     chunk_obs = obs[:, start_idx:end_idx]
+    #     chunk_dones = dones[:, start_idx:end_idx]
+    #     chunk_step_count = step_count[:, start_idx:end_idx]
+    #     chunk_v_loc, chunk_obs_rep, hstate = encoder(
+    #         chunk_obs, hstate, chunk_dones, chunk_step_count
+    #     )
+    #     v_loc = v_loc.at[:, start_idx:end_idx].set(chunk_v_loc)
+    #     obs_rep = obs_rep.at[:, start_idx:end_idx].set(chunk_obs_rep)
+    v_loc, obs_rep, hstate = encoder(obs, hstate, dones, step_count, num_chunks)
 
     return v_loc, obs_rep, hstate
 
