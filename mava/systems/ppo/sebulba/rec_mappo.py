@@ -413,7 +413,13 @@ def get_learner_step_fn(
         params, opt_states, traj_batch, advantages, targets, key = update_state
 
         learner_state = RNNLearnerState(
-            params, opt_states, key, env_state, last_timestep, last_done, hstates
+            params,
+            opt_states,
+            key,
+            env_state,
+            last_timestep,
+            last_done,
+            None,  # type: ignore
         )
         return learner_state, loss_info
 
@@ -478,7 +484,7 @@ def learner_thread(
                     .repeat(config.system.num_agents)
                     .reshape(config.arch.num_envs, -1)
                 )
-                learner_state = learner_state._replace(hstates=hstates)
+                learner_state = learner_state._replace(hstates=hstates)  # type: ignore
 
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
@@ -567,7 +573,7 @@ def learner_setup(
     init_obs = env.reset().observation
     init_agents_view = init_obs.agents_view[0][jnp.newaxis, jnp.newaxis, :]
     init_action_mask = init_obs.action_mask[0][jnp.newaxis, jnp.newaxis, :]
-    init_global_state = init_obs.global_state[0][jnp.newaxis, jnp.newaxis, :]
+    init_global_state = init_obs.global_state[0][jnp.newaxis, jnp.newaxis, :]  # type: ignore
     single_obs = ObservationGlobalState(init_agents_view, init_action_mask, init_global_state)
     init_done = jnp.zeros((1, config.arch.num_envs, config.system.num_agents), dtype=bool)
     init_x = (single_obs, init_done)
@@ -636,7 +642,7 @@ def learner_setup(
     )
 
     # Initialise learner state.
-    init_learner_state = RNNLearnerState(params, opt_states, step_keys, None, None, dones, hstates)  # type: ignore
+    init_learner_state = RNNLearnerState(params, opt_states, step_keys, None, None, dones, None)  # type: ignore
     env.close()
 
     return learn, apply_fns, init_learner_state, learner_sharding  # type: ignore
