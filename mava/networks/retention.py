@@ -290,22 +290,22 @@ class MultiScaleRetention(nn.Module):
         )
 
         ret_output = jnp.zeros((B, C, self.embed_dim), dtype=value.dtype)
-
         for head in range(self.n_head):
             if self.memory_config.type == "ff_sable":
-                decay_matrix = jnp.ones_like(decay_matrix[:, head])
-                decay_matrix = _causal_mask(decay_matrix, self.masked)
-                xi = jnp.ones_like(xi[:, head])
+                decay_matrix_head = jnp.ones_like(decay_matrix[:, head])
+                decay_matrix_head = _causal_mask(decay_matrix_head, self.masked)
+                xi_head = jnp.ones_like(xi[:, head])
                 next_hstate = (k_proj[:, head] @ v_proj[:, head]) + hstate[:, head]
-                del chunk_decay, delta
             else:
+                decay_matrix_head = decay_matrix[:, head]
+                xi_head = xi[:, head]
                 next_hstate = (
-                    k_proj[:, head] @ (v_proj[:, head] * decay_matrix[:, head, -1].reshape(B, C, 1))
+                    k_proj[:, head] @ (v_proj[:, head] * decay_matrix_head[:, -1].reshape(B, C, 1))
                     + hstate[:, head] * chunk_decay[None, head, None, None] * delta[:, head]
                 )
 
-            cross_chunk = (q_proj[:, head] @ hstate[:, head]) * xi[:, head]
-            inner_chunk = ((q_proj[:, head] @ k_proj[:, head]) * decay_matrix[:, head]) @ v_proj[
+            cross_chunk = (q_proj[:, head] @ hstate[:, head]) * xi_head
+            inner_chunk = ((q_proj[:, head] @ k_proj[:, head]) * decay_matrix_head) @ v_proj[
                 :, head
             ]
 
@@ -314,8 +314,7 @@ class MultiScaleRetention(nn.Module):
                 :, :, head * self.head_size : (head + 1) * self.head_size
             ].set(ret)
             hstate = hstate.at[:, head].set(next_hstate)
-        # ret_output = rearrange(ret, "B nh C hs -> B C (nh hs)")
-
+        
         ret_output = self.group_norm(ret_output.reshape(-1, self.head_size)).reshape(
             ret_output.shape
         )
@@ -340,8 +339,9 @@ class MultiScaleRetention(nn.Module):
 
         ret_output = jnp.zeros((B, S, self.embed_dim), dtype=value_n.dtype)
         q_proj = rearrange(q_proj, "B S (n h) -> B h S n", h=self.n_head)
-        k_proj = rearrange(k_proj, "B S (n h) -> B h n S", h=self.n_head)
+        k_proj = rearrange(k_proj, "B S (n h) -> B h S n", h=self.n_head)
         v_proj = rearrange(v_proj, "B S (n h) -> B h S n", h=self.n_head)
+        k_proj = k_proj.transpose(0, 1, -1, -2)
 
         for head in range(self.n_head):
             updated_hstate = hstate[:, head] + (k_proj[:, head] @ v_proj[:, head])
