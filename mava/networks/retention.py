@@ -338,9 +338,9 @@ class MultiScaleRetention(nn.Module):
         v_proj = value_n @ self.w_v
 
         ret_output = jnp.zeros((B, S, self.embed_dim), dtype=value_n.dtype)
-        q_proj = rearrange(q_proj, "B S (n h) -> B h S n", h=self.n_head)
-        k_proj = rearrange(k_proj, "B S (n h) -> B h S n", h=self.n_head)
-        v_proj = rearrange(v_proj, "B S (n h) -> B h S n", h=self.n_head)
+        q_proj = rearrange(q_proj, "B C (nh hs) -> B nh C hs", nh=self.n_head)
+        k_proj = rearrange(k_proj, "B C (nh hs) -> B nh C hs", nh=self.n_head)
+        v_proj = rearrange(v_proj, "B C (nh hs) -> B nh C hs", nh=self.n_head)
         k_proj = k_proj.transpose(0, 1, -1, -2)
 
         for head in range(self.n_head):
@@ -350,9 +350,6 @@ class MultiScaleRetention(nn.Module):
                 :, :, head * self.head_size : (head + 1) * self.head_size
             ].set(y)
             hstate = hstate.at[:, head].set(updated_hstate)
-
-        # Join heads again
-        # ret_output = rearrange(ret_output, "B h S n -> B S (n h)", h=self.n_head)
 
         ret_output = self.group_norm(ret_output.reshape(-1, self.head_size)).reshape(
             ret_output.shape
