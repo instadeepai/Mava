@@ -404,8 +404,15 @@ def get_learner_step_fn(
 
         params, opt_states, traj_batch, advantages, targets, key = update_state
 
+        # hstates is replaced in learner thread
         learner_state = RNNLearnerState(
-            params, opt_states, key, env_state, last_timestep, last_done, hstates
+            params,
+            opt_states,
+            key,
+            env_state,
+            last_timestep,
+            last_done,
+            None,  # type: ignore
         )
         return learner_state, loss_info
 
@@ -457,7 +464,7 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, rollout_time, ep_metrics, (timestep, hstates) = pipeline.get(
+                    traj_batch, rollout_time, ep_metrics, (timestep, hstates) = pipeline.get(  # type: ignore
                         block=True
                     )
 
@@ -470,7 +477,7 @@ def learner_thread(
                     .repeat(config.system.num_agents)
                     .reshape(config.arch.num_envs, -1)
                 )
-                learner_state = learner_state._replace(hstates=hstates)
+                learner_state = learner_state._replace(hstates=hstates)  # type: ignore
 
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
@@ -625,7 +632,7 @@ def learner_setup(
     )
 
     # Initialise learner state.
-    init_learner_state = RNNLearnerState(params, opt_states, step_keys, None, None, dones, hstates)
+    init_learner_state = RNNLearnerState(params, opt_states, step_keys, None, None, dones, None)  # type: ignore
     env.close()
 
     return learn, apply_fns, init_learner_state, learner_sharding
