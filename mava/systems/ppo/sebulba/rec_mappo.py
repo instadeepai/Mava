@@ -17,7 +17,6 @@ import queue
 import threading
 import warnings
 from collections import defaultdict
-from copy import deepcopy
 from queue import Queue
 from typing import Any, Dict, List, Sequence, Tuple
 
@@ -63,6 +62,7 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_sebulba_config, check_total_timesteps
 from mava.utils.jax_utils import switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
 from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
 from mava.utils.training import make_learning_rate
@@ -111,10 +111,7 @@ def rollout(
         """Get action and value."""
 
         batched_observation = tree.map(lambda x: x[jnp.newaxis, :], observation)
-        ac_in = (
-            batched_observation,
-            dones[jnp.newaxis, :],
-        )
+        ac_in = (batched_observation, dones[jnp.newaxis, :])
         policy_hidden_state, actor_policy = actor_apply_fn(
             params.actor_params, hstates.policy_hidden_state, ac_in
         )
@@ -122,8 +119,9 @@ def rollout(
             params.critic_params, hstates.critic_hidden_state, ac_in
         )
 
-        action = actor_policy.sample(seed=key)
-        log_prob = actor_policy.log_prob(action)
+        action = actor_policy.sample(seed=key).squeeze(0)
+        log_prob = actor_policy.log_prob(action).squeeze(0)
+        value = value.squeeze(0)
         # It may be faster to calculate the values in the learner as
         # then we won't need to pass critic params to actors.
 
@@ -140,7 +138,7 @@ def rollout(
         (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
     last_hstates = HiddenStates(init_policy_hstate, init_critic_hstate)
-    last_hstates = tree.map(move_to_device, last_hstates)
+    last_hstates = move_to_device(last_hstates)
 
     # Loop till the desired num_updates is reached.
     while not thread_lifetime.should_stop():
@@ -153,9 +151,9 @@ def rollout(
                 with RecordTimeTo(actor_timings["get_params_time"]):
                     params = params_source.get()  # Get the latest parameters from the learner
 
-                last_obs = tree.map(move_to_device, timestep.observation)
+                last_obs = move_to_device(timestep.observation)
                 last_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
-                last_dones = tree.map(move_to_device, last_dones)
+                last_dones = move_to_device(last_dones)
 
                 # Sample action from the policy and squeeze out the batch dimension.
                 with RecordTimeTo(actor_timings["compute_action_time"]):
@@ -164,9 +162,9 @@ def rollout(
                         params, last_obs, last_dones, last_hstates, act_key
                     )
                     value, action, log_prob = (
-                        value.squeeze(0),
-                        action.squeeze(0),
-                        log_prob.squeeze(0),
+                        value,
+                        action,
+                        log_prob,
                     )
                     cpu_action = jax.device_get(action)
 
@@ -186,7 +184,7 @@ def rollout(
                         last_hstates,
                     )
                 )
-                last_hstates = deepcopy(hstates)
+                last_hstates = hstates
 
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
@@ -230,51 +228,20 @@ def get_learner_step_fn(
             traj_batch (PPOTransition): the batch of data to learn with.
         """
 
-        def _calculate_gae(
-            traj_batch: RNNPPOTransition, last_val: chex.Array, last_done: chex.Array
-        ) -> Tuple[chex.Array, chex.Array]:
-            gamma, gae_lambda = config.system.gamma, config.system.gae_lambda
-
-            def _get_advantages(
-                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
-            ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
-                gae, next_value, next_done = carry
-                done, value, reward = transition.done, transition.value, transition.reward
-                delta = reward + gamma * next_value * (1 - next_done) - value
-                gae = delta + gamma * gae_lambda * (1 - next_done) * gae
-                return (gae, value, done), gae
-
-            _, advantages = jax.lax.scan(
-                _get_advantages,
-                (jnp.zeros_like(last_val), last_val, last_done),
-                traj_batch,
-                reverse=True,
-                unroll=16,
-            )
-            return advantages, advantages + traj_batch.value
-
         # Add a batch dimension to the observation.
-        (
-            params,
-            opt_states,
-            key,
-            env_state,
-            last_timestep,
-            last_done,
-            hstates,
-        ) = learner_state
+        (params, opt_states, key, env_state, last_timestep, last_done, hstates) = learner_state
 
         batched_last_observation = tree.map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
-        ac_in = (
-            batched_last_observation,
-            last_done[jnp.newaxis, :],
-        )
+        ac_in = (batched_last_observation, last_done[jnp.newaxis, :])
 
         # Run the network.
         _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
         # Squeeze out the batch dimension and mask out the value of terminal states.
         last_val = last_val.squeeze(0)
-        advantages, targets = _calculate_gae(traj_batch, last_val, last_done)
+        # Calculate advantage
+        advantages, targets = calculate_gae(
+            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+        )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple[Tuple, Metrics]:
             """Update the network for a single epoch."""
@@ -446,13 +413,7 @@ def get_learner_step_fn(
         params, opt_states, traj_batch, advantages, targets, key = update_state
 
         learner_state = RNNLearnerState(
-            params,
-            opt_states,
-            key,
-            env_state,
-            last_timestep,
-            last_done,
-            hstates,
+            params, opt_states, key, env_state, last_timestep, last_done, hstates
         )
         return learner_state, loss_info
 
@@ -517,7 +478,7 @@ def learner_thread(
                     .repeat(config.system.num_agents)
                     .reshape(config.arch.num_envs, -1)
                 )
-                learner_state = learner_state._replace(hstates=hstates)  # type: ignore
+                learner_state = learner_state._replace(hstates=hstates)
 
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
@@ -606,7 +567,7 @@ def learner_setup(
     init_obs = env.reset().observation
     init_agents_view = init_obs.agents_view[0][jnp.newaxis, jnp.newaxis, :]
     init_action_mask = init_obs.action_mask[0][jnp.newaxis, jnp.newaxis, :]
-    init_global_state = init_obs.global_state[0][jnp.newaxis, jnp.newaxis, :]  # type: ignore
+    init_global_state = init_obs.global_state[0][jnp.newaxis, jnp.newaxis, :]
     single_obs = ObservationGlobalState(init_agents_view, init_action_mask, init_global_state)
     init_done = jnp.zeros((1, config.arch.num_envs, config.system.num_agents), dtype=bool)
     init_x = (single_obs, init_done)
