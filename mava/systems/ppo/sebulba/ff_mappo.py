@@ -389,7 +389,7 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, rollout_time, ep_metrics, (timestep, _) = pipeline.get(block=True)
+                    traj_batch, rollout_time, ep_metrics, (timestep, _) = pipeline.get(block=True)  # type: ignore
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
@@ -468,7 +468,7 @@ def learner_setup(
     init_obs = env.reset().observation
     init_agents_view = init_obs.agents_view[0][jnp.newaxis, :]
     init_action_mask = init_obs.action_mask[0][jnp.newaxis, :]
-    init_global_state = init_obs.global_state[0][jnp.newaxis, :]
+    init_global_state = init_obs.global_state[0][jnp.newaxis, :]  # type: ignore
     init_x = ObservationGlobalState(init_agents_view, init_action_mask, init_global_state)
 
     # Initialise actor params and optimiser state.
