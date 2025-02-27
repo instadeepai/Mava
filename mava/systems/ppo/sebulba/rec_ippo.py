@@ -163,7 +163,7 @@ def rollout(
                 # Step environment
                 with RecordTimeTo(actor_timings["env_step_time"]):
                     timestep = env.step(cpu_action)
-                
+
                 # Append data to storage
                 traj.append(
                     RNNPPOTransition(
@@ -220,15 +220,7 @@ def get_learner_step_fn(
         """
 
         # Add a batch dimension to the observation.
-        (
-            params,
-            opt_states,
-            key,
-            env_state,
-            last_timestep,
-            last_done,
-            hstates,
-        ) = learner_state
+        (params, opt_states, key, env_state, last_timestep, last_done, hstates) = learner_state
 
         batched_last_observation = tree.map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
         ac_in = (batched_last_observation, last_done[jnp.newaxis, :])
@@ -241,6 +233,7 @@ def get_learner_step_fn(
         advantages, targets = calculate_gae(
             traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
         )
+
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple[Tuple, Metrics]:
             """Update the network for a single epoch."""
 
@@ -412,13 +405,7 @@ def get_learner_step_fn(
         params, opt_states, traj_batch, advantages, targets, key = update_state
 
         learner_state = RNNLearnerState(
-            params,
-            opt_states,
-            key,
-            env_state,
-            last_timestep,
-            last_done,
-            hstates,
+            params, opt_states, key, env_state, last_timestep, last_done, hstates
         )
         return learner_state, loss_info
 
@@ -470,15 +457,21 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, rollout_time, ep_metrics, (timestep, hstates) = pipeline.get(block=True)
+                    traj_batch, rollout_time, ep_metrics, (timestep, hstates) = pipeline.get(
+                        block=True
+                    )
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
                 # an additional timestep which it can use to bootstrap.
                 learner_state = learner_state._replace(timestep=timestep)
-                learner_state = learner_state._replace(dones=timestep.last().repeat(config.system.num_agents).reshape(config.arch.num_envs, -1))
+                learner_state = learner_state._replace(
+                    dones=timestep.last()
+                    .repeat(config.system.num_agents)
+                    .reshape(config.arch.num_envs, -1)
+                )
                 learner_state = learner_state._replace(hstates=hstates)
-                
+
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
                     learner_state, train_metrics = learn_fn(learner_state, traj_batch)
