@@ -95,9 +95,11 @@ def _get_default_decay_matrix(dones: Array, decay_kappa: float) -> Array:
     m = jnp.arange(T)[jnp.newaxis, ...]
 
     # Decay based on difference in timestep indices.
-    decay_matrix = (decay_kappa ** (n - m)) * (n >= m)
-    # Replace NaN values with 0
-    decay_matrix = jnp.nan_to_num(decay_matrix)
+    decay_matrix = (decay_kappa * (n - m)) * (n >= m)
+    decay_matrix = jnp.exp(decay_matrix)
+
+    # Zero out upper-triangular values (excluding the main diagonal)
+    decay_matrix = decay_matrix * jnp.tril(jnp.ones((T, T)))
 
     # Adjust for batch size
     decay_matrix = jnp.broadcast_to(decay_matrix, (B, T, T))
@@ -123,7 +125,7 @@ def get_xi(dones: Array, n_agents: int, decay_kappa: float) -> Array:
     # Fill 'xi' with decaying values up until the first done step
     for i in range(T):
         before_first_done = i < first_dones
-        xi_i = (decay_kappa ** (i + 1)) * before_first_done
+        xi_i = jnp.exp(decay_kappa * (i + 1)) * before_first_done
         xi = xi.at[:, i, :].set(xi_i)
 
     # Repeat the decay matrix 'xi' for all agents
@@ -166,7 +168,7 @@ def get_decay_matrices(
     for h in range(n_head):
         head_decay_kappa = decay_kappas[h]
         # Compute the scalar chunk_decay for this head (matching the SimpleRetention version)
-        head_chunk_decay = head_decay_kappa**T
+        head_chunk_decay = jnp.exp(head_decay_kappa * T)
         chunk_decay_list.append(head_chunk_decay)
 
         # Compute the decay matrix for this head.
@@ -230,6 +232,7 @@ class MultiScaleRetention(nn.Module):
             jnp.linspace(jnp.log(1 / 32), jnp.log(1 / 512), self.n_head)
         )
         self.decay_kappas = self.decay_kappas * self.decay_scaling_factor
+        self.decay_kappas = jnp.log(self.decay_kappas)
 
         # Initialise the weights and group norm
         self.w_g = self.param(
@@ -273,7 +276,7 @@ class MultiScaleRetention(nn.Module):
     ) -> Tuple[Array, Array]:
         """Chunkwise (default) representation of the multi-scale retention mechanism"""
         B, C, _ = value.shape
-        
+
         # Positional encoding of the current step
         if self.memory_config.timestep_positional_encoding:
             key, query, value = self.pe(key, query, value, step_count)
@@ -343,7 +346,7 @@ class MultiScaleRetention(nn.Module):
 
         # Joint heads again
         ret_output = rearrange(ret_output, "B nh C hs -> B C (nh hs)", nh=self.n_head)
-        
+
         ret_output = self.group_norm(ret_output.reshape(-1, self.head_size)).reshape(
             (B, S, self.embed_dim)
         )

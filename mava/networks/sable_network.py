@@ -368,6 +368,7 @@ class SableNetwork(nn.Module):
         )
         self.decay_kappas = self.decay_kappas * self.memory_config.decay_scaling_factor
         self.decay_kappas = self.decay_kappas[None, :, None, None, None]
+        self.decay_kappas = jnp.log(self.decay_kappas)
 
         self.encoder = Encoder(
             self.net_config,
@@ -455,7 +456,7 @@ class SableNetwork(nn.Module):
         )
 
         # Decay the hidden states: each timestep we decay the hidden states once
-        decayed_hstates = tree.map(lambda x: x * self.decay_kappas, hstates)
+        decayed_hstates = tree.map(lambda x: x * jnp.exp(self.decay_kappas), hstates)
 
         value, obs_rep, updated_enc_hs = self.act_encoder_fn(
             encoder=self.encoder,
