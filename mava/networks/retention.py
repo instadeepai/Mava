@@ -150,7 +150,7 @@ def get_decay_matrices(
     Returns:
         decay_matrix: Array of shape (B, n_head, C, C)
         xi: Array of shape (B, n_head, C, 1)
-        chunk_decay: Array of shape (n_head,) computed as exp(decay_kappa * T) per head.
+        chunk_decay: Array of shape (n_head,) computed as decay_kappa ** T per head.
         delta: Array of shape (B, n_head, 1) indicating per-head done mask.
     """
     B, C = dones.shape
@@ -178,18 +178,17 @@ def get_decay_matrices(
         xi_list.append(xi_h)
 
         # Compute delta for this head.
-        # Extract one done per timestep: shape (B, T)
-        timestep_dones = dones[:, ::n_agents]
         # delta is True (or 1) if no done occurred during the timesteps.
-        delta_h = ~jnp.any(timestep_dones, axis=1)  # shape: (B,)
-        delta_h = delta_h[:, None]  # shape: (B, 1)
+        delta_h = ~jnp.any(dones[:, ::n_agents], axis=1)[
+            :, jnp.newaxis, jnp.newaxis
+        ]  # shape: (B, 1, 1)
         delta_list.append(delta_h)
 
     # Stack over the head dimension.
     decay_matrix = jnp.stack(decay_matrices_list, axis=1)  # (B, n_head, C, C)
     xi = jnp.stack(xi_list, axis=1)  # (B, n_head, C, 1)
-    chunk_decay = jnp.stack(chunk_decay_list, axis=0)  # (n_head,)
-    delta = jnp.stack(delta_list, axis=1)  # (B, n_head, 1)
+    chunk_decay = jnp.stack(chunk_decay_list, axis=0)  # (B, n_head, 1, 1)
+    delta = jnp.stack(delta_list, axis=1)  # (B, n_head, 1, 1)
 
     return decay_matrix, xi, chunk_decay, delta
 
@@ -274,7 +273,7 @@ class MultiScaleRetention(nn.Module):
     ) -> Tuple[Array, Array]:
         """Chunkwise (default) representation of the multi-scale retention mechanism"""
         B, C, _ = value.shape
-
+        
         # Positional encoding of the current step
         if self.memory_config.timestep_positional_encoding:
             key, query, value = self.pe(key, query, value, step_count)
@@ -301,17 +300,18 @@ class MultiScaleRetention(nn.Module):
         else:
             next_hstate = (
                 k_proj @ (v_proj * decay_matrix[:, :, -1].reshape(B, self.n_head, C, 1))
-                + hstate * chunk_decay[None, :, None, None] * delta[..., None]
+                + hstate * chunk_decay[None, :, None, None] * delta
             )
 
         cross_chunk = (q_proj @ hstate) * xi
         inner_chunk = ((q_proj @ k_proj) * decay_matrix) @ v_proj
 
-        ret = cross_chunk + inner_chunk
-        ret_output = rearrange(ret, "B nh C hs -> B C (nh hs)")
+        ret_output = cross_chunk + inner_chunk
 
+        # Joint heads again
+        ret_output = rearrange(ret_output, "B nh C hs -> B C (nh hs)", nh=self.n_head)
         ret_output = self.group_norm(ret_output.reshape(-1, self.head_size)).reshape(
-            ret_output.shape
+            (B, C, self.embed_dim)
         )
 
         x = key
@@ -322,6 +322,7 @@ class MultiScaleRetention(nn.Module):
         self, key_n: Array, query_n: Array, value_n: Array, hstate: Array, step_count: Array
     ) -> Tuple[Array, Array]:
         """Recurrent representation of the multi-scale retention mechanism"""
+
         B, S, _ = value_n.shape
 
         # Positional encoding of the current step if enabled
@@ -332,18 +333,19 @@ class MultiScaleRetention(nn.Module):
         k_proj = key_n @ self.w_k
         v_proj = value_n @ self.w_v
 
-        q_proj = rearrange(q_proj, "B S (n h) -> B h S n", h=self.n_head)
-        k_proj = rearrange(k_proj, "B S (n h) -> B h n S", h=self.n_head)
-        v_proj = rearrange(v_proj, "B S (n h) -> B h S n", h=self.n_head)
+        q_proj = rearrange(q_proj, "B C (nh hs) -> B nh C hs", nh=self.n_head)
+        k_proj = rearrange(k_proj, "B C (nh hs) -> B nh C hs", nh=self.n_head)
+        v_proj = rearrange(v_proj, "B C (nh hs) -> B nh C hs", nh=self.n_head)
+        k_proj = k_proj.transpose(0, 1, -1, -2)
 
         updated_hstate = hstate + (k_proj @ v_proj)
         ret_output = q_proj @ updated_hstate
 
-        # Join heads again
-        ret_output = rearrange(ret_output, "B h S n -> B S (n h)", h=self.n_head)
-
+        # Joint heads again
+        ret_output = rearrange(ret_output, "B nh C hs -> B C (nh hs)", nh=self.n_head)
+        
         ret_output = self.group_norm(ret_output.reshape(-1, self.head_size)).reshape(
-            ret_output.shape
+            (B, S, self.embed_dim)
         )
 
         x = key_n
