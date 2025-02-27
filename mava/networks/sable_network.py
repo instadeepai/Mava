@@ -80,36 +80,9 @@ class EncodeBlock(nn.Module):
         return output, updated_hstate
 
 
-class DualPathValueHead(nn.Module):
-    """A dual-path value head that computes both a linear and a non-linear value prediction,
-    blended via a learned gating mechanism.
-    
-    The final value is given by:
-         value = gate * linear_value + (1 - gate) * nonlinear_value,
-    where gate is computed from the latent features.
-    """
-    embed_dim: int
-
-    def setup(self):
-        self.linear = nn.Dense(1, kernel_init=orthogonal(0.01))
-        self.nonlinear = nn.Sequential([
-            nn.Dense(self.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
-            nn.relu,
-            nn.Dense(1, kernel_init=orthogonal(0.01))
-        ])
-        self.gate = nn.Dense(1, kernel_init=orthogonal(0.01))
-    
-    def __call__(self, x: chex.Array) -> chex.Array:
-        linear_value = self.linear(x)
-        nonlinear_value = self.nonlinear(x)
-        gate_value = nn.sigmoid(self.gate(x))
-        # Adaptive convex combination of the two predictions
-        value = gate_value * linear_value + (1 - gate_value) * nonlinear_value
-        return value
-
-# Overwriting the Encoder class with the new DualPathValueHead integration.
 class Encoder(nn.Module):
-    """Multi-block encoder with DualPathValueHead for improved value estimates."""
+    """Multi-block encoder consisting of multiple `EncoderBlock` modules."""
+
     net_config: SableNetworkConfig
     memory_config: DictConfig
     n_agents: int
@@ -126,8 +99,14 @@ class Encoder(nn.Module):
                 nn.gelu,
             ],
         )
-        # Updated head using the DualPathValueHead
-        self.head = DualPathValueHead(embed_dim=self.net_config.embed_dim)
+        self.head = nn.Sequential(
+            [
+                nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
+                nn.gelu,
+                nn.RMSNorm(),
+                nn.Dense(1, kernel_init=orthogonal(0.01)),
+            ],
+        )
 
         self.blocks = [
             EncodeBlock(
@@ -149,6 +128,7 @@ class Encoder(nn.Module):
         # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
             hs = hstate[:, :, i]  # Get the hidden state for the current block
+            # Apply the chunkwise encoder block
             obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
@@ -166,6 +146,7 @@ class Encoder(nn.Module):
         # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
             hs = hstate[:, :, i]  # Get the hidden state for the current block
+            # Apply the recurrent encoder block
             obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
@@ -500,3 +481,89 @@ class SableNetwork(nn.Module):
 
         value = jnp.squeeze(value, axis=-1)
         return output_actions, output_actions_log, value, updated_hs
+
+### Assistant Code ###
+
+from flax.linen.initializers import orthogonal
+
+class ValueHead(nn.Module):
+    """A quadratic value head that combines linear and quadratic features of the latent representation."""
+    embed_dim: int
+
+    def setup(self):
+        self.linear = nn.Dense(1, kernel_init=orthogonal(0.01))
+        self.quadratic = nn.Dense(1, kernel_init=orthogonal(0.01))
+
+    def __call__(self, x: chex.Array) -> chex.Array:
+        linear_out = self.linear(x)
+        quadratic_out = self.quadratic(x * x)
+        return linear_out + quadratic_out
+
+# Overwriting the Encoder class with the new ValueHead integration.
+class Encoder(nn.Module):
+    """Multi-block encoder consisting of multiple `EncoderBlock` modules with a quadratic value head."""
+    net_config: SableNetworkConfig
+    memory_config: DictConfig
+    n_agents: int
+
+    def setup(self) -> None:
+        self.ln = nn.RMSNorm()
+
+        self.obs_encoder = nn.Sequential(
+            [
+                nn.RMSNorm(),
+                nn.Dense(
+                    self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2)), use_bias=False
+                ),
+                nn.gelu,
+            ],
+        )
+        # New quadratic value head is used here.
+        self.head = ValueHead(embed_dim=self.net_config.embed_dim)
+
+        self.blocks = [
+            EncodeBlock(
+                self.net_config,
+                self.memory_config,
+                self.n_agents,
+                name=f"encoder_block_{block_id}",
+            )
+            for block_id in range(self.net_config.n_block)
+        ]
+
+    def __call__(
+        self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array
+    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
+        """Apply chunkwise encoding."""
+        updated_hstate = jnp.zeros_like(hstate)
+        obs_rep = self.obs_encoder(obs)
+
+        # Apply the encoder blocks
+        for i, block in enumerate(self.blocks):
+            hs = hstate[:, :, i]  # Get the hidden state for the current block
+            # Apply the chunkwise encoder block
+            obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count)
+            updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
+
+        value = self.head(obs_rep)
+
+        return value, obs_rep, updated_hstate
+
+    def recurrent(
+        self, obs: chex.Array, hstate: chex.Array, step_count: chex.Array
+    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
+        """Apply recurrent encoding."""
+        updated_hstate = jnp.zeros_like(hstate)
+        obs_rep = self.obs_encoder(obs)
+
+        # Apply the encoder blocks
+        for i, block in enumerate(self.blocks):
+            hs = hstate[:, :, i]  # Get the hidden state for the current block
+            # Apply the recurrent encoder block
+            obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs, step_count)
+            updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
+
+        # Compute the value function
+        value = self.head(obs_rep)
+
+        return value, obs_rep, updated_hstate
