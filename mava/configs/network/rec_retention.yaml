@@ -9,7 +9,7 @@ memory_config:
   # --- Memory  factor ---
   decay_scaling_factor: 0.8 # Decay scaling factor for the kappa parameter: kappa = kappa * decay_scaling_factor
   # --- Positional encoding ---
-  timestep_positional_encoding: False # Timestamp positional encoding for Sable memory.
+  timestep_positional_encoding: True # Timestamp positional encoding for Sable memory.
   # --- Chunking ---
   timestep_chunk_size: ~ # Size of the chunk: calculated over timesteps dim.
   # For example a chunksize of 2 results in a sequence length of 2 * num_agents because there num_agents observations within a timestep
