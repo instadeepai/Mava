@@ -404,9 +404,9 @@ class MultiScaleRetention(nn.Module):
         # S: sequence length
         # n: num heads
         # h: head size
-        q_proj = rearrange(q_proj, "B S (n h) -> B h S n", h=self.n_head)
-        k_proj = rearrange(k_proj, "B S (n h) -> B h S n", h=self.n_head)
-        v_proj = rearrange(v_proj, "B S (n h) -> B h n S", h=self.n_head)
+        q_proj = rearrange(q_proj, "B S (nh hs) -> B nh S hs", nh=self.n_head)
+        k_proj = rearrange(k_proj, "B S (nh hs) -> B nh S hs", nh=self.n_head)
+        v_proj = rearrange(v_proj, "B S (nh hs) -> B nh hs S", nh=self.n_head)
         # v_proj = rearrange(v_proj, "B S (n h) -> B h S n", h=self.n_head)
 
         # updated_hstate = hstate + (k_proj.transpose(0, 1, -1, -2) @ v_proj) / jnp.sqrt(scale)
