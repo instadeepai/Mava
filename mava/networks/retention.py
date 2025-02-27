@@ -336,9 +336,7 @@ class MultiScaleRetention(nn.Module):
         k_proj = key_n @ self.w_k
         v_proj = value_n @ self.w_v
 
-        q_proj = rearrange(q_proj, "B C (nh hs) -> B nh C hs", nh=self.n_head)
-        k_proj = rearrange(k_proj, "B C (nh hs) -> B nh C hs", nh=self.n_head)
-        v_proj = rearrange(v_proj, "B C (nh hs) -> B nh C hs", nh=self.n_head)
+        q_proj, k_proj, v_proj = reshape_qkv(q_proj, k_proj, v_proj, self.n_head)
         k_proj = k_proj.transpose(0, 1, -1, -2)
 
         updated_hstate = hstate + (k_proj @ v_proj)
