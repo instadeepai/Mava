@@ -401,7 +401,7 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, (rollout_time, ep_metric) = pipeline.get()
+                    traj_batch, (rollout_time, ep_metric) = pipeline.get()  # type: ignore
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
                     learner_state, train_metric = learn_fn(learner_state, traj_batch)
