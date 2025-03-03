@@ -86,6 +86,7 @@ class Encoder(nn.Module):
     net_config: SableNetworkConfig
     memory_config: DictConfig
     n_agents: int
+    num_value_bins: int
 
     def setup(self) -> None:
         self.ln = nn.RMSNorm()
@@ -104,7 +105,7 @@ class Encoder(nn.Module):
                 nn.Dense(self.net_config.embed_dim, kernel_init=orthogonal(jnp.sqrt(2))),
                 nn.gelu,
                 nn.RMSNorm(),
-                nn.Dense(1, kernel_init=orthogonal(0.01)),
+                nn.Dense(self.num_value_bins, kernel_init=orthogonal(0.01)),
             ],
         )
 
@@ -352,6 +353,7 @@ class SableNetwork(nn.Module):
     net_config: SableNetworkConfig
     memory_config: DictConfig
     action_space_type: str = _DISCRETE
+    num_value_bins: int = 51
 
     def setup(self) -> None:
         if self.action_space_type not in [_DISCRETE, _CONTINUOUS]:
@@ -373,6 +375,7 @@ class SableNetwork(nn.Module):
             self.net_config,
             self.memory_config,
             self.n_agents_per_chunk,
+            self.num_value_bins,
         )
         self.decoder = Decoder(
             self.net_config,
@@ -386,10 +389,12 @@ class SableNetwork(nn.Module):
         self.train_encoder_fn = partial(
             train_encoder_fn,
             chunk_size=self.memory_config.chunk_size,
+            num_value_bins=self.num_value_bins,
         )
         self.act_encoder_fn = partial(
             act_encoder_fn,
             chunk_size=self.n_agents_per_chunk,
+            num_value_bins=self.num_value_bins,
         )
         if self.action_space_type == _CONTINUOUS:
             self.train_decoder_fn = partial(
@@ -438,7 +443,7 @@ class SableNetwork(nn.Module):
             rng_key=rng_key,
         )
 
-        value = jnp.squeeze(value, axis=-1)
+        # value = jnp.squeeze(value, axis=-1)
         return value, action_log, entropy
 
     def get_actions(
@@ -479,5 +484,5 @@ class SableNetwork(nn.Module):
             decoder_cross_retn=updated_dec_hs[1],
         )
 
-        value = jnp.squeeze(value, axis=-1)
+        # value = jnp.squeeze(value, axis=-1)
         return output_actions, output_actions_log, value, updated_hs

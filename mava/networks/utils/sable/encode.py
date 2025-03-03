@@ -31,10 +31,11 @@ def train_encoder_fn(
     dones: chex.Array,
     step_count: chex.Array,
     chunk_size: int,
+    num_value_bins: int,
 ) -> Tuple[chex.Array, chex.Array, chex.Array]:
     """Chunkwise encoding for discrete action spaces."""
     B, S = obs.shape[:2]
-    v_loc = jnp.zeros((B, S, 1))
+    v_loc = jnp.zeros((B, S, num_value_bins))
     obs_rep = jnp.zeros((B, S, encoder.net_config.embed_dim))
 
     # Apply the encoder per chunk
@@ -61,10 +62,11 @@ def act_encoder_fn(
     decayed_hstate: chex.Array,
     step_count: chex.Array,
     chunk_size: int,
+    num_value_bins: int,
 ) -> Tuple[chex.Array, chex.Array, chex.Array]:
     """Chunkwise encoding for ff-Sable and for discrete action spaces."""
     B, C = obs.shape[:2]
-    v_loc = jnp.zeros((B, C, 1))
+    v_loc = jnp.zeros((B, C, num_value_bins))
     obs_rep = jnp.zeros((B, C, encoder.net_config.embed_dim))
 
     # Apply the encoder per chunk

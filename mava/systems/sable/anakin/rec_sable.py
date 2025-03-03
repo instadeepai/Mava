@@ -50,6 +50,35 @@ from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
+NUM_BINS = 128
+MIN_VALUE = -200
+MAX_VALUE = 3000
+BIN_WIDTH = (MAX_VALUE - MIN_VALUE) / NUM_BINS
+SIGMA = 0.75 * BIN_WIDTH
+
+
+def hl_gauss_transform(
+    min_value: float,
+    max_value: float,
+    num_bins: int,
+    sigma: float,
+) -> Tuple[Callable, Callable]:
+    """Histogram loss transform for a normal distribution."""
+    support = jnp.linspace(min_value, max_value, num_bins + 1, dtype=jnp.float32)
+
+    def transform_to_probs(target: jax.Array) -> jax.Array:
+        cdf_evals = jax.scipy.special.erf((support - target) / (jnp.sqrt(2) * sigma))
+        z = cdf_evals[-1] - cdf_evals[0]
+        bin_probs = cdf_evals[1:] - cdf_evals[:-1]
+        return bin_probs / z
+
+    def transform_from_logits(probs: jax.Array) -> jax.Array:
+        probs = jax.nn.softmax(probs, axis=-1)
+        centers = (support[:-1] + support[1:]) / 2
+        return jnp.sum(probs * centers)
+
+    return transform_to_probs, transform_from_logits
+
 
 def get_learner_fn(
     env: MarlEnv,
@@ -61,6 +90,7 @@ def get_learner_fn(
 
     # Get apply functions for executing and training the network.
     sable_action_select_fn, sable_apply_fn = apply_fns
+    to_probs_fn, from_probs_fn = hl_gauss_transform(MIN_VALUE, MAX_VALUE, NUM_BINS, SIGMA)
     num_envs = config.arch.num_envs
 
     def _update_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, Tuple]:
@@ -95,12 +125,13 @@ def get_learner_fn(
 
             # Apply the actor network to get the action, log_prob, value and updated hstates.
             last_obs = last_timestep.observation
-            action, log_prob, value, hstates = sable_action_select_fn(  # type: ignore
+            action, log_prob, value_logits, hstates = sable_action_select_fn(  # type: ignore
                 params,
                 last_obs,
                 hstates,
                 policy_key,
             )
+            value = jax.vmap(jax.vmap(from_probs_fn))(value_logits)
 
             # Step environment
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
@@ -128,9 +159,10 @@ def get_learner_fn(
         # Calculate advantage
         params, opt_states, key, env_state, last_timestep, updated_hstates = learner_state
         key, last_val_key = jax.random.split(key)
-        _, _, last_val, _ = sable_action_select_fn(  # type: ignore
+        _, _, last_val_logits, _ = sable_action_select_fn(  # type: ignore
             params, last_timestep.observation, updated_hstates, last_val_key
         )
+        last_val = jax.vmap(jax.vmap(from_probs_fn))(last_val_logits)
         last_done = last_timestep.last().repeat(env.num_agents).reshape(num_envs, -1)
 
         def _calculate_gae(
@@ -184,7 +216,7 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate Sable loss."""
                     # Rerun network
-                    value, log_prob, entropy = sable_apply_fn(  # type: ignore
+                    value_logits, log_prob, entropy = sable_apply_fn(  # type: ignore
                         params,
                         traj_batch.obs,
                         traj_batch.action,
@@ -192,6 +224,7 @@ def get_learner_fn(
                         traj_batch.done,
                         rng_key,
                     )
+                    value_probs_targets = jax.vmap(jax.vmap(to_probs_fn))(value_targets)
 
                     # Calculate actor loss
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -210,13 +243,13 @@ def get_learner_fn(
                     actor_loss = actor_loss.mean()
                     entropy = entropy.mean()
 
-                    # Clipped MSE loss
-                    value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
-                        -config.system.clip_eps, config.system.clip_eps
-                    )
-                    value_losses = jnp.square(value - value_targets)
-                    value_losses_clipped = jnp.square(value_pred_clipped - value_targets)
-                    value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
+                    # Cross entropy loss
+                    value_loss = -jnp.mean(
+                        jnp.sum(
+                            value_probs_targets * jax.nn.log_softmax(value_logits, axis=-1), axis=-1
+                        ),
+                        axis=-1,
+                    ).mean()
 
                     total_loss = (
                         actor_loss
@@ -384,6 +417,7 @@ def learner_setup(
         net_config=config.network.net_config,
         memory_config=config.network.memory_config,
         action_space_type=action_space_type,
+        num_value_bins=NUM_BINS,
     )
 
     # Define optimiser.

@@ -14,7 +14,7 @@
 
 import copy
 import time
-from typing import Any, Dict, Tuple
+from typing import Any, Callable, Dict, Tuple, Union
 
 import chex
 import flax
@@ -23,16 +23,26 @@ import jax
 import jax.numpy as jnp
 import optax
 from colorama import Fore, Style
+from flax import linen as nn
 from flax.core.frozen_dict import FrozenDict
+from flax.linen.initializers import orthogonal
 from jax import tree
 from omegaconf import DictConfig, OmegaConf
 from rich.pretty import pprint
 
 from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
-from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
-from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn, MarlEnv, Metrics
+from mava.types import (
+    ActorApply,
+    CriticApply,
+    ExperimentOutput,
+    LearnerFn,
+    MarlEnv,
+    Metrics,
+    Observation,
+    ObservationGlobalState,
+)
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
@@ -42,6 +52,60 @@ from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
+
+NUM_BINS = 51
+MIN_VALUE = 0.0
+MAX_VALUE = 22.0
+BIN_WIDTH = (MAX_VALUE - MIN_VALUE) / NUM_BINS
+SIGMA = 0.75 * BIN_WIDTH
+
+
+class Critic(nn.Module):
+    """Feedforward Value Network. Returns the value of an observation."""
+
+    torso: nn.Module
+    num_bins: int
+    centralised_critic: bool = False
+
+    @nn.compact
+    def __call__(self, observation: Union[Observation, ObservationGlobalState]) -> chex.Array:
+        """Forward pass."""
+        if self.centralised_critic:
+            if not isinstance(observation, ObservationGlobalState):
+                raise ValueError("Global state must be provided to the centralised critic.")
+            # Get global state in the case of a centralised critic.
+            observation = observation.global_state
+        else:
+            # Get single agent view in the case of a decentralised critic.
+            observation = observation.agents_view
+
+        critic_output = self.torso(observation)
+        critic_output = nn.Dense(self.num_bins, kernel_init=orthogonal(1.0))(critic_output)
+
+        return critic_output
+
+
+def hl_gauss_transform(
+    min_value: float,
+    max_value: float,
+    num_bins: int,
+    sigma: float,
+) -> Tuple[Callable, Callable]:
+    """Histogram loss transform for a normal distribution."""
+    support = jnp.linspace(min_value, max_value, num_bins + 1, dtype=jnp.float32)
+
+    def transform_to_probs(target: jax.Array) -> jax.Array:
+        cdf_evals = jax.scipy.special.erf((support - target) / (jnp.sqrt(2) * sigma))
+        z = cdf_evals[-1] - cdf_evals[0]
+        bin_probs = cdf_evals[1:] - cdf_evals[:-1]
+        return bin_probs / z
+
+    def transform_from_logits(probs: jax.Array) -> jax.Array:
+        probs = jax.nn.softmax(probs, axis=-1)
+        centers = (support[:-1] + support[1:]) / 2
+        return jnp.sum(probs * centers)
+
+    return transform_to_probs, transform_from_logits
 
 
 def get_learner_fn(
@@ -54,6 +118,8 @@ def get_learner_fn(
     # Get apply and update functions for actor and critic networks.
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
+
+    to_probs_fn, from_probs_fn = hl_gauss_transform(MIN_VALUE, MAX_VALUE, NUM_BINS, SIGMA)
 
     def _update_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, Tuple]:
         """A single update of the network.
@@ -84,7 +150,8 @@ def get_learner_fn(
             # Select action
             key, policy_key = jax.random.split(key)
             actor_policy = actor_apply_fn(params.actor_params, last_timestep.observation)
-            value = critic_apply_fn(params.critic_params, last_timestep.observation)
+            value_logits = critic_apply_fn(params.critic_params, last_timestep.observation)
+            value = jax.vmap(jax.vmap(from_probs_fn))(value_logits)
 
             action = actor_policy.sample(seed=policy_key)
             log_prob = actor_policy.log_prob(action)
@@ -106,7 +173,8 @@ def get_learner_fn(
 
         # Calculate advantage
         params, opt_states, key, env_state, last_timestep, last_done = learner_state
-        last_val = critic_apply_fn(params.critic_params, last_timestep.observation)
+        last_val_logits = critic_apply_fn(params.critic_params, last_timestep.observation)
+        last_val = jax.vmap(jax.vmap(from_probs_fn))(last_val_logits)
 
         advantages, targets = calculate_gae(
             traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
@@ -159,15 +227,16 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate the critic loss."""
                     # Rerun network
-                    value = critic_apply_fn(critic_params, traj_batch.obs)
+                    value_logits = critic_apply_fn(critic_params, traj_batch.obs)
+                    value_probs_targets = jax.vmap(jax.vmap(to_probs_fn))(targets)
 
-                    # Clipped MSE loss
-                    value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
-                        -config.system.clip_eps, config.system.clip_eps
-                    )
-                    value_losses = jnp.square(value - targets)
-                    value_losses_clipped = jnp.square(value_pred_clipped - targets)
-                    value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
+                    # Cross entropy loss
+                    value_loss = -jnp.mean(
+                        jnp.sum(
+                            value_probs_targets * jax.nn.log_softmax(value_logits, axis=-1), axis=-1
+                        ),
+                        axis=-1,
+                    ).mean()
 
                     total_value_loss = config.system.vf_coef * value_loss
                     return total_value_loss, value_loss
@@ -313,7 +382,7 @@ def learner_setup(
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 
     actor_network = Actor(torso=actor_torso, action_head=actor_action_head)
-    critic_network = Critic(torso=critic_torso)
+    critic_network = Critic(torso=critic_torso, num_bins=NUM_BINS)
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
     critic_lr = make_learning_rate(config.system.critic_lr, config)
