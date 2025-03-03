@@ -6,8 +6,8 @@ flax>=0.8.1
 gigastep @ git+https://github.com/mlech26l/gigastep
 hydra-core==1.3.2
 id-marl-eval @ git+https://github.com/instadeepai/marl-eval
-jax==0.4.30
-jaxlib==0.4.30
+jax==0.5.1
+jaxlib==0.5.1
 jaxmarl @ git+https://github.com/RuanJohn/JaxMARL@unpin-jax  # This only unpins the version of Jax.
 jumanji>= 1.1.0
 lbforaging
