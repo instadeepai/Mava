@@ -25,7 +25,7 @@ from jax.sharding import Sharding
 from jumanji.types import TimeStep
 
 # todo: remove the ppo dependencies when we make sebulba for other systems
-from mava.systems.ppo.types import HiddenStates, Params
+from mava.systems.ppo.types import Params
 from mava.types import MavaTransition, Metrics
 
 QUEUE_PUT_TIMEOUT = 100
@@ -94,7 +94,7 @@ class Pipeline(threading.Thread):
         self,
         traj: Sequence[MavaTransition],
         metrics: Tuple[Dict, List[Dict]],
-        final_timestep: Tuple[TimeStep, Optional[HiddenStates]],
+        final_timestep: Tuple[TimeStep, Optional[Tuple[jax.Array, ...]]],
     ) -> None:
         """Put a trajectory on the queue to be consumed by the learner."""
         start_condition, end_condition = (threading.Condition(), threading.Condition())
@@ -138,7 +138,12 @@ class Pipeline(threading.Thread):
 
     def get(
         self, block: bool = True, timeout: Union[float, None] = None
-    ) -> Tuple[MavaTransition, Dict, Metrics, Tuple[TimeStep, Optional[HiddenStates]]]:
+    ) -> Tuple[
+        MavaTransition,
+        Dict,
+        Metrics,
+        Tuple[TimeStep, Optional[Tuple[jax.Array, ...]]],
+    ]:
         """Get a trajectory from the pipeline."""
         return self._queue.get(block, timeout)  # type: ignore
 
