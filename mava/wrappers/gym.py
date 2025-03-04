@@ -116,7 +116,7 @@ class UoeWrapper(gymnasium.Wrapper):
             info["global_obs"] = self.get_global_obs(agents_view)
 
         self.step_count = 0
-        info["step_count"] = np.full((self.num_agents,),self.step_count)
+        info["step_count"] = np.full((self.num_agents,), self.step_count)
         return np.array(agents_view), info
 
     def step(self, actions: List) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
@@ -132,7 +132,7 @@ class UoeWrapper(gymnasium.Wrapper):
             reward = np.array(reward)
 
         self.step_count += 1
-        info["step_count"] = np.full((self.num_agents,),self.step_count)
+        info["step_count"] = np.full((self.num_agents,), self.step_count)
         return agents_view, reward, terminated, truncated, info
 
     def get_action_mask(self, info: Dict) -> NDArray:

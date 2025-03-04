@@ -19,7 +19,7 @@ import warnings
 from collections import defaultdict
 from functools import partial
 from queue import Queue
-from typing import Any, Dict, List, Sequence, Tuple, Callable
+from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 import chex
 import hydra
@@ -53,7 +53,6 @@ from mava.types import (
     Action,
     Metrics,
     Observation,
-    SebulbaLearnerFn,
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
@@ -94,7 +93,6 @@ def rollout(
     name = threading.current_thread().name
     print(f"{Fore.BLUE}{Style.BRIGHT}Thread {name} started{Style.RESET_ALL}")
 
-    num_agents, num_envs = config.system.num_agents, config.arch.num_envs
     move_to_device = lambda x: jax.device_put(x, device=actor_device)
 
     @jax.jit
@@ -154,7 +152,9 @@ def rollout(
                 # Updated the dones and Hstates
                 dones = timestep.last()
                 dones = jnp.expand_dims(dones, (1, 2, 3, 4))
-                hstates = tree.map(lambda hs: jnp.where(dones, jnp.zeros_like(hs), hs), hstates)
+                hstates = tree.map(
+                    lambda hs, dones=dones: jnp.where(dones, jnp.zeros_like(hs), hs), hstates
+                )
 
                 # Append data to storage
                 traj.append(
@@ -172,7 +172,9 @@ def rollout(
         # send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
             try:
-                rollout_queue.put(traj, (actor_timings, episode_metrics), (timestep, (prev_hstates, hstates)))
+                rollout_queue.put(
+                    traj, (actor_timings, episode_metrics), (timestep, (prev_hstates, hstates))
+                )
             except queue.Full:
                 err = "Waited too long to add to the rollout queue, killing the actor thread"
                 warnings.warn(err, stacklevel=2)
@@ -197,8 +199,8 @@ def get_learner_step_fn(
     def _update_step(
         learner_state: LearnerState,
         traj_batch: Transition,
-        prev_hstates : HiddenStates,
-        updated_hstates : HiddenStates
+        prev_hstates: HiddenStates,
+        updated_hstates: HiddenStates,
     ) -> Tuple[LearnerState, Metrics]:
         """A single update of the network.
 
@@ -316,7 +318,7 @@ def get_learner_step_fn(
                         + config.system.vf_coef * value_loss
                     )
                     return total_loss, (actor_loss, entropy, value_loss)
-                
+
                 # Calculate actor loss
                 key, entropy_key = jax.random.split(key)
                 grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
@@ -332,7 +334,7 @@ def get_learner_step_fn(
                 # Compute the parallel mean (pmean) over the batch.
                 grads, loss_info = jax.lax.pmean((grads, loss_info), axis_name="learner_devices")
 
-                 # Update params and optimiser state
+                # Update params and optimiser state
                 updates, new_opt_state = update_fn(grads, opt_state)
                 new_params = optax.apply_updates(params, updates)
 
@@ -397,7 +399,10 @@ def get_learner_step_fn(
         return learner_state, loss_info
 
     def learner_fn(
-        learner_state: LearnerState, traj_batch: Transition, prev_hstates: HiddenStates, updated_hstates: HiddenStates
+        learner_state: LearnerState,
+        traj_batch: Transition,
+        prev_hstates: HiddenStates,
+        updated_hstates: HiddenStates,
     ) -> Tuple[LearnerState, Metrics]:
         """Learner function.
 
@@ -416,7 +421,9 @@ def get_learner_step_fn(
         # This function is shard mapped on the batch axis, but `_update_step` needs
         # the first axis to be time
         traj_batch = tree.map(switch_leading_axes, traj_batch)
-        learner_state, loss_info = _update_step(learner_state, traj_batch, prev_hstates, updated_hstates)
+        learner_state, loss_info = _update_step(
+            learner_state, traj_batch, prev_hstates, updated_hstates
+        )
 
         return learner_state, loss_info
 
@@ -424,7 +431,9 @@ def get_learner_step_fn(
 
 
 def learner_thread(
-    learn_fn: Callable[[LearnerState, Transition, HiddenStates, HiddenStates], Tuple[LearnerState, Metrics]],
+    learn_fn: Callable[
+        [LearnerState, Transition, HiddenStates, HiddenStates], Tuple[LearnerState, Metrics]
+    ],
     learner_state: LearnerState,
     config: DictConfig,
     eval_queue: Queue,
@@ -442,7 +451,12 @@ def learner_thread(
                 # Get the trajectory batch from the pipeline
                 # This is blocking so it will wait until the pipeline has data.
                 with RecordTimeTo(learn_times["rollout_get_time"]):
-                    traj_batch, rollout_time, ep_metrics, (timestep, (prev_hstates, updated_hstates)) = pipeline.get(block=True)  # type: ignore
+                    (
+                        traj_batch,
+                        rollout_time,
+                        ep_metrics,
+                        (timestep, (prev_hstates, updated_hstates)),
+                    ) = pipeline.get(block=True)  # type: ignore
 
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
@@ -450,7 +464,9 @@ def learner_thread(
                 learner_state = learner_state._replace(timestep=timestep)
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
-                    learner_state, train_metrics = learn_fn(learner_state, traj_batch, prev_hstates, updated_hstates)
+                    learner_state, train_metrics = learn_fn(
+                        learner_state, traj_batch, prev_hstates, updated_hstates
+                    )
 
                 metrics.append((ep_metrics, train_metrics))
                 rollout_times_array.append(rollout_time)
@@ -577,7 +593,6 @@ def learner_setup(
         )
         # Update the params and hidden states
         params = restored_params
-        init_hstates = restored_hstates if restored_hstates else None
 
     # Define params to be replicated across devices and batches.
     key, *step_keys = jax.random.split(key, len(learner_devices) + 1)
