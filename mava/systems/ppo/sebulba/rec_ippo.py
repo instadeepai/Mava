@@ -135,7 +135,7 @@ def rollout(
         (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
     last_hstates = HiddenStates(init_policy_hstate, init_critic_hstate)
-    last_hstates = tree.map(move_to_device, last_hstates)
+    last_hstates = move_to_device(last_hstates)
 
     # Loop till the desired num_updates is reached.
     while not thread_lifetime.should_stop():
@@ -152,7 +152,7 @@ def rollout(
                 last_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
                 last_dones = move_to_device(last_dones)
 
-                # Sample action from the policy and squeeze out the batch dimension.
+                # Sample action from the policy.
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
                     action, log_prob, value, hstates = act_fn(
@@ -309,7 +309,7 @@ def get_learner_step_fn(
 
                 # Calculate critic loss
                 critic_grad_fn = jax.value_and_grad(_critic_loss_fn, has_aux=True)
-                critic_loss_info, critic_grads = critic_grad_fn(
+                value_loss_info, critic_grads = critic_grad_fn(
                     params.critic_params, traj_batch, targets
                 )
 
@@ -323,8 +323,8 @@ def get_learner_step_fn(
                 )
 
                 # pmean over learner devices.
-                critic_grads, critic_loss_info = jax.lax.pmean(
-                    (critic_grads, critic_loss_info), axis_name="learner_devices"
+                critic_grads, value_loss_info = jax.lax.pmean(
+                    (critic_grads, value_loss_info), axis_name="learner_devices"
                 )
 
                 # Update actor params and optimiser state
@@ -344,7 +344,7 @@ def get_learner_step_fn(
                 new_opt_state = OptStates(actor_new_opt_state, critic_new_opt_state)
                 # Pack loss info
                 actor_total_loss, (actor_loss, entropy) = actor_loss_info
-                value_loss, (value_loss) = critic_loss_info
+                value_loss, (value_loss) = value_loss_info
                 total_loss = value_loss + actor_total_loss
                 loss_info = {
                     "total_loss": total_loss,
@@ -471,14 +471,13 @@ def learner_thread(
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
                 # an additional timestep which it can use to bootstrap.
-                learner_state = learner_state._replace(timestep=timestep)
                 learner_state = learner_state._replace(
+                    timestep=timestep,
                     dones=timestep.last()
                     .repeat(config.system.num_agents)
-                    .reshape(config.arch.num_envs, -1)
+                    .reshape(config.arch.num_envs, -1),
+                    hstates=hstates,  # type: ignore
                 )
-                learner_state = learner_state._replace(hstates=hstates)  # type: ignore
-
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
                     learner_state, train_metrics = learn_fn(learner_state, traj_batch)
