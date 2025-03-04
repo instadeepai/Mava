@@ -66,6 +66,7 @@ class EncodeBlock(nn.Module):
         dones: chex.Array,
         step_count: chex.Array,
         num_chunks: int,
+        inference: bool = False,
     ) -> chex.Array:
         """Applies Chunkwise MultiScaleRetention."""
         ret, updated_hstate = self.retn(
@@ -76,6 +77,7 @@ class EncodeBlock(nn.Module):
             dones=dones,
             step_count=step_count,
             num_chunks=num_chunks,
+            inference=inference,
         )
         x = self.ln1(x + ret)
         output = self.ln2(x + self.ffn(x))
@@ -136,6 +138,7 @@ class Encoder(nn.Module):
         dones: chex.Array,
         step_count: chex.Array,
         num_chunks: int,
+        inference: bool = False,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         """Apply chunkwise encoding."""
         updated_hstate = jnp.zeros_like(hstate)
@@ -145,7 +148,7 @@ class Encoder(nn.Module):
         for i, block in enumerate(self.blocks):
             hs = hstate[:, :, i]  # Get the hidden state for the current block
             # Apply the chunkwise encoder block
-            obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count, num_chunks)
+            obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count, num_chunks, inference)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
         value = self.head(obs_rep)

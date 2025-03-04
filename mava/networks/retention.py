@@ -321,6 +321,7 @@ class MultiScaleRetention(nn.Module):
         dones: Array,
         step_count: Array,
         num_chunks: int,
+        inference: bool = False,
     ) -> Tuple[Array, Array]:
         """Chunkwise (default) representation of the multi-scale retention mechanism"""
         B, C, _ = value.shape
@@ -334,8 +335,8 @@ class MultiScaleRetention(nn.Module):
         v_proj = value @ self.w_v
 
         # (B, num_chunks, num_heads, chunk_size, head_size)
-        _q_proj, _k_proj, _v_proj = reshape_qkv(q_proj, k_proj, v_proj, self.n_head, num_chunks)
-        _k_proj = _k_proj.transpose(0, 1, 2, -1, -2)
+        q_proj, k_proj, v_proj = reshape_qkv(q_proj, k_proj, v_proj, self.n_head, num_chunks)
+        k_proj = k_proj.transpose(0, 1, 2, -1, -2)
 
         dones = reshape_dones(dones, num_chunks)
 
@@ -343,39 +344,40 @@ class MultiScaleRetention(nn.Module):
             dones, self.decay_kappas, self.n_agents, self.masked
         )
 
-        ret_outputs = []
+        qk_mat = q_proj @ k_proj
+        qk_mat = qk_mat * _decay_matrix
+        inner_output = qk_mat @ v_proj
+        value_inner_decay = _decay_matrix[:, :, :, -1][..., jnp.newaxis]
+
+        kv = jax.lax.cond(
+            inference,
+            lambda: k_proj @ v_proj,
+            lambda: k_proj @ (v_proj * value_inner_decay),
+        )
+
+        kv_recurrent = []
+
         for chunk in range(num_chunks):
-            decay_matrix = _decay_matrix[:, chunk]
-            xi = _xi[:, chunk]
-            chunk_decay = _chunk_decay[chunk]
-            delta = _delta[:, chunk]
-            q_proj = _q_proj[:, chunk]
-            k_proj = _k_proj[:, chunk]
-            v_proj = _v_proj[:, chunk]
+            kv_recurrent.append(hstate)
+            hstate = jax.lax.cond(
+                inference,
+                lambda hstate=hstate, chunk=chunk: hstate + kv[:, chunk],
+                lambda hstate=hstate, chunk=chunk: hstate
+                * _chunk_decay[chunk][jnp.newaxis, :, jnp.newaxis, jnp.newaxis]
+                * _delta[:, chunk]
+                + kv[:, chunk],
+            )
 
-            if self.memory_config.type == "ff_sable":
-                decay_matrix = jnp.ones_like(decay_matrix)
-                decay_matrix = jax.vmap(_causal_mask, in_axes=(1, None), out_axes=1)(
-                    decay_matrix, self.masked
-                )
-                xi = jnp.ones_like(xi)
-                next_hstate = (k_proj @ v_proj) + hstate
-                del chunk_decay, delta
-            else:
-                next_hstate = (
-                    k_proj @ (v_proj * decay_matrix[:, :, -1].reshape(B, self.n_head, C, 1))
-                    + hstate * chunk_decay[None, :, None, None] * delta
-                )
+        kv_recurrent = jnp.stack(kv_recurrent, axis=1)
+        cross_output = jax.lax.cond(
+            inference,
+            lambda: q_proj @ kv_recurrent,
+            lambda: (q_proj * _xi) @ kv_recurrent,
+        )
 
-            cross_chunk = (q_proj @ hstate) * xi
-            inner_chunk = ((q_proj @ k_proj) * decay_matrix) @ v_proj
+        ret_output = cross_output + inner_output
 
-            hstate = next_hstate
-
-            ret_output = cross_chunk + inner_chunk
-            ret_outputs.append(ret_output)
-
-        ret_output = jnp.stack(ret_outputs, axis=1)
+        # Join chunks
         ret_output = rearrange(ret_output, "B nC nh Cs hs -> B nh (nC Cs) hs", nh=self.n_head)
 
         # Joint heads again
@@ -399,28 +401,32 @@ class MultiScaleRetention(nn.Module):
         if self.memory_config.timestep_positional_encoding:
             key_n, query_n, value_n = self.pe(key_n, query_n, value_n, step_count)
 
+        # Squeeze of seq dims to mirror retnet code.
         q_proj = query_n @ self.w_q
         k_proj = key_n @ self.w_k
         v_proj = value_n @ self.w_v
 
-        # Never chunk in the recurrent case
-        q_proj, k_proj, v_proj = q_proj, k_proj, v_proj = reshape_qkv(
-            q_proj, k_proj, v_proj, self.n_head, 1
-        )
-        k_proj = k_proj.transpose(0, 1, 2, -1, -2)
+        # Reshape exactly like retnet code
+        q_proj = rearrange(q_proj, "B S (nh hs) -> B S nh hs", nh=self.n_head)
+        k_proj = rearrange(k_proj, "B S (nh hs) -> B S nh hs", nh=self.n_head)
+        v_proj = rearrange(v_proj, "B S (nh hs) -> B nh hs S", nh=self.n_head)
 
-        # Remove chunk dim
-        q_proj, k_proj, v_proj = q_proj.squeeze(1), k_proj.squeeze(1), v_proj.squeeze(1)
+        q_proj = q_proj.transpose(0, 2, 1, 3)
+        k_proj = k_proj.transpose(0, 2, 1, 3)
 
-        updated_hstate = hstate + (k_proj @ v_proj)
-        ret_output = q_proj @ updated_hstate
+        kv = k_proj * v_proj
+        updated_hstate = hstate + kv
+        ret_output = (q_proj * updated_hstate).sum(axis=3)
 
-        # Joint heads again
-        ret_output = rearrange(ret_output, "B nh C hs -> B C (nh hs)", nh=self.n_head)
+        # Rejoin heads
+        ret_output = rearrange(ret_output, "B nh hs -> B (nh hs)", nh=self.n_head)
 
         ret_output = self.group_norm(ret_output.reshape(-1, self.head_size)).reshape(
-            (B, S, self.embed_dim)
+            (B, self.embed_dim)
         )
+
+        # Add back dummy seq dim
+        ret_output = ret_output[:, jnp.newaxis, :]
 
         x = key_n
         output = (jax.nn.swish(x @ self.w_g) * ret_output) @ self.w_o

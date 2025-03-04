@@ -65,21 +65,25 @@ def act_encoder_fn(
 ) -> Tuple[chex.Array, chex.Array, chex.Array]:
     """Chunkwise encoding for ff-Sable and for discrete action spaces."""
     B, C = obs.shape[:2]
-    v_loc = jnp.zeros((B, C, 1))
-    obs_rep = jnp.zeros((B, C, encoder.net_config.embed_dim))
+    # v_loc = jnp.zeros((B, C, 1))
+    # obs_rep = jnp.zeros((B, C, encoder.net_config.embed_dim))
 
     # Apply the encoder per chunk
     num_chunks = C // chunk_size
-    for chunk_id in range(0, num_chunks):
-        start_idx = chunk_id * chunk_size
-        end_idx = (chunk_id + 1) * chunk_size
-        # Chunk obs and step_count
-        chunk_obs = obs[:, start_idx:end_idx]
-        chunk_step_count = step_count[:, start_idx:end_idx]
-        chunk_v_loc, chunk_obs_rep, decayed_hstate = encoder.recurrent(
-            chunk_obs, decayed_hstate, chunk_step_count
-        )
-        v_loc = v_loc.at[:, start_idx:end_idx].set(chunk_v_loc)
-        obs_rep = obs_rep.at[:, start_idx:end_idx].set(chunk_obs_rep)
+    inference_dones = jnp.zeros((B, C), dtype=bool)
+    # for chunk_id in range(0, num_chunks):
+    #     start_idx = chunk_id * chunk_size
+    #     end_idx = (chunk_id + 1) * chunk_size
+    #     # Chunk obs and step_count
+    #     chunk_obs = obs[:, start_idx:end_idx]
+    #     chunk_step_count = step_count[:, start_idx:end_idx]
+    #     chunk_v_loc, chunk_obs_rep, decayed_hstate = encoder.recurrent(
+    #         chunk_obs, decayed_hstate, chunk_step_count
+    #     )
+    #     v_loc = v_loc.at[:, start_idx:end_idx].set(chunk_v_loc)
+    #     obs_rep = obs_rep.at[:, start_idx:end_idx].set(chunk_obs_rep)
+    v_loc, obs_rep, decayed_hstate = encoder(
+        obs, decayed_hstate, inference_dones, step_count, num_chunks, True
+    )
 
     return v_loc, obs_rep, decayed_hstate

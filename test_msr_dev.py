@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
+
 import jax
 import jax.numpy as jnp
 from omegaconf import DictConfig
@@ -27,7 +29,8 @@ num_time_steps = 100
 seq_len = num_agents * num_time_steps
 
 retnet_embed_dim = 32
-retnet_num_heads = 1
+retnet_num_heads = 2
+num_chunks = 1
 
 memory_config = DictConfig(
     {
@@ -81,5 +84,43 @@ params = msr.init(
     init_hstate,
     dones,
     step_counts,
-    1,
+    num_chunks=num_chunks,
 )
+
+hstate = copy.deepcopy(init_hstate)
+act_output = []
+
+# for the decoder we use the chunkwise
+for step in range(num_time_steps):
+    # todo: reset later
+    hstate = hstate * jnp.exp(decay_kappas)
+    obs_i = obs[:, step * num_agents : (step + 1) * num_agents, ...]
+    dones_i = dones[:, step * num_agents : (step + 1) * num_agents]
+    step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
+
+    out, hstate = msr.apply(
+        params,
+        obs_i,
+        obs_i,
+        obs_i,
+        hstate,
+        dones_i,
+        step_counts_i,
+        num_chunks=num_chunks,
+        inference=True,
+    )
+    act_output.append(out)
+
+act_output = jnp.concatenate(act_output, axis=1)
+print(act_output.shape)
+
+hstate = copy.deepcopy(init_hstate)
+train_out, _ = msr.apply(
+    params, obs, obs, obs, hstate, dones, step_counts, num_chunks=1, inference=False
+)
+print(train_out.shape)
+
+total_error = jnp.mean(jnp.abs(train_out - act_output))
+print(total_error)
+
+# print(jnp.abs(train_out - act_output))
