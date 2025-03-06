@@ -401,32 +401,27 @@ class MultiScaleRetention(nn.Module):
         if self.memory_config.timestep_positional_encoding:
             key_n, query_n, value_n = self.pe(key_n, query_n, value_n, step_count)
 
-        # Squeeze of seq dims to mirror retnet code.
         q_proj = query_n @ self.w_q
         k_proj = key_n @ self.w_k
         v_proj = value_n @ self.w_v
 
         # Reshape exactly like retnet code
-        q_proj = rearrange(q_proj, "B S (nh hs) -> B S nh hs", nh=self.n_head)
-        k_proj = rearrange(k_proj, "B S (nh hs) -> B S nh hs", nh=self.n_head)
-        v_proj = rearrange(v_proj, "B S (nh hs) -> B nh hs S", nh=self.n_head)
+        q_proj = rearrange(q_proj, "B S (nh hs) -> B nh S hs", nh=self.n_head, S=S)
+        k_proj = rearrange(k_proj, "B S (nh hs) -> B nh S hs", nh=self.n_head, S=S)
+        v_proj = rearrange(v_proj, "B S (nh hs) -> B nh S hs", nh=self.n_head, S=S)
 
-        q_proj = q_proj.transpose(0, 2, 1, 3)
-        k_proj = k_proj.transpose(0, 2, 1, 3)
+        k_proj = k_proj.transpose(0, 1, 3, 2)
 
-        kv = k_proj * v_proj
+        kv = k_proj @ v_proj
         updated_hstate = hstate + kv
-        ret_output = (q_proj * updated_hstate).sum(axis=3)
+        ret_output = q_proj @ updated_hstate
 
         # Rejoin heads
-        ret_output = rearrange(ret_output, "B nh hs -> B (nh hs)", nh=self.n_head)
+        ret_output = rearrange(ret_output, "B nh S hs -> B S (nh hs)", nh=self.n_head)
 
         ret_output = self.group_norm(ret_output.reshape(-1, self.head_size)).reshape(
-            (B, self.embed_dim)
+            (B, S, self.embed_dim)
         )
-
-        # Add back dummy seq dim
-        ret_output = ret_output[:, jnp.newaxis, :]
 
         x = key_n
         output = (jax.nn.swish(x @ self.w_g) * ret_output) @ self.w_o

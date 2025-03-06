@@ -25,7 +25,7 @@ from mava.networks.retention import MultiScaleRetention
 bsz = 16
 num_agents = 4
 obs_dim = 11
-num_time_steps = 100
+num_time_steps = 300
 seq_len = num_agents * num_time_steps
 
 retnet_embed_dim = 32
@@ -46,6 +46,9 @@ decay_kappas *= memory_config.decay_scaling_factor
 decay_kappas = jnp.log(decay_kappas)
 decay_kappas = decay_kappas[None, :, None, None]
 
+################################################################################
+# Test unmasked MSR
+################################################################################
 msr = MultiScaleRetention(
     embed_dim=retnet_embed_dim,
     n_head=retnet_num_heads,
@@ -111,16 +114,98 @@ for step in range(num_time_steps):
     )
     act_output.append(out)
 
+print("Encoder:")
 act_output = jnp.concatenate(act_output, axis=1)
 print(act_output.shape)
 
 hstate = copy.deepcopy(init_hstate)
 train_out, _ = msr.apply(
-    params, obs, obs, obs, hstate, dones, step_counts, num_chunks=1, inference=False
+    params,
+    obs,
+    obs,
+    obs,
+    hstate,
+    dones,
+    step_counts,
+    num_chunks=1,
+    inference=False,
 )
 print(train_out.shape)
 
 total_error = jnp.mean(jnp.abs(train_out - act_output))
 print(total_error)
 
-# print(jnp.abs(train_out - act_output))
+################################################################################
+# Test masked MSR
+################################################################################
+
+msr = MultiScaleRetention(
+    embed_dim=retnet_embed_dim,
+    n_head=retnet_num_heads,
+    n_agents=num_agents,
+    memory_config=memory_config,
+    masked=True,
+    decay_scaling_factor=memory_config.decay_scaling_factor,
+)
+
+params = msr.init(
+    init_key,
+    obs,
+    obs,
+    obs,
+    init_hstate,
+    dones,
+    step_counts,
+    num_chunks=num_chunks,
+)
+
+hstate = copy.deepcopy(init_hstate)
+act_output = []
+
+# for the decoder we use the recurrent form at inference
+for step in range(num_time_steps):
+    obs_i = obs[:, step * num_agents : (step + 1) * num_agents, ...]
+    step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
+
+    timestep_outputs = []
+    for agent in range(num_agents):
+        if agent == 0:
+            hstate = hstate * jnp.exp(decay_kappas)
+        obs_i_agent = obs_i[:, agent : agent + 1, ...]
+        step_counts_i_agent = step_counts_i[:, agent : agent + 1, ...]
+
+        out, hstate = msr.apply(
+            params,
+            obs_i_agent,
+            obs_i_agent,
+            obs_i_agent,
+            hstate,
+            step_counts_i_agent,
+            method="recurrent",
+        )
+        timestep_outputs.append(out)
+
+    timestep_output = jnp.concatenate(timestep_outputs, axis=1)
+    act_output.append(timestep_output)
+
+print()
+print("Decoder:")
+act_output = jnp.concatenate(act_output, axis=1)
+print(act_output.shape)
+
+hstate = copy.deepcopy(init_hstate)
+train_out, _ = msr.apply(
+    params,
+    obs,
+    obs,
+    obs,
+    hstate,
+    dones,
+    step_counts,
+    num_chunks=1,
+    inference=False,
+)
+print(train_out.shape)
+
+total_error = jnp.mean(jnp.abs(train_out - act_output))
+print(total_error)
