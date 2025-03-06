@@ -273,6 +273,7 @@ class MultiScaleRetention(nn.Module):
     def setup(self) -> None:
         assert self.embed_dim % self.n_head == 0, "embed_dim must be divisible by n_head"
         self.head_size = self.embed_dim // self.n_head
+        self.scaling = self.head_size**-0.5
 
         # Decay kappa for each head
         self.decay_kappas = 1 - jnp.exp(
@@ -333,6 +334,7 @@ class MultiScaleRetention(nn.Module):
         q_proj = query @ self.w_q
         k_proj = key @ self.w_k
         v_proj = value @ self.w_v
+        k_proj *= self.scaling
 
         # (B, num_chunks, num_heads, chunk_size, head_size)
         q_proj, k_proj, v_proj = reshape_qkv(q_proj, k_proj, v_proj, self.n_head, num_chunks)
@@ -404,6 +406,7 @@ class MultiScaleRetention(nn.Module):
         q_proj = query_n @ self.w_q
         k_proj = key_n @ self.w_k
         v_proj = value_n @ self.w_v
+        k_proj *= self.scaling
 
         # Reshape exactly like retnet code
         q_proj = rearrange(q_proj, "B S (nh hs) -> B nh S hs", nh=self.n_head, S=S)

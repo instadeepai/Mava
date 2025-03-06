@@ -43,7 +43,7 @@ class PositionalEncoding(nn.Module):
         # Add positional encoding to the input tensors
         key += pe
         query += pe
-        value += pe
+        # value += pe
 
         return key, query, value
 
