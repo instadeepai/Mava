@@ -25,7 +25,7 @@ from mava.networks.retention import MultiScaleRetention
 bsz = 16
 num_agents = 4
 obs_dim = 11
-num_time_steps = 300
+num_time_steps = 10
 seq_len = num_agents * num_time_steps
 
 retnet_embed_dim = 32
@@ -49,7 +49,7 @@ decay_kappas = decay_kappas[None, :, None, None]
 ################################################################################
 # Test unmasked MSR
 ################################################################################
-msr = MultiScaleRetention(
+msr_enc = MultiScaleRetention(
     embed_dim=retnet_embed_dim,
     n_head=retnet_num_heads,
     n_agents=num_agents,
@@ -79,7 +79,7 @@ step_counts = step_counts[None, ...].repeat(bsz, axis=0)[..., None].repeat(num_a
 step_counts = step_counts.reshape(bsz, seq_len)
 
 key, init_key = jax.random.split(key)
-params = msr.init(
+msr_enc_params = msr_enc.init(
     init_key,
     obs,
     obs,
@@ -101,8 +101,8 @@ for step in range(num_time_steps):
     dones_i = dones[:, step * num_agents : (step + 1) * num_agents]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
 
-    out, hstate = msr.apply(
-        params,
+    out, hstate = msr_enc.apply(
+        msr_enc_params,
         obs_i,
         obs_i,
         obs_i,
@@ -114,13 +114,14 @@ for step in range(num_time_steps):
     )
     act_output.append(out)
 
+print("Never done test:")
 print("Encoder:")
 act_output = jnp.concatenate(act_output, axis=1)
 print(act_output.shape)
 
 hstate = copy.deepcopy(init_hstate)
-train_out, _ = msr.apply(
-    params,
+train_out, _ = msr_enc.apply(
+    msr_enc_params,
     obs,
     obs,
     obs,
@@ -139,7 +140,7 @@ print(total_error)
 # Test masked MSR
 ################################################################################
 
-msr = MultiScaleRetention(
+msr_dec = MultiScaleRetention(
     embed_dim=retnet_embed_dim,
     n_head=retnet_num_heads,
     n_agents=num_agents,
@@ -148,7 +149,7 @@ msr = MultiScaleRetention(
     decay_scaling_factor=memory_config.decay_scaling_factor,
 )
 
-params = msr.init(
+msr_dec_params = msr_dec.init(
     init_key,
     obs,
     obs,
@@ -167,15 +168,19 @@ for step in range(num_time_steps):
     obs_i = obs[:, step * num_agents : (step + 1) * num_agents, ...]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
 
+    hstate = hstate * jnp.exp(decay_kappas)
+    reset_done = dones[:, step * num_agents, None, None, None]
+    hstate = jax.tree.map(
+        lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
+    )
+
     timestep_outputs = []
     for agent in range(num_agents):
-        if agent == 0:
-            hstate = hstate * jnp.exp(decay_kappas)
         obs_i_agent = obs_i[:, agent : agent + 1, ...]
         step_counts_i_agent = step_counts_i[:, agent : agent + 1, ...]
 
-        out, hstate = msr.apply(
-            params,
+        out, hstate = msr_dec.apply(
+            msr_dec_params,
             obs_i_agent,
             obs_i_agent,
             obs_i_agent,
@@ -194,8 +199,8 @@ act_output = jnp.concatenate(act_output, axis=1)
 print(act_output.shape)
 
 hstate = copy.deepcopy(init_hstate)
-train_out, _ = msr.apply(
-    params,
+train_out, _ = msr_dec.apply(
+    msr_dec_params,
     obs,
     obs,
     obs,
@@ -205,6 +210,115 @@ train_out, _ = msr.apply(
     num_chunks=1,
     inference=False,
 )
+print(train_out.shape)
+
+total_error = jnp.mean(jnp.abs(train_out - act_output))
+print(total_error)
+
+print()
+print("With done test:")
+
+key, done_key = jax.random.split(key)
+dones = jnp.repeat(  # dones are the same per agent so repeat them
+    jax.random.randint(done_key, (bsz, num_time_steps), 0, 2).astype(bool), num_agents, axis=1
+)
+
+print("Encoder:")
+hstate = copy.deepcopy(init_hstate)
+
+act_output = []
+for step in range(num_time_steps):
+    hstate = hstate * jnp.exp(decay_kappas)
+    reset_done = dones[:, step * num_agents, None, None, None]
+    hstate = jax.tree.map(
+        lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
+    )
+    obs_i = obs[:, step * num_agents : (step + 1) * num_agents, ...]
+    dones_i = dones[:, step : step + 1]
+    step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
+
+    out, hstate = msr_enc.apply(
+        msr_enc_params,
+        obs_i,
+        obs_i,
+        obs_i,
+        hstate,
+        dones_i,
+        step_counts_i,
+        num_chunks=num_chunks,
+        inference=True,
+    )
+    act_output.append(out)
+
+act_output = jnp.concatenate(act_output, axis=1)
+print(act_output.shape)
+
+hstate = copy.deepcopy(init_hstate)
+train_out, _ = msr_enc.apply(
+    msr_enc_params,
+    obs,
+    obs,
+    obs,
+    hstate,
+    dones,
+    step_counts,
+    num_chunks=1,
+    inference=False,
+)
+print(train_out.shape)
+
+total_error = jnp.mean(jnp.abs(train_out - act_output))
+print(total_error)
+
+print()
+print("Decoder:")
+hstate = copy.deepcopy(init_hstate)
+act_output = []
+for step in range(num_time_steps):
+    obs_i = obs[:, step * num_agents : (step + 1) * num_agents, ...]
+    step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
+
+    hstate = hstate * jnp.exp(decay_kappas)
+    reset_done = dones[:, step * num_agents, None, None, None]
+    hstate = jax.tree.map(
+        lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
+    )
+
+    timestep_outputs = []
+    for agent in range(num_agents):
+        obs_i_agent = obs_i[:, agent : agent + 1, ...]
+        step_counts_i_agent = step_counts_i[:, agent : agent + 1, ...]
+
+        out, hstate = msr_dec.apply(
+            msr_dec_params,
+            obs_i_agent,
+            obs_i_agent,
+            obs_i_agent,
+            hstate,
+            step_counts_i_agent,
+            method="recurrent",
+        )
+        timestep_outputs.append(out)
+
+    timestep_output = jnp.concatenate(timestep_outputs, axis=1)
+    act_output.append(timestep_output)
+
+act_output = jnp.concatenate(act_output, axis=1)
+print(act_output.shape)
+
+hstate = copy.deepcopy(init_hstate)
+train_out, _ = msr_dec.apply(
+    msr_dec_params,
+    obs,
+    obs,
+    obs,
+    hstate,
+    dones,
+    step_counts,
+    num_chunks=1,
+    inference=False,
+)
+
 print(train_out.shape)
 
 total_error = jnp.mean(jnp.abs(train_out - act_output))
