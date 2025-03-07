@@ -478,13 +478,13 @@ def learner_thread(
                 # Replace the timestep in the learner state with the latest timestep
                 # This means the learner has access to the entire trajectory as well as
                 # an additional timestep which it can use to bootstrap.
-                learner_state = learner_state._replace(timestep=timestep)
                 learner_state = learner_state._replace(
+                    timestep=timestep,
                     dones=timestep.last()
                     .repeat(config.system.num_agents)
-                    .reshape(config.arch.num_envs, -1)
+                    .reshape(config.arch.num_envs, -1),
+                    hstates=hstates,  # type: ignore
                 )
-                learner_state = learner_state._replace(hstates=hstates)  # type: ignore
 
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
