@@ -122,7 +122,7 @@ def rollout(
                 with RecordTimeTo(actor_timings["get_params_time"]):
                     params = params_source.get()  # Get the latest parameters from the learner
 
-                obs_tpu = tree.map(move_to_device, timestep.observation)
+                obs_tpu = move_to_device(timestep.observation)
 
                 # Get action and value
                 with RecordTimeTo(actor_timings["compute_action_time"]):
