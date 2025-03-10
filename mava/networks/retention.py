@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 from typing import Tuple
 
 import flax.linen as nn
@@ -38,17 +39,19 @@ def get_decay_matrix(dones: Array, n_agents: int, masked: bool, decay_kappa: flo
 
     # B, T, T
     timestep_mask = _get_decay_matrix_mask_timestep(timestep_dones)
-    decay_matrix = _get_default_decay_matrix(timestep_dones, decay_kappa)
-    decay_matrix *= timestep_mask
+    decay_matrix_timesteps = _get_default_decay_matrix(timestep_dones, decay_kappa)
+    decay_matrix_timesteps *= timestep_mask
 
     # B, T, T ->  B, T * N, T * N
-    decay_matrix = jnp.repeat(jnp.repeat(decay_matrix, n_agents, axis=1), n_agents, axis=2)
+    decay_matrix_broadcast_over_agents = jnp.repeat(
+        jnp.repeat(decay_matrix_timesteps, n_agents, axis=1), n_agents, axis=2
+    )
 
     # Apply a causal mask over agents if full self-retention is disabled
     # This converts it from a blocked decay matrix to a causal decay matrix
-    decay_matrix = _causal_mask(decay_matrix, masked)
+    decay_matrix_broadcast_over_agents = _causal_mask(decay_matrix_broadcast_over_agents, masked)
 
-    return decay_matrix
+    return decay_matrix_broadcast_over_agents, decay_matrix_timesteps
 
 
 def _causal_mask(matrix: Array, masked: bool) -> Array:
@@ -129,9 +132,10 @@ def get_xi(dones: Array, n_agents: int, decay_kappa: float) -> Array:
         xi = xi.at[:, i, :].set(xi_i)
 
     # Repeat the decay matrix 'xi' for all agents
-    xi = jnp.repeat(xi, n_agents, axis=1)
+    xi_timesteps = copy.deepcopy(xi)
+    xi_broadcast_over_agents = jnp.repeat(xi, n_agents, axis=1)
 
-    return xi
+    return xi_broadcast_over_agents, xi_timesteps
 
 
 def get_decay_matrices(
@@ -139,7 +143,7 @@ def get_decay_matrices(
     decay_kappas: Array,  # shape: (n_head,)
     n_agents: int,
     masked: bool,
-) -> Tuple[Array, Array, Array, Array]:
+) -> Tuple[Array, Array, Array, Array, Array, Array]:
     """
     Compute decay matrices, xi, and delta arrays for multi-head inputs with an added chunk
         dimension.
@@ -167,6 +171,8 @@ def get_decay_matrices(
     all_xis = []
     all_chunk_decays = []
     all_deltas = []
+    all_dm_times = []
+    all_xi_times = []
 
     for h in range(n_head):
         head_decay_kappa = decay_kappas[h]
@@ -174,6 +180,8 @@ def get_decay_matrices(
         head_xis = []
         head_chunk_decays = []
         head_deltas = []
+        _head_dm_times = []
+        _head_xi_times = []
         head_chunk_decay = jnp.exp(head_decay_kappa * T)
         for c in range(nc):
             chunk_dones = dones[:, c, :]
@@ -182,14 +190,18 @@ def get_decay_matrices(
             head_chunk_decays.append(head_chunk_decay)
 
             # Compute the decay matrix for this head and chunk.
-            dm = get_decay_matrix(
+            dm, dm_timesteps = get_decay_matrix(
                 chunk_dones, n_agents, masked, head_decay_kappa
             )  # shape: (B, C, C)
             head_decay_matrices.append(dm)
+            _head_dm_times.append(dm_timesteps)
 
             # Compute xi for this chunk.
-            xi_chunk = get_xi(chunk_dones, n_agents, head_decay_kappa)  # shape: (B, C, 1)
+            xi_chunk, xi_chunk_timesteps = get_xi(
+                chunk_dones, n_agents, head_decay_kappa
+            )  # shape: (B, C, 1)
             head_xis.append(xi_chunk)
+            _head_xi_times.append(xi_chunk_timesteps)
 
             # Compute delta for this chunk.
             delta_h = ~jnp.any(chunk_dones[:, ::n_agents], axis=1)[
@@ -202,19 +214,25 @@ def get_decay_matrices(
         head_xi_chunks = jnp.stack(head_xis, axis=1)  # (B, nC, C, 1)
         head_delta = jnp.stack(head_deltas, axis=1)  # (B, nC, 1, 1)
         head_chunk_decays = jnp.stack(head_chunk_decays, axis=0)  # (nC,)
+        head_xi_times = jnp.stack(_head_xi_times, axis=1)  # (B, nC, T, 1)
+        head_dm_times = jnp.stack(_head_dm_times, axis=1)  # (B, nC, T, T)
 
         all_decay_matrices.append(head_decay_chunks)
         all_xis.append(head_xi_chunks)
         all_chunk_decays.append(head_chunk_decays)
         all_deltas.append(head_delta)
+        all_xi_times.append(head_xi_times)
+        all_dm_times.append(head_dm_times)
 
     # Stack over head dimension:
     decay_matrix = jnp.stack(all_decay_matrices, axis=2)  # (B, nC, n_head, C, C)
     xi = jnp.stack(all_xis, axis=2)  # (B, nC, n_head, C, 1)
     chunk_decay = jnp.stack(all_chunk_decays, axis=1)  # (nC, n_head)
     delta = jnp.stack(all_deltas, axis=2)  # (B, nC, n_head, 1, 1)
+    decay_matrix_times = jnp.stack(all_dm_times, axis=2)  # (B, nC, n_head, T, T)
+    xi_times = jnp.stack(all_xi_times, axis=2)  # (B, nC, n_head, T, 1)
 
-    return decay_matrix, xi, chunk_decay, delta
+    return decay_matrix, xi, chunk_decay, delta, decay_matrix_times, xi_times
 
 
 def reshape_qkv(
@@ -322,8 +340,9 @@ class MultiScaleRetention(nn.Module):
         dones: Array,
         step_count: Array,
         num_chunks: int,
+        kv_scale: Array,
         inference: bool = False,
-    ) -> Tuple[Array, Array]:
+    ) -> Tuple[Array, Array, Array]:
         """Chunkwise (default) representation of the multi-scale retention mechanism"""
         B, C, _ = value.shape
 
@@ -342,14 +361,33 @@ class MultiScaleRetention(nn.Module):
 
         dones = reshape_dones(dones, num_chunks)
 
-        _decay_matrix, _xi, _chunk_decay, _delta = get_decay_matrices(
+        # we use the timestep ones for computing normalised decay matrix
+        _decay_matrix, _xi, _chunk_decay, _delta, _decay_matrix_timesteps, _ = get_decay_matrices(
             dones, self.decay_kappas, self.n_agents, self.masked
         )
 
+        _scale = jnp.sqrt(_decay_matrix_timesteps.sum(axis=-1, keepdims=True))
+        _scale = jnp.repeat(_scale, self.n_agents, axis=-2)
+        _normalised_decay_matrix = _decay_matrix / _scale
+
         qk_mat = q_proj @ k_proj
-        qk_mat = qk_mat * _decay_matrix
+        qk_mat = qk_mat * _normalised_decay_matrix
+
+        # Compute inner scale on timestep level
+        qk_mat_timesteps = qk_mat[:, :, :, :: self.n_agents, :: self.n_agents]
+        inner_scale = jnp.clip(jnp.abs(qk_mat_timesteps).sum(axis=-1, keepdims=True), min=1.0)
+        inner_scale = jnp.repeat(inner_scale, self.n_agents, axis=-2)
+        qk_mat = qk_mat / inner_scale
         inner_output = qk_mat @ v_proj
-        value_inner_decay = _decay_matrix[:, :, :, -1][..., jnp.newaxis]
+
+        value_decay_scale_factor = _decay_matrix_timesteps[:, :, :, -1].sum(axis=-1, keepdims=True)
+        value_inner_decay = (_decay_matrix[:, :, :, -1] / value_decay_scale_factor)[
+            ..., jnp.newaxis
+        ]
+
+        _xi_scale_factor = _decay_matrix_timesteps.sum(axis=-1, keepdims=True)
+        _xi_scale_factor = jnp.repeat(_xi_scale_factor, self.n_agents, axis=-2)
+        _xi = _xi / (_scale / _xi_scale_factor)
 
         kv = jax.lax.cond(
             inference,
@@ -358,9 +396,11 @@ class MultiScaleRetention(nn.Module):
         )
 
         kv_recurrent = []
+        cross_scale = []
 
         for chunk in range(num_chunks):
-            kv_recurrent.append(hstate)
+            kv_recurrent.append(hstate / kv_scale)
+            cross_scale.append(kv_scale)
             hstate = jax.lax.cond(
                 inference,
                 lambda hstate=hstate, chunk=chunk: hstate + kv[:, chunk],
@@ -369,15 +409,24 @@ class MultiScaleRetention(nn.Module):
                 * _delta[:, chunk]
                 + kv[:, chunk],
             )
+            kv_scale = jnp.clip(
+                jnp.abs(hstate).sum(axis=-2, keepdims=True).max(axis=-1, keepdims=True), min=1.0
+            )
 
         kv_recurrent = jnp.stack(kv_recurrent, axis=1)
+        cross_scale = jnp.stack(cross_scale, axis=1)
+
+        all_scale = jnp.maximum(inner_scale, cross_scale)
+        align_inner_scale = inner_scale / all_scale
+        align_cross_scale = cross_scale / all_scale
+
         cross_output = jax.lax.cond(
             inference,
             lambda: q_proj @ kv_recurrent,
             lambda: (q_proj * _xi) @ kv_recurrent,
         )
 
-        ret_output = cross_output + inner_output
+        ret_output = cross_output / align_cross_scale + inner_output / align_inner_scale
 
         # Join chunks
         ret_output = rearrange(ret_output, "B nC nh Cs hs -> B nh (nC Cs) hs", nh=self.n_head)
@@ -390,7 +439,7 @@ class MultiScaleRetention(nn.Module):
 
         x = key
         output = (jax.nn.swish(x @ self.w_g) * ret_output) @ self.w_o
-        return output, hstate
+        return output, hstate, kv_scale
 
     def recurrent(
         self, key_n: Array, query_n: Array, value_n: Array, hstate: Array, step_count: Array
