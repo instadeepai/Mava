@@ -1,0 +1,11 @@
+defaults:
+  - logger: logger
+  - arch: sebulba
+  - system: ppo/rec_ippo
+  - network: rnn  # [mlp, continuous_mlp, cnn]
+  - env: rware_gym  # [rware_gym, lbf_gym, smaclite_gym]
+  - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs
