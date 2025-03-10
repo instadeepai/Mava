@@ -442,7 +442,13 @@ class MultiScaleRetention(nn.Module):
         return output, hstate, kv_scale
 
     def recurrent(
-        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array, step_count: Array
+        self,
+        key_n: Array,
+        query_n: Array,
+        value_n: Array,
+        hstate: Array,
+        step_count: Array,
+        kv_scale: Array,
     ) -> Tuple[Array, Array]:
         """Recurrent representation of the multi-scale retention mechanism"""
 
@@ -465,7 +471,7 @@ class MultiScaleRetention(nn.Module):
         k_proj = k_proj.transpose(0, 1, 3, 2)
 
         kv = k_proj @ v_proj
-        updated_hstate = hstate + kv
+        updated_hstate = hstate + kv / jnp.sqrt(kv_scale)
         ret_output = q_proj @ updated_hstate
 
         # Rejoin heads

@@ -78,6 +78,8 @@ step_counts = jnp.arange(num_time_steps)
 step_counts = step_counts[None, ...].repeat(bsz, axis=0)[..., None].repeat(num_agents, axis=-1)
 step_counts = step_counts.reshape(bsz, seq_len)
 
+init_scale = jnp.ones((bsz, retnet_num_heads, 1, 1))
+
 key, init_key = jax.random.split(key)
 msr_enc_params = msr_enc.init(
     init_key,
@@ -88,9 +90,11 @@ msr_enc_params = msr_enc.init(
     dones,
     step_counts,
     num_chunks=num_chunks,
+    kv_scale=init_scale,
 )
 
 hstate = copy.deepcopy(init_hstate)
+scale = copy.deepcopy(init_scale)
 act_output = []
 
 # for the decoder we use the chunkwise
@@ -101,7 +105,7 @@ for step in range(num_time_steps):
     dones_i = dones[:, step * num_agents : (step + 1) * num_agents]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
 
-    out, hstate = msr_enc.apply(
+    out, hstate, scale = msr_enc.apply(
         msr_enc_params,
         obs_i,
         obs_i,
@@ -110,6 +114,7 @@ for step in range(num_time_steps):
         dones_i,
         step_counts_i,
         num_chunks=num_chunks,
+        kv_scale=scale,
         inference=True,
     )
     act_output.append(out)
@@ -120,7 +125,8 @@ act_output = jnp.concatenate(act_output, axis=1)
 print(act_output.shape)
 
 hstate = copy.deepcopy(init_hstate)
-train_out, _ = msr_enc.apply(
+scale = copy.deepcopy(init_scale)
+train_out, _, _ = msr_enc.apply(
     msr_enc_params,
     obs,
     obs,
@@ -129,6 +135,7 @@ train_out, _ = msr_enc.apply(
     dones,
     step_counts,
     num_chunks=1,
+    kv_scale=scale,
     inference=False,
 )
 print(train_out.shape)
@@ -158,9 +165,11 @@ msr_dec_params = msr_dec.init(
     dones,
     step_counts,
     num_chunks=num_chunks,
+    kv_scale=init_scale,
 )
 
 hstate = copy.deepcopy(init_hstate)
+scale = copy.deepcopy(init_scale)
 act_output = []
 
 # for the decoder we use the recurrent form at inference
@@ -168,12 +177,14 @@ for step in range(num_time_steps):
     obs_i = obs[:, step * num_agents : (step + 1) * num_agents, ...]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
 
-    hstate = hstate * jnp.exp(decay_kappas)
+    new_scale = scale * jnp.exp(decay_kappas) + 1.0
+    hstate_scale_factor = jnp.sqrt(scale) * jnp.exp(decay_kappas) / jnp.sqrt(new_scale)
+    hstate = hstate * hstate_scale_factor
+    scale = new_scale
     reset_done = dones[:, step * num_agents, None, None, None]
     hstate = jax.tree.map(
         lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
     )
-
     timestep_outputs = []
     for agent in range(num_agents):
         obs_i_agent = obs_i[:, agent : agent + 1, ...]
@@ -186,6 +197,7 @@ for step in range(num_time_steps):
             obs_i_agent,
             hstate,
             step_counts_i_agent,
+            kv_scale=scale,
             method="recurrent",
         )
         timestep_outputs.append(out)
@@ -199,7 +211,8 @@ act_output = jnp.concatenate(act_output, axis=1)
 print(act_output.shape)
 
 hstate = copy.deepcopy(init_hstate)
-train_out, _ = msr_dec.apply(
+scale = copy.deepcopy(init_scale)
+train_out, _, _ = msr_dec.apply(
     msr_dec_params,
     obs,
     obs,
@@ -207,7 +220,8 @@ train_out, _ = msr_dec.apply(
     hstate,
     dones,
     step_counts,
-    num_chunks=1,
+    num_chunks=num_chunks,
+    kv_scale=scale,
     inference=False,
 )
 print(train_out.shape)
@@ -225,6 +239,7 @@ dones = jnp.repeat(  # dones are the same per agent so repeat them
 
 print("Encoder:")
 hstate = copy.deepcopy(init_hstate)
+scale = copy.deepcopy(init_scale)
 
 act_output = []
 for step in range(num_time_steps):
@@ -233,11 +248,14 @@ for step in range(num_time_steps):
     hstate = jax.tree.map(
         lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
     )
+    scale = jax.tree.map(
+        lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.ones_like(x), x), scale
+    )
     obs_i = obs[:, step * num_agents : (step + 1) * num_agents, ...]
     dones_i = dones[:, step : step + 1]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
 
-    out, hstate = msr_enc.apply(
+    out, hstate, scale = msr_enc.apply(
         msr_enc_params,
         obs_i,
         obs_i,
@@ -246,6 +264,7 @@ for step in range(num_time_steps):
         dones_i,
         step_counts_i,
         num_chunks=num_chunks,
+        kv_scale=scale,
         inference=True,
     )
     act_output.append(out)
@@ -254,7 +273,8 @@ act_output = jnp.concatenate(act_output, axis=1)
 print(act_output.shape)
 
 hstate = copy.deepcopy(init_hstate)
-train_out, _ = msr_enc.apply(
+scale = copy.deepcopy(init_scale)
+train_out, _, _ = msr_enc.apply(
     msr_enc_params,
     obs,
     obs,
@@ -263,6 +283,7 @@ train_out, _ = msr_enc.apply(
     dones,
     step_counts,
     num_chunks=1,
+    kv_scale=scale,
     inference=False,
 )
 print(train_out.shape)
@@ -278,10 +299,16 @@ for step in range(num_time_steps):
     obs_i = obs[:, step * num_agents : (step + 1) * num_agents, ...]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
 
-    hstate = hstate * jnp.exp(decay_kappas)
+    new_scale = scale * jnp.exp(decay_kappas) + 1.0
+    hstate_scale_factor = jnp.sqrt(scale) * jnp.exp(decay_kappas) / jnp.sqrt(new_scale)
+    hstate = hstate * hstate_scale_factor
+    scale = new_scale
     reset_done = dones[:, step * num_agents, None, None, None]
     hstate = jax.tree.map(
         lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
+    )
+    scale = jax.tree.map(
+        lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.ones_like(x), x), scale
     )
 
     timestep_outputs = []
@@ -296,6 +323,7 @@ for step in range(num_time_steps):
             obs_i_agent,
             hstate,
             step_counts_i_agent,
+            kv_scale=scale,
             method="recurrent",
         )
         timestep_outputs.append(out)
@@ -307,7 +335,8 @@ act_output = jnp.concatenate(act_output, axis=1)
 print(act_output.shape)
 
 hstate = copy.deepcopy(init_hstate)
-train_out, _ = msr_dec.apply(
+scale = copy.deepcopy(init_scale)
+train_out, _, _ = msr_dec.apply(
     msr_dec_params,
     obs,
     obs,
@@ -316,6 +345,7 @@ train_out, _ = msr_dec.apply(
     dones,
     step_counts,
     num_chunks=1,
+    kv_scale=scale,
     inference=False,
 )
 
