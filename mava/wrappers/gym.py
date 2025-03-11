@@ -29,7 +29,7 @@ from gymnasium.spaces.utils import is_space_dtype_shape_equiv
 from gymnasium.vector.utils import write_to_shared_memory
 from numpy.typing import NDArray
 
-from mava.types import Observation, ObservationGlobalState
+from mava.types import MavaObservation, Observation, ObservationGlobalState
 
 if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
     from dataclasses import dataclass
@@ -54,7 +54,7 @@ class TimeStep:
     step_type: StepType
     reward: NDArray
     discount: NDArray
-    observation: Union[Observation, ObservationGlobalState]
+    observation: MavaObservation
     extras: Dict = field(default_factory=dict)
 
     def first(self) -> NDArray:
@@ -78,12 +78,13 @@ class UoeWrapper(gymnasium.Wrapper):
         use_shared_rewards: bool = True,
         add_global_state: bool = False,
     ):
-        """Initialise the gym wrapper
+        """Initialize the gym wrapper
         Args:
             env (gymnasium.env): gymnasium env instance.
             use_shared_rewards (bool, optional): Use individual or shared rewards.
             Defaults to False.
-            add_global_state (bool, optional) : Create global observations. Defaults to False.
+            add_global_state (bool, optional) : Add global state information
+            to observations.
         """
         super().__init__(env)
         self._env = env
@@ -141,7 +142,7 @@ class UoeWrapper(gymnasium.Wrapper):
 
 
 class SmacWrapper(UoeWrapper):
-    """A wrapper that converts actions step to integers."""
+    """A wrapper that converts actions to integers."""
 
     def reset(
         self, seed: Optional[int] = None, options: Optional[dict] = None
@@ -251,18 +252,18 @@ class GymToJumanji:
         self.env = env
         self.single_action_space = env.unwrapped.single_action_space
         self.single_observation_space = env.unwrapped.single_observation_space
+        self.num_agents = len(self.env.single_action_space)
 
     def reset(self, seed: Optional[list[int]] = None, options: Optional[dict] = None) -> TimeStep:
         obs, info = self.env.reset(seed=seed, options=options)  # type: ignore
 
-        num_agents = len(self.env.single_action_space)  # type: ignore
         num_envs = self.env.num_envs
 
         step_type = np.full(num_envs, StepType.FIRST)
-        rewards = np.zeros((num_envs, num_agents), dtype=float)
-        teminated = np.zeros(num_envs, dtype=float)
+        rewards = np.zeros((num_envs, self.num_agents), dtype=float)
+        terminated = np.zeros((num_envs, self.num_agents), dtype=float)
 
-        timestep = self._create_timestep(obs, step_type, teminated, rewards, info)
+        timestep = self._create_timestep(obs, step_type, terminated, rewards, info)
 
         return timestep
 
@@ -271,21 +272,27 @@ class GymToJumanji:
 
         ep_done = np.logical_or(terminated, truncated)
         step_type = np.where(ep_done, StepType.LAST, StepType.MID)
+        terminated = np.repeat(
+            terminated[..., np.newaxis], repeats=self.num_agents, axis=-1
+        )  # (B,) --> (B, N)
 
         timestep = self._create_timestep(obs, step_type, terminated, rewards, info)
 
         return timestep
 
     def _format_observation(
-        self, obs: NDArray, info: Dict
+        self,
+        obs: NDArray,
+        action_mask: Tuple[NDArray],
+        global_obs: Tuple[Union[NDArray, None]] = (None,),
     ) -> Union[Observation, ObservationGlobalState]:
         """Create an observation from the raw observation and environment state."""
 
-        action_mask = np.stack(info["action_mask"])
+        action_mask = np.stack(action_mask)
         obs_data = {"agents_view": obs, "action_mask": action_mask}
 
-        if "global_obs" in info:
-            global_obs = np.array(info["global_obs"])
+        if global_obs[0] is not None:
+            global_obs = np.array(global_obs)
             obs_data["global_state"] = global_obs
             return ObservationGlobalState(**obs_data)
         else:
@@ -294,17 +301,23 @@ class GymToJumanji:
     def _create_timestep(
         self, obs: NDArray, step_type: NDArray, terminated: NDArray, rewards: NDArray, info: Dict
     ) -> TimeStep:
-        observation = self._format_observation(obs, info)
+        observation = self._format_observation(
+            obs, info["action_mask"], info.get("global_obs", (None,))
+        )
         # Filter out the masks and auxiliary data
         extras = {}
         extras["episode_metrics"] = {
             key: value for key, value in info["metrics"].items() if key[0] != "_"
         }
+        extras["real_next_obs"] = self._format_observation(  # type: ignore
+            info["real_next_obs"], info["real_next_action_mask"], info["real_next_global_obs"]
+        )
+
         if "won_episode" in info:
             extras["won_episode"] = info["won_episode"]
 
         return TimeStep(
-            step_type=step_type,  # type: ignore
+            step_type=step_type,
             reward=rewards,
             discount=1.0 - terminated,
             observation=observation,
@@ -315,7 +328,7 @@ class GymToJumanji:
         self.env.close()
 
 
-# Copied form Gymnasium/blob/main/gymnasium/vector/async_vector_env.py
+# Copied from Gymnasium/blob/main/gymnasium/vector/async_vector_env.py
 # Modified to work with multiple agents
 # Note: The worker handles auto-resetting the environments.
 # Each environment resets when all of its agents have either terminated or been truncated.
@@ -338,13 +351,16 @@ def async_multiagent_worker(  # CCR001
 
             if command == "reset":
                 observation, info = env.reset(**data)
+                info["real_next_obs"] = observation
+                info["real_next_action_mask"] = info["action_mask"]
+                info["real_next_global_obs"] = info.get("global_obs", None)
                 if shared_memory:
                     write_to_shared_memory(observation_space, index, observation, shared_memory)
                     observation = None
                 pipe.send(((observation, info), True))
             elif command == "step":
                 # Modified the step function to align with 'AutoResetWrapper'.
-                # The environment resets immediately upon termination or truncation.
+                # The environment resets when all agents have either terminated or truncated.
                 (
                     observation,
                     reward,
@@ -352,9 +368,13 @@ def async_multiagent_worker(  # CCR001
                     truncated,
                     info,
                 ) = env.step(data)
+                info["real_next_obs"] = observation
+                info["real_next_action_mask"] = info["action_mask"]
+                info["real_next_global_obs"] = info.get("global_obs", None)
                 if np.logical_or(terminated, truncated).all():
                     observation, new_info = env.reset()
                     info["action_mask"] = new_info["action_mask"]
+                    info["global_obs"] = new_info.get("global_obs", None)
 
                 if shared_memory:
                     write_to_shared_memory(observation_space, index, observation, shared_memory)

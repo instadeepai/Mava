@@ -18,7 +18,7 @@ from colorama import Fore, Style
 from omegaconf import DictConfig
 
 
-def check_sebulba_config(config: DictConfig) -> None:
+def base_sebulba_checks(config: DictConfig) -> None:
     """Checks that the given config does not have conflicting values."""
     assert (
         config.system.num_updates > config.arch.num_evaluation
@@ -29,6 +29,10 @@ def check_sebulba_config(config: DictConfig) -> None:
         "Number of environments must be divisible by the number of learner."
         + "The output of each actor is equally split across the learners."
     )
+
+
+def ppo_sebulba_checks(config: DictConfig) -> None:
+    base_sebulba_checks(config)
 
     num_eval_samples = (
         int(config.arch.num_envs / len(config.arch.learner_device_ids))
