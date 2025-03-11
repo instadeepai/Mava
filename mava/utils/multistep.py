@@ -19,10 +19,11 @@ import jax
 import jax.numpy as jnp
 
 from mava.systems.ppo.types import PPOTransition, RNNPPOTransition
+from mava.systems.sable.types import Transition
 
 
 def calculate_gae(
-    traj_batch: Union[PPOTransition, RNNPPOTransition],
+    traj_batch: Union[PPOTransition, RNNPPOTransition, Transition],
     last_val: chex.Array,
     last_done: chex.Array,
     gamma: float,

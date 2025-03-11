@@ -55,6 +55,7 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_sebulba_config, check_total_timesteps
 from mava.utils.jax_utils import merge_leading_dims, switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
 from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
 from mava.utils.training import make_learning_rate
@@ -133,19 +134,10 @@ def rollout(
                 with RecordTimeTo(actor_timings["env_step_time"]):
                     timestep = env.step(cpu_action)
 
+                # Append data to storage
+                traj.append(Transition(dones, action, value, timestep.reward, log_prob, obs_tpu))
                 dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
-                # Append data to storage
-                traj.append(
-                    Transition(
-                        dones,
-                        action,
-                        value,
-                        timestep.reward,
-                        log_prob,
-                        obs_tpu,
-                    )
-                )
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
         # send trajectories to learner
@@ -187,46 +179,21 @@ def get_learner_step_fn(
             traj_batch (PPOTransition): the batch of data to learn with.
         """
 
-        def _calculate_gae(
-            traj_batch: Transition,
-            current_val: chex.Array,
-        ) -> Tuple[chex.Array, chex.Array]:
-            """Calculate the GAE."""
-
-            def _get_advantages(
-                carry: Tuple[chex.Array, chex.Array], transition: Transition
-            ) -> Tuple[Tuple[chex.Array, chex.Array], chex.Array]:
-                """Calculate the GAE for a single transition."""
-                gae, next_value = carry
-                done, value, reward = (
-                    transition.done,
-                    transition.value,
-                    transition.reward,
-                )
-                gamma = config.system.gamma
-                delta = reward + gamma * next_value * (1 - done) - value
-                gae = delta + gamma * config.system.gae_lambda * (1 - done) * gae
-                return (gae, value), gae
-
-            _, advantages = jax.lax.scan(
-                _get_advantages,
-                (jnp.zeros_like(current_val), current_val),
-                traj_batch,
-                reverse=True,
-                unroll=16,
-            )
-            return advantages, advantages + traj_batch.value
-
         # Calculate advantage
         params, opt_states, key, _, final_timestep = learner_state
         key = jnp.squeeze(key, axis=0)
-        _, _, current_val, _ = sable_action_select_fn(  # type: ignore
+        _, _, last_val, _ = sable_action_select_fn(  # type: ignore
             params,
             observation=final_timestep.observation,
             key=key,
             hstates=get_init_hidden_state(config.network.net_config, num_learner_envs),
         )
-        advantages, targets = _calculate_gae(traj_batch, current_val)
+        last_done = jnp.repeat(final_timestep.last(), config.system.num_agents).reshape(
+            num_learner_envs, -1
+        )
+        advantages, targets = calculate_gae(
+            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+        )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
@@ -498,12 +465,11 @@ def learner_setup(
     opt_state = optim.init(params)
 
     # Pack apply and update functions.
-    apply_fns = (
-        partial(
-            sable_network.apply, method="get_actions"
-        ),  # Execution function required for the advantage calculation
-        partial(sable_network.apply),  # Training function
-    )
+    net_act_fn = partial(
+        sable_network.apply, method="get_actions"
+    )  # Required for the advantage calculation
+    net_learn_fn = partial(sable_network.apply)  # Training function
+    apply_fns = (net_act_fn, net_learn_fn)
 
     # defines how the learner state is sharded: params, opt and key = sharded, timestep = sharded
     learn_state_spec = LearnerState(model_spec, model_spec, data_spec, None, data_spec)
@@ -539,7 +505,7 @@ def learner_setup(
     init_learner_state = LearnerState(params, opt_state, step_keys, None, None)  # type: ignore
     env.close()
 
-    return learn, apply_fns[0], init_learner_state, learner_sharding  # type: ignore
+    return learn, net_act_fn, init_learner_state, learner_sharding  # type: ignore
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -611,7 +577,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Executor setup and launch.
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
-    # the rollout queue/ the pipe between actor and learner
+    # The rollout queue/ the pipe between actor and learner
     pipe_lifetime = ThreadLifetime()
     pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding, pipe_lifetime)
     pipe.start()
