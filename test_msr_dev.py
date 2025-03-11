@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import copy
+from functools import partial
 
 import jax
 import jax.numpy as jnp
@@ -22,20 +23,20 @@ from mava.networks.retention import MultiScaleRetention
 
 # jax.config.update("jax_enable_x64", True)
 
-bsz = 16
+bsz = 64
 num_agents = 4
 obs_dim = 11
-num_time_steps = 10
+num_time_steps = 128
 seq_len = num_agents * num_time_steps
 
-retnet_embed_dim = 32
+retnet_embed_dim = 128
 retnet_num_heads = 2
 num_chunks = 1
 
 memory_config = DictConfig(
     {
         "type": "rec_sable",
-        "decay_scaling_factor": 0.3,
+        "decay_scaling_factor": 1.0,
         "timestep_positional_encoding": True,
         "timestep_chunk_size": None,
     }
@@ -81,17 +82,18 @@ step_counts = step_counts.reshape(bsz, seq_len)
 init_scale = jnp.ones((bsz, retnet_num_heads, 1, 1))
 
 key, init_key = jax.random.split(key)
+
 msr_enc_params = msr_enc.init(
     init_key,
-    obs,
-    obs,
-    obs,
-    init_hstate,
-    dones,
-    step_counts,
-    num_chunks=num_chunks,
-    kv_scale=init_scale,
+    obs[0:1, 0:1, ...],
+    obs[0:1, 0:1, ...],
+    obs[0:1, 0:1, ...],
+    init_hstate[0:1, ...],
+    step_counts[0:1, 0:1],
+    init_scale[0:1, ...],
+    method="recurrent",
 )
+enc_jit_apply = partial(jax.jit(msr_enc.apply, static_argnames="num_chunks"))
 
 hstate = copy.deepcopy(init_hstate)
 scale = copy.deepcopy(init_scale)
@@ -105,7 +107,7 @@ for step in range(num_time_steps):
     dones_i = dones[:, step * num_agents : (step + 1) * num_agents]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
 
-    out, hstate, scale = msr_enc.apply(
+    out, hstate, scale = enc_jit_apply(
         msr_enc_params,
         obs_i,
         obs_i,
@@ -126,7 +128,7 @@ print(act_output.shape)
 
 hstate = copy.deepcopy(init_hstate)
 scale = copy.deepcopy(init_scale)
-train_out, _, _ = msr_enc.apply(
+train_out, _, _ = enc_jit_apply(
     msr_enc_params,
     obs,
     obs,
@@ -134,7 +136,7 @@ train_out, _, _ = msr_enc.apply(
     hstate,
     dones,
     step_counts,
-    num_chunks=1,
+    num_chunks=num_chunks,
     kv_scale=scale,
     inference=False,
 )
@@ -158,15 +160,16 @@ msr_dec = MultiScaleRetention(
 
 msr_dec_params = msr_dec.init(
     init_key,
-    obs,
-    obs,
-    obs,
-    init_hstate,
-    dones,
-    step_counts,
-    num_chunks=num_chunks,
-    kv_scale=init_scale,
+    obs[0:1, 0:1, ...],
+    obs[0:1, 0:1, ...],
+    obs[0:1, 0:1, ...],
+    init_hstate[0:1, ...],
+    step_counts[0:1, 0:1],
+    init_scale[0:1, ...],
+    method="recurrent",
 )
+dec_jit_apply = partial(jax.jit(msr_dec.apply, static_argnames="num_chunks"))
+dec_jit_inf = jax.jit(partial(msr_dec.apply, method="recurrent"))
 
 hstate = copy.deepcopy(init_hstate)
 scale = copy.deepcopy(init_scale)
@@ -190,7 +193,7 @@ for step in range(num_time_steps):
         obs_i_agent = obs_i[:, agent : agent + 1, ...]
         step_counts_i_agent = step_counts_i[:, agent : agent + 1, ...]
 
-        out, hstate = msr_dec.apply(
+        out, hstate = dec_jit_inf(
             msr_dec_params,
             obs_i_agent,
             obs_i_agent,
@@ -198,7 +201,6 @@ for step in range(num_time_steps):
             hstate,
             step_counts_i_agent,
             kv_scale=scale,
-            method="recurrent",
         )
         timestep_outputs.append(out)
 
@@ -212,7 +214,7 @@ print(act_output.shape)
 
 hstate = copy.deepcopy(init_hstate)
 scale = copy.deepcopy(init_scale)
-train_out, _, _ = msr_dec.apply(
+train_out, _, _ = dec_jit_apply(
     msr_dec_params,
     obs,
     obs,
@@ -255,7 +257,7 @@ for step in range(num_time_steps):
     dones_i = dones[:, step : step + 1]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
 
-    out, hstate, scale = msr_enc.apply(
+    out, hstate, _ = enc_jit_apply(
         msr_enc_params,
         obs_i,
         obs_i,
@@ -274,7 +276,7 @@ print(act_output.shape)
 
 hstate = copy.deepcopy(init_hstate)
 scale = copy.deepcopy(init_scale)
-train_out, _, _ = msr_enc.apply(
+train_out, _, _ = enc_jit_apply(
     msr_enc_params,
     obs,
     obs,
@@ -316,7 +318,7 @@ for step in range(num_time_steps):
         obs_i_agent = obs_i[:, agent : agent + 1, ...]
         step_counts_i_agent = step_counts_i[:, agent : agent + 1, ...]
 
-        out, hstate = msr_dec.apply(
+        out, hstate = dec_jit_inf(
             msr_dec_params,
             obs_i_agent,
             obs_i_agent,
@@ -324,7 +326,6 @@ for step in range(num_time_steps):
             hstate,
             step_counts_i_agent,
             kv_scale=scale,
-            method="recurrent",
         )
         timestep_outputs.append(out)
 
@@ -336,7 +337,7 @@ print(act_output.shape)
 
 hstate = copy.deepcopy(init_hstate)
 scale = copy.deepcopy(init_scale)
-train_out, _, _ = msr_dec.apply(
+train_out, _, _ = dec_jit_apply(
     msr_dec_params,
     obs,
     obs,
@@ -344,7 +345,7 @@ train_out, _, _ = msr_dec.apply(
     hstate,
     dones,
     step_counts,
-    num_chunks=1,
+    num_chunks=num_chunks,
     kv_scale=scale,
     inference=False,
 )
