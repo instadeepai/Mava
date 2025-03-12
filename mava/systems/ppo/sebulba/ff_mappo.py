@@ -137,16 +137,7 @@ def rollout(
                     timestep = env.step(cpu_action)
 
                 # Append data to storage
-                traj.append(
-                    PPOTransition(
-                        dones,
-                        action,
-                        value,
-                        timestep.reward,
-                        log_prob,
-                        obs_tpu
-                    )
-                )
+                traj.append(PPOTransition(dones, action, value, timestep.reward, log_prob, obs_tpu))
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
                 dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
