@@ -20,7 +20,6 @@ from datetime import datetime
 from enum import Enum
 from os import PathLike
 from typing import ClassVar, Dict, List, Union
-from unittest.mock import Base
 
 import hydra
 import jax
@@ -32,8 +31,9 @@ from jax import tree
 from jax.typing import ArrayLike
 from marl_eval.json_tools import JsonLogger as MarlEvalJsonLogger
 from neptune.utils import stringify_unsupported
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from pandas.io.json._normalize import _simple_json_normalize as flatten_dict
+from rich.pretty import pprint
 from tensorboard_logger import configure, log_value
 
 
@@ -55,6 +55,16 @@ class MavaLogger:
     def __init__(self, config: DictConfig) -> None:
         self.logger: BaseLogger = _make_multi_logger(config)
         self.cfg = config
+
+    def log_config(self, config: Dict | None = None) -> None:
+        """Log configuration dictionary.
+
+        Args:
+        ----
+            config: Configuration to log. If None, uses the config provided during initialization.
+        """
+        cfg = config if config is not None else OmegaConf.to_container(self.cfg, resolve=True)
+        self.logger.log_config(cfg)  # type: ignore
 
     def log(self, metrics: Dict, t: int, t_eval: int, event: LogEvent) -> None:
         """Log a dictionary metrics at a given timestep.
@@ -122,6 +132,16 @@ class BaseLogger(abc.ABC):
         """Log a single metric."""
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def log_config(self, config: Dict) -> None:
+        """Log configuration dictionary.
+
+        Args:
+        ----
+            config: Configuration dictionary to log.
+        """
+        raise NotImplementedError
+
     def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
         """Log a dictionary of metrics."""
         # in case the dict is nested, flatten it.
@@ -129,8 +149,6 @@ class BaseLogger(abc.ABC):
 
         for key, value in data.items():
             self.log_stat(key, value, step, eval_step, event)
-
-    # TODO: log_config(self, config) - impl for console and neptune...maybe json?
 
     def stop(self) -> None:
         """Stop the logger."""
@@ -145,6 +163,10 @@ class MultiLogger(BaseLogger):
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         for logger in self.loggers:
             logger.log_stat(key, value, step, eval_step, event)
+
+    def log_config(self, config: Dict) -> None:
+        for logger in self.loggers:
+            logger.log_config(config)
 
     def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
         for logger in self.loggers:
@@ -185,9 +207,8 @@ class NeptuneLogger(BaseLogger):
         # async logging leads to deadlocks in sebulba
         mode = "async" if architecture_name == "anakin" else "sync"
 
-        self.logger = neptune.init_run(project=project, tags=tag, mode="offline")
+        self.logger = neptune.init_run(project=project, tags=tag, mode=mode)
 
-        # self.logger["config"] = stringify_unsupported(cfg)
         self.detailed_logging = detailed_logging
         self.upload_json_data = upload_json_data
 
@@ -206,6 +227,9 @@ class NeptuneLogger(BaseLogger):
 
         value = value.item() if isinstance(value, (jax.Array, np.ndarray)) else value
         self.logger[f"{event.value}/{key}"].log(value, step=step)
+
+    def log_config(self, config: Dict) -> None:
+        self.logger["config"] = stringify_unsupported(config)
 
     def stop(self) -> None:
         if self.upload_json_data:
@@ -242,6 +266,8 @@ class TensorboardLogger(BaseLogger):
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         t = step if event != LogEvent.EVAL else eval_step
         self.log(f"{event.value}/{key}", value, t)
+
+    def log_config(self, config: Dict) -> None: ...
 
 
 class JsonLogger(BaseLogger):
@@ -302,6 +328,8 @@ class JsonLogger(BaseLogger):
         if event == LogEvent.ABSOLUTE or event == LogEvent.EVAL:
             self.logger.write(step, key, value, eval_step, event == LogEvent.ABSOLUTE)
 
+    def log_config(self, config: Dict) -> None: ...
+
 
 class ConsoleLogger(BaseLogger):
     _EVENT_COLOURS: ClassVar[Dict[LogEvent, str]] = {
@@ -359,6 +387,11 @@ class ConsoleLogger(BaseLogger):
         self.logger.info(
             f"{colour}{Style.BRIGHT}{event.value.upper()} - {log_str}{Style.RESET_ALL}"
         )
+
+    def log_config(self, config: Dict) -> None:
+        colour = self._EVENT_COLOURS[LogEvent.MISC]
+        self.logger.info(f"{colour}{Style.BRIGHT}CONFIG{Style.RESET_ALL}")
+        pprint(config)
 
 
 def _make_multi_logger(cfg: DictConfig) -> MultiLogger:

@@ -174,3 +174,4 @@ results/
 outputs/
 multirun/
 .neptune
+.aider*
