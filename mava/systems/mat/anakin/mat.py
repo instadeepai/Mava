@@ -15,7 +15,7 @@
 import copy
 import time
 from functools import partial
-from typing import Any, Dict, Tuple
+from typing import Any, Tuple
 
 import chex
 import flax
@@ -27,7 +27,6 @@ from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from jax import tree
 from omegaconf import DictConfig, OmegaConf
-from rich.pretty import pprint
 
 from mava.evaluator import ActorState, get_eval_fn
 from mava.networks.mat_network import MultiAgentTransformer
@@ -467,9 +466,7 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Logger setup
     logger = MavaLogger(config)
-    cfg: Dict = OmegaConf.to_container(config, resolve=True)
-    cfg["arch"]["devices"] = jax.devices()
-    pprint(cfg)
+    logger.log_config(OmegaConf.to_container(config, resolve=True))
 
     # Set up checkpointer
     save_checkpoint = config.logger.checkpointing.save_model

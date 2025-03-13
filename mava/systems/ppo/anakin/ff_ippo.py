@@ -14,7 +14,7 @@
 
 import copy
 import time
-from typing import Any, Dict, Tuple
+from typing import Any, Tuple
 
 import chex
 import flax
@@ -446,9 +446,7 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Logger setup
     logger = MavaLogger(config)
-    cfg: Dict[str, Any] = OmegaConf.to_container(config, resolve=True)
-    cfg["arch"]["devices"] = jax.devices()
-    logger.log_config(cfg)
+    logger.log_config(OmegaConf.to_container(config, resolve=True))
 
     # Set up checkpointer
     save_checkpoint = config.logger.checkpointing.save_model
