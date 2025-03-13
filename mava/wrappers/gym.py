@@ -289,12 +289,13 @@ class GymToJumanji:
         self,
         obs: NDArray,
         action_mask: Tuple[NDArray],
+        step_count : NDArray,
         global_obs: Tuple[Union[NDArray, None]] = (None,),
     ) -> Union[Observation, ObservationGlobalState]:
         """Create an observation from the raw observation and environment state."""
         
         action_mask = np.stack(action_mask)
-        step_count = np.stack(info["step_count"])[:, np.newaxis]
+        step_count = np.stack(step_count)[:, np.newaxis]
 
         obs_data = {"agents_view": obs, "action_mask": action_mask, "step_count": step_count}
 
@@ -309,7 +310,7 @@ class GymToJumanji:
         self, obs: NDArray, step_type: NDArray, terminated: NDArray, rewards: NDArray, info: Dict
     ) -> TimeStep:
         observation = self._format_observation(
-            obs, info["action_mask"], info.get("global_obs", (None,))
+            obs, info["action_mask"], info["step_count"],  info.get("global_obs", (None,))
         )
         # Filter out the masks and auxiliary data
         extras = {}
@@ -317,7 +318,7 @@ class GymToJumanji:
             key: value for key, value in info["metrics"].items() if key[0] != "_"
         }
         extras["real_next_obs"] = self._format_observation(  # type: ignore
-            info["real_next_obs"], info["real_next_action_mask"], info["real_next_global_obs"]
+            info["real_next_obs"], info["real_next_action_mask"], info["step_count"], info["real_next_global_obs"]
         )
 
         if "won_episode" in info:
