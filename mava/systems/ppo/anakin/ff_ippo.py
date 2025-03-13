@@ -96,7 +96,8 @@ def get_learner_fn(
                 last_done, action, value, timestep.reward, log_prob, last_timestep.observation
             )
             learner_state = LearnerState(params, opt_states, key, env_state, timestep, done)
-            return learner_state, (transition, timestep.extras["episode_metrics"])
+            metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
+            return learner_state, (transition, metrics)
 
         # Step environment for rollout length
         learner_state, (traj_batch, episode_metrics) = jax.lax.scan(

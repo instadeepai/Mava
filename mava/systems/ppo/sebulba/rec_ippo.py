@@ -179,7 +179,8 @@ def rollout(
                     )
                 )
                 last_hstates = hstates
-                episode_metrics.append(timestep.extras["episode_metrics"])
+                metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
+                episode_metrics.append(metrics)
 
         # Send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):

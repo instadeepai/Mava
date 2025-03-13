@@ -144,7 +144,9 @@ def rollout(
                         obs_tpu,
                     )
                 )
-                episode_metrics.append(timestep.extras["episode_metrics"])
+
+                metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
+                episode_metrics.append(metrics)
 
                 dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 

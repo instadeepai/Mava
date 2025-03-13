@@ -426,14 +426,14 @@ def make_update_fns(
         next_obs = timestep.observation
         rewards = timestep.reward
         terms = ~timestep.discount.astype(bool)
-        infos = timestep.extras
+        metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
 
-        real_next_obs = infos["real_next_obs"]
+        real_next_obs = timestep.extras["real_next_obs"]
 
         transition = Transition(obs, action, rewards, terms, real_next_obs)
         buffer_state = rb.add(buffer_state, transition)
 
-        return next_obs, env_state, buffer_state, infos["episode_metrics"]
+        return next_obs, env_state, buffer_state, metrics
 
     def act(
         carry: Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], _: Any

@@ -275,7 +275,8 @@ def make_update_fns(
             next_term_or_trunc,
         )
 
-        return new_act_state, next_timestep.extras["episode_metrics"]
+        metrics = next_timestep.extras["episode_metrics"] | next_timestep.extras["env_metrics"]
+        return new_act_state, metrics
 
     # ---- Training functions ----
 

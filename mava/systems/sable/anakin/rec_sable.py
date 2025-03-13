@@ -115,7 +115,8 @@ def get_learner_fn(
                 prev_done, action, value, timestep.reward, log_prob, last_timestep.observation
             )
             learner_state = LearnerState(params, opt_states, key, env_state, timestep, hstates)
-            return learner_state, (transition, timestep.extras["episode_metrics"])
+            metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
+            return learner_state, (transition, metrics)
 
         # Copy old hidden states: to be used in the training loop
         prev_hstates = tree.map(lambda x: jnp.copy(x), learner_state.hstates)

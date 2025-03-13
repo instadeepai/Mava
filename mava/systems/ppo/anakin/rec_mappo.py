@@ -141,7 +141,8 @@ def get_learner_fn(
             learner_state = RNNLearnerState(
                 params, opt_states, key, env_state, timestep, done, hstates
             )
-            return learner_state, (transition, timestep.extras["episode_metrics"])
+            metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
+            return learner_state, (transition, metrics)
 
         # Step environment for rollout length
         learner_state, (traj_batch, episode_metrics) = jax.lax.scan(

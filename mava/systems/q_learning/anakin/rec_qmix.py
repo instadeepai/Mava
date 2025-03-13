@@ -308,7 +308,8 @@ def make_update_fns(
             next_term_or_trunc,
         )
 
-        return new_act_state, next_timestep.extras["episode_metrics"]
+        metrics = next_timestep.extras["episode_metrics"] | next_timestep.extras["env_metrics"]
+        return new_act_state, metrics
 
     def prep_inputs_to_scannedrnn(obs: MavaObservation, term_or_trunc: chex.Array) -> chex.Array:
         """Prepares the inputs to the RNN network for either getting q values or the
