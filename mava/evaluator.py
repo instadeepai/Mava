@@ -290,8 +290,7 @@ def get_sebulba_eval_fn(
             if config.env.log_win_rate:
                 metrics["won_episode"] = timesteps.extras["won_episode"]
 
-            # find the first instance of done to get the metrics at that timestep, we don't
-            # care about subsequent steps because we only the results from the first episode
+            # Find the first instance of done to get the metrics at that timestep.
             done_idx = np.argmax(timesteps.last(), axis=0)
             metrics = tree.map(lambda m: m[done_idx, np.arange(n_parallel_envs)], metrics)
             del metrics["is_terminal_step"]  # uneeded for logging
