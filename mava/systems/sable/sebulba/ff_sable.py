@@ -52,7 +52,8 @@ from mava.types import (
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.config import ppo_sebulba_checks as check_sebulba_config, check_total_timesteps
+from mava.utils.config import check_total_timesteps
+from mava.utils.config import ppo_sebulba_checks as check_sebulba_config
 from mava.utils.jax_utils import merge_leading_dims, switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.multistep import calculate_gae
@@ -466,7 +467,7 @@ def learner_setup(
     opt_state = optim.init(params)
 
     # Pack apply and update functions.
-    net_act_fn = partial(sable_network.apply, method="get_actions")  
+    net_act_fn = partial(sable_network.apply, method="get_actions")
     net_learn_fn = partial(sable_network.apply)  # Training function
     apply_fns = (net_act_fn, net_learn_fn)
 
