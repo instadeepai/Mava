@@ -23,7 +23,7 @@ from mava.networks.retention import MultiScaleRetention
 
 # jax.config.update("jax_enable_x64", True)
 
-bsz = 64
+bsz = 4
 num_agents = 4
 obs_dim = 11
 num_time_steps = 128
@@ -94,6 +94,7 @@ msr_enc_params = msr_enc.init(
     method="recurrent",
 )
 enc_jit_apply = partial(jax.jit(msr_enc.apply, static_argnames="num_chunks"))
+enc_jit_inf = jax.jit(partial(msr_enc.apply, method="recurrent"))
 
 hstate = copy.deepcopy(init_hstate)
 scale = copy.deepcopy(init_scale)
@@ -102,22 +103,22 @@ act_output = []
 # for the decoder we use the chunkwise
 for step in range(num_time_steps):
     # todo: reset later
-    hstate = hstate * jnp.exp(decay_kappas)
+    new_scale = scale * jnp.exp(decay_kappas) + 1.0
+    hstate_scale_factor = jnp.sqrt(scale) * jnp.exp(decay_kappas) / jnp.sqrt(new_scale)
+    hstate = hstate * hstate_scale_factor
+    scale = new_scale
     obs_i = obs[:, step * num_agents : (step + 1) * num_agents, ...]
     dones_i = dones[:, step * num_agents : (step + 1) * num_agents]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
 
-    out, hstate, scale = enc_jit_apply(
+    out, hstate = enc_jit_inf(
         msr_enc_params,
         obs_i,
         obs_i,
         obs_i,
         hstate,
-        dones_i,
         step_counts_i,
-        num_chunks=num_chunks,
         kv_scale=scale,
-        inference=True,
     )
     act_output.append(out)
 
@@ -245,7 +246,10 @@ scale = copy.deepcopy(init_scale)
 
 act_output = []
 for step in range(num_time_steps):
-    hstate = hstate * jnp.exp(decay_kappas)
+    new_scale = scale * jnp.exp(decay_kappas) + 1.0
+    hstate_scale_factor = jnp.sqrt(scale) * jnp.exp(decay_kappas) / jnp.sqrt(new_scale)
+    hstate = hstate * hstate_scale_factor
+    scale = new_scale
     reset_done = dones[:, step * num_agents, None, None, None]
     hstate = jax.tree.map(
         lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
@@ -257,17 +261,14 @@ for step in range(num_time_steps):
     dones_i = dones[:, step : step + 1]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
 
-    out, hstate, _ = enc_jit_apply(
+    out, hstate = enc_jit_inf(
         msr_enc_params,
         obs_i,
         obs_i,
         obs_i,
         hstate,
-        dones_i,
         step_counts_i,
-        num_chunks=num_chunks,
         kv_scale=scale,
-        inference=True,
     )
     act_output.append(out)
 

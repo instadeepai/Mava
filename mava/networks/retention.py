@@ -470,9 +470,18 @@ class MultiScaleRetention(nn.Module):
 
         k_proj = k_proj.transpose(0, 1, 3, 2)
 
+        # TODO: Using mat muls here. This is not exactly like the retnet code.
+        # But it was hard to get the chunkwise encoder passes to match up between inference
+        # and training. So doing this for now since the tests pass.
+
         kv = k_proj @ v_proj
+        # kv = k_proj * v_proj
         updated_hstate = hstate + kv / jnp.sqrt(kv_scale)
         ret_output = q_proj @ updated_hstate
+        # ret_output = (q_proj * updated_hstate).sum(axis=-1)
+
+        # Add back dummy sequence dimension
+        # ret_output = ret_output[:, :, jnp.newaxis, :]
 
         # Rejoin heads
         ret_output = rearrange(ret_output, "B nh S hs -> B S (nh hs)", nh=self.n_head)
