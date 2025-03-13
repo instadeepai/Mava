@@ -19,7 +19,7 @@ import zipfile
 from datetime import datetime
 from enum import Enum
 from os import PathLike
-from typing import ClassVar, Dict, List, Union
+from typing import Callable, ClassVar, Dict, List, Union
 
 import hydra
 import jax
@@ -45,16 +45,60 @@ class LogEvent(Enum):
     MISC = "misc"
 
 
-class MavaLogger:
-    """The main logger for Mava systems.
+def winrate_custom_metric(metrics: Dict, config: DictConfig) -> Dict:
+    """Calculate win rate from episode metrics.
 
-    Thin wrapper around the MultiLogger that is able to describe arrays of metrics
-    and calculate environment specific metrics if required (e.g winrate).
+    Args:
+    ----
+        metrics: Dictionary containing 'won_episode' and 'is_terminal_step'.
+        config: The system config.
+
+    Returns:
+    -------
+        Dictionary with added 'win_rate' metric and 'won_episode' removed.
     """
+    if "won_episode" not in metrics:
+        return metrics
 
-    def __init__(self, config: DictConfig) -> None:
+    # Count the number of terminal steps to determine episode count
+    is_terminal_steps = metrics.get("is_terminal_step", np.array([]))
+    n_episodes: int = np.sum(is_terminal_steps)
+
+    # If no episodes were completed, return unchanged metrics
+    if n_episodes == 0:
+        return metrics
+
+    # Calculate the win rate
+    n_won_episodes: int = np.sum(metrics["won_episode"])
+    win_rate: float = (n_won_episodes / n_episodes) * 100
+
+    # Update metrics
+    metrics["win_rate"] = win_rate
+    metrics.pop("won_episode")
+
+    return metrics
+
+
+class MavaLogger:
+    def __init__(
+        self,
+        config: DictConfig,
+        custom_metrics_fn: Callable[[Dict, DictConfig], Dict] = winrate_custom_metric,
+    ) -> None:
+        """The main logger for Mava systems.
+
+        Thin wrapper around the MultiLogger that is able to describe arrays of metrics
+        and calculate environment specific metrics if required (e.g winrate).
+
+        Args:
+        ____
+            config: The system config.
+            custom_metrics_fn: A function that can edit the metrics to produce custom metrics.
+                For example a win-rate.
+        """
         self.logger: BaseLogger = _make_multi_logger(config)
         self.cfg = config
+        self.custom_metrics_fn = custom_metrics_fn
 
     def log_config(self, config: Dict | None = None) -> None:
         """Log configuration dictionary.
@@ -77,11 +121,12 @@ class MavaLogger:
             event (LogEvent): the event that the metrics are associated with.
 
         """
-        # Ideally we want to avoid special metrics like this as much as possible.
-        # Might be better to calculate this outside as we want to keep the number of these
-        # if statements to a minimum.
-        if "won_episode" in metrics:
-            metrics = self.calc_winrate(metrics, event)
+        # Apply custom metrics calculation
+        metrics = self.custom_metrics_fn(metrics, self.cfg)
+
+        # Remove the is_terminal_step flag if it exists since we're done with it
+        if "is_terminal_step" in metrics:
+            metrics.pop("is_terminal_step")
 
         if event == LogEvent.TRAIN:
             # We only want to log mean losses, max/min/std don't matter.
@@ -92,30 +137,6 @@ class MavaLogger:
             metrics = tree.map(describe, metrics)
 
         self.logger.log_dict(metrics, t, t_eval, event)
-
-    # TODO: make this more general:
-    # pass in a fn for custom metric logging `custom_episode_metrics(metrics) -> metrics`
-    # keep array that has episode boundaries when logging
-    def calc_winrate(self, episode_metrics: Dict, event: LogEvent) -> Dict:
-        """Log the win rate of the environment's episodes."""
-        # Get the number of episodes used to evaluate.
-        if event == LogEvent.ABSOLUTE:
-            # To measure the absolute metric, we evaluate the best policy
-            # found across training over 10 times the evaluation episodes.
-            # For more details on the absolute metric please see:
-            # https://arxiv.org/abs/2209.10485.
-            n_episodes = self.cfg.arch.num_eval_episodes * 10
-        else:
-            n_episodes = self.cfg.arch.num_eval_episodes
-
-        # Calculate the win rate.
-        n_won_episodes: int = np.sum(episode_metrics["won_episode"])
-        win_rate = (n_won_episodes / n_episodes) * 100
-
-        episode_metrics["win_rate"] = win_rate
-        episode_metrics.pop("won_episode")
-
-        return episode_metrics
 
     def stop(self) -> None:
         """Stop the logger."""

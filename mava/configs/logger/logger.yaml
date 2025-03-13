@@ -4,10 +4,10 @@ base_exp_path: results/
 loggers:
   console:
     _target_: mava.utils.logger.ConsoleLogger
-    enabled: true
+    enabled: True
   neptune:
     _target_: mava.utils.logger.NeptuneLogger
-    enabled: true
+    enabled: False
 
     project: Instadeep/Mava
     tag: [delete]
@@ -17,20 +17,20 @@ loggers:
     # aggregation and plotting of data from multiple experiments. Note that when uploading JSON files,
     # `json_path` must be unset to ensure that uploaded json files don't continue getting larger
     # over time. Setting both will raise an error.
-    upload_json_data: False  
+    upload_json_data: False
   json:
     _target_: mava.utils.logger.JsonLogger
-    enabled: true
-    
+    enabled: False
+
     # If set, json files will be logged to a set path so that multiple experiments can
     # write to the same json file for easy downstream aggregation and plotting with marl-eval.
-    path: ~ 
+    path: ~
     task_name: ${env.scenario.task_name}
     env_name: ${env.env_name}
     seed: ${system.seed}
   tensorboard:
     _target_: mava.utils.logger.TensorboardLogger
-    enabled: true
+    enabled: False
 
 # --- Checkpointing ---
 checkpointing:
