@@ -417,8 +417,8 @@ class MultiScaleRetention(nn.Module):
         cross_scale = jnp.stack(cross_scale, axis=1)
 
         all_scale = jnp.maximum(inner_scale, cross_scale)
-        align_inner_scale = inner_scale / all_scale
-        align_cross_scale = cross_scale / all_scale
+        align_inner_scale = all_scale / inner_scale
+        align_cross_scale = all_scale / cross_scale
 
         cross_output = jax.lax.cond(
             inference,

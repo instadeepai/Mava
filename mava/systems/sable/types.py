@@ -37,6 +37,14 @@ class HiddenStates(NamedTuple):
     decoder_cross_retn: Array
 
 
+class Scales(NamedTuple):
+    """Scales for the encoder and decoder."""
+
+    encoder: Array
+    decoder_self_retn: Array
+    decoder_cross_retn: Array
+
+
 class RecLearnerState(NamedTuple):
     """State of the learner for Memory Sable"""
 
