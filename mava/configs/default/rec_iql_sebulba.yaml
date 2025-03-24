@@ -1,0 +1,11 @@
+defaults:
+  - logger: logger
+  - arch: sebulba
+  - system: q_learning/rec_iql
+  - network: rnn  # [rnn, rcnn]
+  - env: lbf_gym  # [rware_gym, lbf_gym, smac_gym]
+  - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs

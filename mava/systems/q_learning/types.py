@@ -21,7 +21,7 @@ from jax import Array
 from jumanji.env import State
 from typing_extensions import NamedTuple, TypeAlias
 
-from mava.types import Observation
+from mava.types import MavaObservation
 
 Metrics = Dict[str, Array]
 
@@ -29,14 +29,14 @@ Metrics = Dict[str, Array]
 class Transition(NamedTuple):
     """Transition for recurrent Q-learning."""
 
-    obs: Observation
+    obs: MavaObservation
     action: Array
     reward: Array
     terminal: Array
     term_or_trunc: Array
     # Even though we use a trajectory buffer we need to store both obs and next_obs.
     # This is because of how the `AutoResetWrapper` returns obs at the end of an episode.
-    next_obs: Observation
+    next_obs: MavaObservation
 
 
 BufferState: TypeAlias = TrajectoryBufferState[Transition]
@@ -64,7 +64,7 @@ class ActionState(NamedTuple):
     action_selection_state: ActionSelectionState
     env_state: State
     buffer_state: BufferState
-    obs: Observation
+    obs: MavaObservation
     terminal: Array
     term_or_trunc: Array
 
@@ -83,7 +83,7 @@ class LearnerState(NamedTuple, Generic[QLearningParams]):
     """State of the learner in an interaction-training loop."""
 
     # Interaction vars
-    obs: Observation
+    obs: MavaObservation
     terminal: Array
     term_or_trunc: Array
     hidden_state: Array
@@ -108,3 +108,11 @@ class TrainState(NamedTuple, Generic[QLearningParams]):
     opt_state: optax.OptState
     train_steps: Array
     key: PRNGKey
+
+
+class SebulbaLearnerState(NamedTuple):
+    """State of the learner for the Sebulba architecture."""
+
+    params: QNetParams
+    opt_states: optax.OptState
+    step_counter: int

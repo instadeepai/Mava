@@ -15,9 +15,9 @@ rollout_length: 2 # Number of environment steps per vectorised environment.
 epochs: 2 # Number of learn epochs per training data batch.
 
 # sizes
-buffer_size: 5000 # size of the replay buffer. Note: total size is this * num_devices
+buffer_size: 1000 # size of the replay buffer. Note: total size is this * num_devices
 sample_batch_size: 32  # size of training data batch sampled from the buffer
-sample_sequence_length: 20 # 20 transitions are sampled, giving 19 complete data points
+sample_sequence_length: 32 # 20 transitions are sampled, giving 19 complete data points
 
 # learning rates
 q_lr: 3e-4  # the learning rate of the Q network network optimizer
@@ -31,3 +31,7 @@ gamma: 0.99  # discount factor
 
 eps_min: 0.05
 eps_decay: 1e5
+
+# --- Sebulba parameters ---
+replay_ratio : 4  # Average number of times the learner should sample each item from the replay buffer.
+error_tolerance: 4 # Maximum allowed deviation from the target sampling ratio. Controls how far the actual samples can vary from the ideal samples-per-insert ratio. Must be > 2 to prevent deadlocks.
