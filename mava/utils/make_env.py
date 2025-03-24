@@ -225,43 +225,94 @@ def make_gigastep_env(
     train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
     return train_env, eval_env
 
+from gymnasium.spaces import Tuple as gTuple, Box, Discrete
+import jax.numpy as jnp
+import jax
+import numpy as np
+from jumanji.env import Environment
 
+
+class Jumanjicompatibility():
+    """A wrapper that converts a Jumanji `Environment` to one that follows the `gymnasium.Env` API."""
+    def __init__(
+        self,
+        env: Environment,
+        num_envs : int = 32,
+        backend: str = "cpu",
+    ):
+        self._env = env
+        self.num_envs = num_envs
+        self.backend = backend
+        self._state = None
+        self._key = jax.random.PRNGKey(np.random.randint(0, np.iinfo(np.uint32).max) )
+        self.backend = jax.devices(backend)[0]
+        
+        # Convert Jumanji observation and action specs to Gymnasium spaces
+        try:
+
+            sample_obs_shape = self._env.observation_spec().generate_value().agents_view.shape
+        except:
+            sample_obs_shape = self._env.observation_spec.generate_value().agents_view.shape
+        
+        self.single_observation_space = gTuple([Box(-np.inf, np.inf,shape = (sample_obs_shape[1],)) for _ in range(sample_obs_shape[0])])
+        try:
+            self.single_action_space = gTuple([Discrete(int(i)) for i in self._env.action_spec().num_values])
+        except:
+            self.single_action_space = gTuple([Discrete(int(i)) for i in self._env.action_spec.num_values])
+        
+        
+        self._reset = jax.vmap(jax.jit(env.reset), in_axes=0)
+        self._step  = jax.vmap(jax.jit(env.step), in_axes=(0, 0))
+        
+        self.jax2numpy = lambda tree : jax.tree_util.tree_map(lambda x: np.array(x) if isinstance(x, (jax.Array, jax.numpy.ndarray)) else x, tree)
+
+    def reset(
+        self,
+        seed: int= None,
+        options: dict = None,
+    ) -> Tuple:
+        """Resets the environment to an initial state and returns the first observation and info."""
+        self._key, *keys = jax.random.split(self._key, self.num_envs + 1)
+        self._state, timestep = self._reset(jnp.array(keys))
+        #timestep.extras = timestep.extras["episode_metrics"]
+        return self.jax2numpy(timestep)
+    
+    def step(self, action) -> Tuple:
+        self._state, timestep = self._step(self._state, action)
+        #timestep.extras = timestep.extras["episode_metrics"]
+        return timestep#self.jax2numpy(timestep)
+    
+    def close(self) -> None:
+        """Closes the environment."""
+        pass
+    
+def make_sebulba_jumanji_env(
+    config: DictConfig,
+    num_env: int,
+    add_global_state: bool = False,
+):
+    """
+    Create a gymnasium environment.
+    Args:
+        config (Dict): The configuration of the environment.
+        num_env (int) : The number of parallel envs to create.
+        add_global_state (bool): Whether to add the global state to the observation. Default False.
+    Returns:
+        Async environments.
+    """
+    env, _ = make_jumanji_env(config, add_global_state)
+    wrapped_env = Jumanjicompatibility(env, num_envs=num_env)
+    return wrapped_env
+    
 def make_gym_env(
     config: DictConfig,
     num_env: int,
     add_global_state: bool = False,
 ) -> GymToJumanji:
-    """
-     Create a gymnasium environment.
+    env_name = config.env.env_name
+    return make_sebulba_jumanji_env(config,num_env, add_global_state)
 
-    Args:
-        config (Dict): The configuration of the environment.
-        num_env (int) : The number of parallel envs to create.
-        add_global_state (bool): Whether to add the global state to the observation. Default False.
-
-    Returns:
-        Async environments.
-    """
-    wrapper = _gym_registry[config.env.env_name]
-    config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
-
-    def create_gym_env(config: DictConfig, add_global_state: bool = False) -> gymnasium.Env:
-        registered_name = f"{config.env.scenario.name}:{config.env.scenario.task_name}"
-        env = gym.make(registered_name, disable_env_checker=True, **config.env.kwargs)
-        wrapped_env = wrapper(env, config.env.use_shared_rewards, add_global_state)
-        if config.system.add_agent_id:
-            wrapped_env = GymAgentIDWrapper(wrapped_env)
-        wrapped_env = GymRecordEpisodeMetrics(wrapped_env)
-        return wrapped_env
-
-    envs = gymnasium.vector.AsyncVectorEnv(
-        [lambda: create_gym_env(config, add_global_state) for _ in range(num_env)],
-        worker=async_multiagent_worker,
-    )
-
-    envs = GymToJumanji(envs)
-
-    return envs
+        
 
 
 def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:

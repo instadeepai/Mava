@@ -26,4 +26,4 @@ def get_action_head(action_types: Union[Spec, Space]) -> Tuple[Dict[str, str], s
     if isinstance(action_types, (DiscreteArray, MultiDiscreteArray, Discrete, MultiDiscrete)):
         return {"_target_": "mava.networks.heads.DiscreteActionHead"}, _DISCRETE
 
-    return {"_target_": "mava.networks.heads.ContinuousActionHead"}, _CONTINUOUS
+    return {"_target_": "mava.networks.heads.DiscreteActionHead"}, _DISCRETE
