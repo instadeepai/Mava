@@ -218,7 +218,7 @@ def get_learner_step_fn(
             key=key,
         )
         current_done = tree.map(
-            lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
+            lambda x: jnp.repeat(x, config.system.num_agents).reshape(num_learner_envs, -1),
             final_timestep.last(),
         )
 
