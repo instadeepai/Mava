@@ -56,11 +56,14 @@ from mava.types import (
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.config import check_sebulba_config, check_total_timesteps
+from mava.utils.config import check_total_timesteps
+from mava.utils.config import ppo_sebulba_checks as check_sebulba_config
 from mava.utils.jax_utils import concat_time_and_agents, switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
-from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
+from mava.utils.sebulba.pipelines import Pipeline
+from mava.utils.sebulba.utils import ParamsSource, RecordTimeTo, stop_sebulba
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 from mava.wrappers.gym import GymToJumanji, TimeStep
@@ -75,7 +78,7 @@ def rollout(
     apply_fns: ActorApply,
     actor_device: int,
     seeds: List[int],
-    thread_lifetime: ThreadLifetime,
+    stop_event: threading.Event,
 ) -> None:
     """Runs rollouts to collect trajectories from the environment.
 
@@ -88,7 +91,7 @@ def rollout(
         apply_fns (Tuple): Functions for running the actor and critic networks.
         actor_device (Device): Actor device to use for rollout.
         seeds (List[int]): Seeds for initializing the environment.
-        thread_lifetime (ThreadLifetime): Manages the thread's lifecycle.
+        stop_event (threading.Event): Manages the thread's lifecycle.
     """
     name = threading.current_thread().name
     print(f"{Fore.BLUE}{Style.BRIGHT}Thread {name} started{Style.RESET_ALL}")
@@ -116,7 +119,7 @@ def rollout(
     hstates = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
 
     # Loop till the desired num_updates is reached.
-    while not thread_lifetime.should_stop():
+    while not stop_event.is_set():
         # Rollout
         traj: List[Transition] = []
         episode_metrics: List[Dict] = []
@@ -158,14 +161,7 @@ def rollout(
 
                 # Append data to storage
                 traj.append(
-                    Transition(
-                        prev_dones,
-                        action,
-                        value,
-                        timestep.reward,
-                        log_prob,
-                        obs_tpu,
-                    )
+                    Transition(prev_dones, action, value, timestep.reward, log_prob, obs_tpu)
                 )
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
@@ -212,37 +208,6 @@ def get_learner_step_fn(
             traj_batch (PPOTransition): the batch of data to learn with.
         """
 
-        def _calculate_gae(
-            traj_batch: Transition,
-            current_val: chex.Array,
-            current_done: chex.Array,
-        ) -> Tuple[chex.Array, chex.Array]:
-            """Calculate the GAE."""
-
-            def _get_advantages(
-                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: Transition
-            ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
-                """Calculate the GAE for a single transition."""
-                gae, next_value, next_done = carry
-                done, value, reward = (
-                    transition.done,
-                    transition.value,
-                    transition.reward,
-                )
-                gamma = config.system.gamma
-                delta = reward + gamma * next_value * (1 - next_done) - value
-                gae = delta + gamma * config.system.gae_lambda * (1 - next_done) * gae
-                return (gae, value, done), gae
-
-            _, advantages = jax.lax.scan(
-                _get_advantages,
-                (jnp.zeros_like(current_val), current_val, current_done),
-                traj_batch,
-                reverse=True,
-                unroll=16,
-            )
-            return advantages, advantages + traj_batch.value
-
         # Calculate advantage
         params, opt_states, key, _, final_timestep = learner_state
         key = jnp.squeeze(key, axis=0)
@@ -257,7 +222,15 @@ def get_learner_step_fn(
             final_timestep.last(),
         )
 
-        advantages, targets = _calculate_gae(traj_batch, current_val, current_done)
+        # Use the unified calculate_gae function
+        advantages, targets = calculate_gae(
+            traj_batch=traj_batch,
+            last_val=current_val,
+            last_done=current_done,
+            gamma=config.system.gamma,
+            gae_lambda=config.system.gae_lambda,
+            unroll=16,
+        )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
@@ -364,10 +337,10 @@ def get_learner_step_fn(
             agent_perm = jax.random.permutation(agent_shuffle_key, config.system.num_agents)
             batch = tree.map(lambda x: jnp.take(x, agent_perm, axis=2), batch)
 
-            # CONCATENATE TIME AND AGENTS
+            # Concatenate time and agents
             batch = tree.map(concat_time_and_agents, batch)
 
-            # SPLIT INTO MINIBATCHES
+            # Split into minibatches
             minibatches = tree.map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 batch,
@@ -377,7 +350,7 @@ def get_learner_step_fn(
                 prev_hstates,
             )
 
-            # UPDATE MINIBATCHES
+            # Update minibatches
             (params, opt_states, entropy_key), loss_info = jax.lax.scan(
                 _update_minibatch,
                 (params, opt_states, entropy_key),
@@ -561,12 +534,9 @@ def learner_setup(
     opt_state = optim.init(params)
 
     # Pack apply and update functions.
-    apply_fns = (
-        partial(
-            sable_network.apply, method="get_actions"
-        ),  # Execution function required for the advantage calculation
-        partial(sable_network.apply),  # Training function
-    )
+    net_act_fn = partial(sable_network.apply, method="get_actions")
+    net_learn_fn = partial(sable_network.apply)  # Training function
+    apply_fns = (net_act_fn, net_learn_fn)
 
     # defines how the learner state is sharded: params, opt and key = sharded, timestep = sharded
     learn_state_spec = LearnerState(model_spec, model_spec, data_spec, None, data_spec)
@@ -605,7 +575,7 @@ def learner_setup(
     init_learner_state = LearnerState(params, opt_state, step_keys, None, None)  # type: ignore
     env.close()
 
-    return learn, apply_fns[0], init_learner_state, learner_sharding  # type: ignore
+    return learn, net_act_fn, init_learner_state, learner_sharding  # type: ignore
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -679,20 +649,18 @@ def run_experiment(_config: DictConfig) -> float:
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
     # the rollout queue/ the pipe between actor and learner
-    pipe_lifetime = ThreadLifetime()
-    pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding, pipe_lifetime)
+    pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding)
     pipe.start()
 
     params_sources: List[ParamsSource] = []
     actor_threads: List[threading.Thread] = []
-    actor_lifetime = ThreadLifetime()
-    params_sources_lifetime = ThreadLifetime()
+    actors_stop_event = threading.Event()
 
     # Create the actor threads
     print(f"{Fore.BLUE}{Style.BRIGHT}Starting up actor threads...{Style.RESET_ALL}")
     for actor_device in actor_devices:
         # Create 1 params source per device
-        params_source = ParamsSource(inital_params, actor_device, params_sources_lifetime)
+        params_source = ParamsSource(inital_params, actor_device)
         params_source.start()
         params_sources.append(params_source)
         # Create multiple rollout threads per actor device
@@ -713,7 +681,7 @@ def run_experiment(_config: DictConfig) -> float:
                     select_action_fn,
                     actor_device,
                     seeds,
-                    actor_lifetime,
+                    actors_stop_event,
                 ),
                 name=f"Actor-{actor_device}-{thread_id}",
             )
@@ -779,6 +747,9 @@ def run_experiment(_config: DictConfig) -> float:
     evaluator_envs.close()
     eval_performance = float(np.mean(eval_metrics[config.env.eval_metric]))
 
+    # Gracefully shutting down all actors and resources.
+    stop_sebulba(actors_stop_event, pipe, params_sources, actor_threads)
+
     # Measure absolute metric.
     if config.arch.absolute_metric:
         print(f"{Fore.BLUE}{Style.BRIGHT}Measuring absolute metric...{Style.RESET_ALL}")
@@ -796,22 +767,6 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Stop all the threads.
     logger.stop()
-    actor_lifetime.stop()
-    pipe.clear()  # We clear the pipeline before stopping the actor threads to avoid deadlock
-    print(f"{Fore.RED}{Style.BRIGHT}Pipe cleared{Style.RESET_ALL}")
-    print(f"{Fore.RED}{Style.BRIGHT}Stopping actor threads...{Style.RESET_ALL}")
-    for actor in actor_threads:
-        actor.join()
-        print(f"{Fore.RED}{Style.BRIGHT}{actor.name} stopped{Style.RESET_ALL}")
-    print(f"{Fore.RED}{Style.BRIGHT}Stopping pipeline...{Style.RESET_ALL}")
-    pipe_lifetime.stop()
-    pipe.join()
-    print(f"{Fore.RED}{Style.BRIGHT}Stopping params sources...{Style.RESET_ALL}")
-    params_sources_lifetime.stop()
-    for params_source in params_sources:
-        params_source.join()
-    print(f"{Fore.RED}{Style.BRIGHT}All threads stopped...{Style.RESET_ALL}")
-
     return eval_performance
 
 
