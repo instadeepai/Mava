@@ -135,11 +135,8 @@ def rollout(
 
                 obs_tpu = tree.map(move_to_device, timestep.observation)
 
-                prev_dones = tree.map(
-                    lambda x: jnp.repeat(x, config.system.num_agents).reshape(
-                        config.arch.num_envs, -1
-                    ),
-                    timestep.last(),
+                prev_dones = jnp.repeat(timestep.last(), config.system.num_agents).reshape(
+                    config.arch.num_envs, -1
                 )
 
                 # Get action and value
