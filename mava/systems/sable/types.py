@@ -58,17 +58,6 @@ class FFLearnerState(NamedTuple):
     timestep: TimeStep
 
 
-class Transition(NamedTuple):
-    """Transition tuple."""
-
-    done: Array
-    action: Array
-    value: Array
-    reward: Array
-    log_prob: Array
-    obs: Array
-
-
 class SebulbaLearnerState(NamedTuple):
     """State of the learner."""
 
