@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Tuple
+from typing import Callable, Tuple
 
 from chex import Array, PRNGKey
 from flax.core.frozen_dict import FrozenDict
@@ -55,16 +55,6 @@ class FFLearnerState(NamedTuple):
     opt_states: OptState
     key: PRNGKey
     env_state: Array
-    timestep: TimeStep
-
-
-class SebulbaLearnerState(NamedTuple):
-    """State of the learner."""
-
-    params: FrozenDict
-    opt_states: OptState
-    key: PRNGKey
-    env_state: Any
     timestep: TimeStep
 
 
