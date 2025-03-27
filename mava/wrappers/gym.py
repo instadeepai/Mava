@@ -17,7 +17,6 @@ import traceback
 import warnings
 from dataclasses import field
 from enum import IntEnum
-from functools import cached_property
 from multiprocessing import Queue
 from multiprocessing.connection import Connection
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
@@ -28,7 +27,6 @@ import numpy as np
 from gymnasium import spaces
 from gymnasium.spaces.utils import is_space_dtype_shape_equiv
 from gymnasium.vector.utils import write_to_shared_memory
-from jumanji import specs
 from numpy.typing import NDArray
 
 from mava.types import MavaObservation, Observation, ObservationGlobalState
@@ -100,48 +98,54 @@ class UoeWrapper(gymnasium.Wrapper):
         shape = (self.num_agents, *single_obs.shape)
         low = np.tile(single_obs.low, (self.num_agents, 1))
         high = np.tile(single_obs.high, (self.num_agents, 1))
-        self.observation_space = spaces.Box(low=low, high=high, shape=shape, dtype=single_obs.dtype)
+        local_observation_space = spaces.Box(
+            low=low, high=high, shape=shape, dtype=single_obs.dtype
+        )
+        self.observation_space = spaces.Dict({"local_obs": local_observation_space})
 
         if add_global_state:
             shape = (self.num_agents, single_obs.shape[0] * self.num_agents)
             low = np.tile(single_obs.low, (self.num_agents, self.num_agents))
             high = np.tile(single_obs.high, (self.num_agents, self.num_agents))
-            self.global_observation_space = spaces.Box(
+            global_observation_space = spaces.Box(
                 low=low, high=high, shape=shape, dtype=single_obs.dtype
             )
-        else:
-            self.global_observation_space = None
+            self.observation_space["global_obs"] = global_observation_space
 
         # Tuple(Discrete(...) * N) --> MultiDiscrete(... * N)
         self.action_space = spaces.MultiDiscrete([self.num_actions] * self.num_agents)
 
     def reset(
         self, seed: Optional[int] = None, options: Optional[dict] = None
-    ) -> Tuple[NDArray, Dict]:
+    ) -> Tuple[Dict, Dict]:
         if seed is not None:
             self.env.unwrapped.seed(seed)
 
         agents_view, info = self._env.reset()
 
         info["action_mask"] = self.get_action_mask(info)
+
+        obs = {"local_obs": agents_view}
+
         if self.add_global_state:
-            info["global_obs"] = self.get_global_obs(agents_view)
+            obs["global_obs"] = self.get_global_obs(agents_view)
+        return obs, info
 
-        return np.array(agents_view), info
-
-    def step(self, actions: List) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
+    def step(self, actions: List) -> Tuple[Dict, NDArray, NDArray, NDArray, Dict]:
         agents_view, reward, terminated, truncated, info = self._env.step(actions)
 
         info["action_mask"] = self.get_action_mask(info)
-        if self.add_global_state:
-            info["global_obs"] = self.get_global_obs(agents_view)
 
         if self.use_shared_rewards:
             reward = np.array([np.array(reward).sum()] * self.num_agents)
         else:
             reward = np.array(reward)
 
-        return agents_view, reward, terminated, truncated, info
+        obs = {"local_obs": agents_view}
+        if self.add_global_state:
+            obs["global_obs"] = self.get_global_obs(agents_view)
+
+        return obs, reward, terminated, truncated, info
 
     def get_action_mask(self, info: Dict) -> NDArray:
         if "action_mask" in info:
@@ -229,20 +233,22 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
         super().__init__(env)
 
         self.agent_ids = np.eye(self.env.num_agents)
-        self.observation_space = self.modify_space(self.env.observation_space)
+        self.observation_space["local_obs"] = self.modify_space(
+            self.env.observation_space["local_obs"]
+        )
 
     def reset(
         self, seed: Optional[int] = None, options: Optional[dict] = None
     ) -> Tuple[NDArray, Dict]:
         """Reset the environment."""
         obs, info = self.env.reset(seed, options)
-        obs = np.concatenate([self.agent_ids, obs], axis=1)
+        obs["local_obs"] = np.concatenate([self.agent_ids, obs["local_obs"]], axis=1)
         return obs, info
 
     def step(self, action: list) -> Tuple[NDArray, float, bool, bool, Dict]:
         """Step the environment."""
         obs, reward, terminated, truncated, info = self.env.step(action)
-        obs = np.concatenate([self.agent_ids, obs], axis=1)
+        obs["local_obs"] = np.concatenate([self.agent_ids, obs["local_obs"]], axis=1)
         return obs, reward, terminated, truncated, info
 
     def modify_space(self, space: spaces.Space) -> spaces.Space:
@@ -264,10 +270,7 @@ class GymToJumanji:
         self.env = env
         self.single_action_space = env.unwrapped.single_action_space
         self.single_observation_space = env.unwrapped.single_observation_space
-        self.add_global_state = self.env.env_fns[0]().env.env.add_global_state
-        self.global_observation_space = self.env.env_fns[0]().env.env.global_observation_space
         self.num_agents = len(self.env.single_action_space)
-        self.time_limit = self.env.env_fns[0]().spec.max_episode_steps
 
     def reset(self, seed: Optional[list[int]] = None, options: Optional[dict] = None) -> TimeStep:
         obs, info = self.env.reset(seed=seed, options=options)  # type: ignore
@@ -317,7 +320,7 @@ class GymToJumanji:
         self, obs: NDArray, step_type: NDArray, terminated: NDArray, rewards: NDArray, info: Dict
     ) -> TimeStep:
         observation = self._format_observation(
-            obs, info["action_mask"], info.get("global_obs", (None,))
+            obs["local_obs"], info["action_mask"], obs.get("global_obs", (None,))
         )
         # Filter out the masks and auxiliary data
         extras = {}
@@ -341,50 +344,6 @@ class GymToJumanji:
 
     def close(self) -> None:
         self.env.close()
-
-    @cached_property
-    def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
-        """Specification of the observation of the environment."""
-
-        view_spec = specs.BoundedArray(
-            self.single_observation_space.shape,
-            self.single_observation_space.dtype,
-            self.single_observation_space.low,
-            self.single_observation_space.high,
-            "agents_view",
-        )
-
-        num_actions = self.env.env_fns[0]().env.env.num_actions
-        action_spec = specs.BoundedArray(
-            (self.num_agents, num_actions),
-            float,
-            np.zeros((self.num_agents, num_actions)),
-            np.ones((self.num_agents, num_actions)),
-            "step_count",
-        )
-
-        step_count = specs.BoundedArray(
-            (self.num_agents,),
-            int,
-            np.zeros(self.num_agents, dtype=int),
-            np.repeat(self.time_limit, self.num_agents),
-            "action_mask",
-        )
-
-        obs_data = {"agents_view": view_spec, "action_mask": action_spec, "step_count": step_count}
-
-        if self.add_global_state:
-            global_state_spec = specs.BoundedArray(
-                self.global_observation_space.shape,
-                self.global_observation_space.dtype,
-                self.global_observation_space.low,
-                self.global_observation_space.high,
-                "global_state",
-            )
-            obs_data["global_state"] = global_state_spec
-            return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
-
-        return specs.Spec(Observation, "ObservationSpec", **obs_data)
 
 
 # Copied from Gymnasium/blob/main/gymnasium/vector/async_vector_env.py
@@ -433,7 +392,6 @@ def async_multiagent_worker(  # CCR001
                 if np.logical_or(terminated, truncated).all():
                     observation, new_info = env.reset()
                     info["action_mask"] = new_info["action_mask"]
-                    info["global_obs"] = new_info.get("global_obs", None)
 
                 if shared_memory:
                     write_to_shared_memory(observation_space, index, observation, shared_memory)

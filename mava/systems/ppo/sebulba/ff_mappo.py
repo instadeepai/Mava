@@ -47,6 +47,7 @@ from mava.types import (
     CriticApply,
     Metrics,
     Observation,
+    ObservationGlobalState,
     SebulbaLearnerFn,
 )
 from mava.utils import make_env as environments
@@ -456,9 +457,12 @@ def learner_setup(
         optax.adam(critic_lr, eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
-    obs = env.observation_spec.generate_value()
-    init_x = tree.map(lambda x: x[jnp.newaxis, ...], obs)
+    # Initialise observation.
+    init_obs = env.single_observation_space.sample()
+    local_obs = jnp.array([init_obs["local_obs"]])
+    global_obs = jnp.array([init_obs["global_obs"]])
+    init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
+    init_x = ObservationGlobalState(local_obs, init_action_mask, global_obs)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(actor_key, init_x)
