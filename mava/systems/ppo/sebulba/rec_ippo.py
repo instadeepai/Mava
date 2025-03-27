@@ -563,7 +563,7 @@ def learner_setup(
     )
 
     # Initialise observation.
-    single_obs = jnp.array([[env.single_observation_space.sample()["local_obs"]]])
+    single_obs = jnp.array([[env.single_observation_space.sample()["agents_view"]]])
     init_action_mask = jnp.ones((1, config.system.num_agents, config.system.num_actions))
     init_obs = Observation(single_obs, init_action_mask)
     init_done = jnp.zeros((1, config.arch.num_envs, config.system.num_agents), dtype=bool)

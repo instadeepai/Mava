@@ -101,7 +101,7 @@ class UoeWrapper(gymnasium.Wrapper):
         local_observation_space = spaces.Box(
             low=low, high=high, shape=shape, dtype=single_obs.dtype
         )
-        self.observation_space = spaces.Dict({"local_obs": local_observation_space})
+        self.observation_space = spaces.Dict({"agents_view": local_observation_space})
 
         if add_global_state:
             shape = (self.num_agents, single_obs.shape[0] * self.num_agents)
@@ -110,7 +110,7 @@ class UoeWrapper(gymnasium.Wrapper):
             global_observation_space = spaces.Box(
                 low=low, high=high, shape=shape, dtype=single_obs.dtype
             )
-            self.observation_space["global_obs"] = global_observation_space
+            self.observation_space["global_state"] = global_observation_space
 
         # Tuple(Discrete(...) * N) --> MultiDiscrete(... * N)
         self.action_space = spaces.MultiDiscrete([self.num_actions] * self.num_agents)
@@ -125,10 +125,10 @@ class UoeWrapper(gymnasium.Wrapper):
 
         info["action_mask"] = self.get_action_mask(info)
 
-        obs = {"local_obs": agents_view}
+        obs = {"agents_view": agents_view}
 
         if self.add_global_state:
-            obs["global_obs"] = self.get_global_obs(agents_view)
+            obs["global_state"] = self.get_global_obs(agents_view)
         return obs, info
 
     def step(self, actions: List) -> Tuple[Dict, NDArray, NDArray, NDArray, Dict]:
@@ -141,9 +141,9 @@ class UoeWrapper(gymnasium.Wrapper):
         else:
             reward = np.array(reward)
 
-        obs = {"local_obs": agents_view}
+        obs = {"agents_view": agents_view}
         if self.add_global_state:
-            obs["global_obs"] = self.get_global_obs(agents_view)
+            obs["global_state"] = self.get_global_obs(agents_view)
 
         return obs, reward, terminated, truncated, info
 
@@ -233,8 +233,8 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
         super().__init__(env)
 
         self.agent_ids = np.eye(self.env.num_agents)
-        self.observation_space["local_obs"] = self.modify_space(
-            self.env.observation_space["local_obs"]
+        self.observation_space["agents_view"] = self.modify_space(
+            self.env.observation_space["agents_view"]
         )
 
     def reset(
@@ -242,13 +242,13 @@ class GymAgentIDWrapper(gymnasium.Wrapper):
     ) -> Tuple[NDArray, Dict]:
         """Reset the environment."""
         obs, info = self.env.reset(seed, options)
-        obs["local_obs"] = np.concatenate([self.agent_ids, obs["local_obs"]], axis=1)
+        obs["agents_view"] = np.concatenate([self.agent_ids, obs["agents_view"]], axis=1)
         return obs, info
 
     def step(self, action: list) -> Tuple[NDArray, float, bool, bool, Dict]:
         """Step the environment."""
         obs, reward, terminated, truncated, info = self.env.step(action)
-        obs["local_obs"] = np.concatenate([self.agent_ids, obs["local_obs"]], axis=1)
+        obs["agents_view"] = np.concatenate([self.agent_ids, obs["agents_view"]], axis=1)
         return obs, reward, terminated, truncated, info
 
     def modify_space(self, space: spaces.Space) -> spaces.Space:
@@ -320,7 +320,7 @@ class GymToJumanji:
         self, obs: NDArray, step_type: NDArray, terminated: NDArray, rewards: NDArray, info: Dict
     ) -> TimeStep:
         observation = self._format_observation(
-            obs["local_obs"], info["action_mask"], obs.get("global_obs", (None,))
+            obs["agents_view"], info["action_mask"], obs.get("global_state", (None,))
         )
         # Filter out the masks and auxiliary data
         extras = {}
@@ -328,7 +328,7 @@ class GymToJumanji:
             key: value for key, value in info["metrics"].items() if key[0] != "_"
         }
         extras["real_next_obs"] = self._format_observation(  # type: ignore
-            info["real_next_obs"], info["real_next_action_mask"], info["real_next_global_obs"]
+            info["real_next_obs"], info["real_next_action_mask"]
         )
 
         if "won_episode" in info:
@@ -371,7 +371,6 @@ def async_multiagent_worker(  # CCR001
                 observation, info = env.reset(**data)
                 info["real_next_obs"] = observation
                 info["real_next_action_mask"] = info["action_mask"]
-                info["real_next_global_obs"] = info.get("global_obs", None)
                 if shared_memory:
                     write_to_shared_memory(observation_space, index, observation, shared_memory)
                     observation = None
@@ -388,7 +387,6 @@ def async_multiagent_worker(  # CCR001
                 ) = env.step(data)
                 info["real_next_obs"] = observation
                 info["real_next_action_mask"] = info["action_mask"]
-                info["real_next_global_obs"] = info.get("global_obs", None)
                 if np.logical_or(terminated, truncated).all():
                     observation, new_info = env.reset()
                     info["action_mask"] = new_info["action_mask"]
