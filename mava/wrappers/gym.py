@@ -92,6 +92,7 @@ class UoeWrapper(gymnasium.Wrapper):
         self.add_global_state = add_global_state
         self.num_agents = len(self._env.action_space)
         self.num_actions = self._env.action_space[0].n
+        self.step_count = 0
 
         # Tuple(Box(...) * N) --> Box(N, ...)
         single_obs = self.observation_space[0]  # type: ignore
@@ -129,9 +130,13 @@ class UoeWrapper(gymnasium.Wrapper):
 
         if self.add_global_state:
             obs["global_state"] = self.get_global_obs(agents_view)
+        
+        self.step_count = 0
+        info["step_count"] = self.step_count
+        
         return obs, info
 
-    def step(self, actions: List) -> Tuple[Dict, NDArray, NDArray, NDArray, Dict]:
+    def step(self, actions: List) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
         agents_view, reward, terminated, truncated, info = self._env.step(actions)
 
         info["action_mask"] = self.get_action_mask(info)
@@ -145,6 +150,8 @@ class UoeWrapper(gymnasium.Wrapper):
         if self.add_global_state:
             obs["global_state"] = self.get_global_obs(agents_view)
 
+        self.step_count += 1
+        info["step_count"] = self.step_count
         return obs, reward, terminated, truncated, info
 
     def get_action_mask(self, info: Dict) -> NDArray:
@@ -302,12 +309,15 @@ class GymToJumanji:
         self,
         obs: NDArray,
         action_mask: Tuple[NDArray],
+        step_count: NDArray,
         global_obs: Tuple[Union[NDArray, None]] = (None,),
     ) -> Union[Observation, ObservationGlobalState]:
         """Create an observation from the raw observation and environment state."""
 
         action_mask = np.stack(action_mask)
-        obs_data = {"agents_view": obs, "action_mask": action_mask}
+        step_count = np.stack(step_count)[:, np.newaxis]
+
+        obs_data = {"agents_view": obs, "action_mask": action_mask, "step_count": step_count}
 
         if global_obs[0] is not None:
             global_obs = np.array(global_obs)
@@ -320,7 +330,10 @@ class GymToJumanji:
         self, obs: NDArray, step_type: NDArray, terminated: NDArray, rewards: NDArray, info: Dict
     ) -> TimeStep:
         observation = self._format_observation(
-            obs["agents_view"], info["action_mask"], obs.get("global_state", (None,))
+            obs["agents_view"],
+            info["action_mask"],
+            info["step_count"],
+            obs.get("global_state", (None,)),
         )
         # Filter out the masks and auxiliary data
         extras = {}
@@ -328,7 +341,10 @@ class GymToJumanji:
             key: value for key, value in info["metrics"].items() if key[0] != "_"
         }
         extras["real_next_obs"] = self._format_observation(  # type: ignore
-            info["real_next_obs"], info["real_next_action_mask"], info["real_next_global_obs"]
+            info["real_next_obs"],
+            info["real_next_action_mask"],
+            info["step_count"],
+            info["real_next_global_obs"],
         )
 
         if "won_episode" in info:
