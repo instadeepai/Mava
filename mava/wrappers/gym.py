@@ -130,10 +130,10 @@ class UoeWrapper(gymnasium.Wrapper):
 
         if self.add_global_state:
             obs["global_state"] = self.get_global_obs(agents_view)
-        
+
         self.step_count = 0
         info["step_count"] = self.step_count
-        
+
         return obs, info
 
     def step(self, actions: List) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
