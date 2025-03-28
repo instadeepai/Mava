@@ -463,8 +463,8 @@ def learner_setup(
         optax.adam(critic_lr, eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
-    init_obs = jnp.array([env.single_observation_space.sample()])
+    # Initialise observation.
+    init_obs = jnp.array([env.single_observation_space.sample()["agents_view"]])
     init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
     init_x = Observation(init_obs, init_action_mask)
 
