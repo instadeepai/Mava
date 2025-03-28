@@ -328,7 +328,7 @@ class GymToJumanji:
             key: value for key, value in info["metrics"].items() if key[0] != "_"
         }
         extras["real_next_obs"] = self._format_observation(  # type: ignore
-            info["real_next_obs"], info["real_next_action_mask"]
+            info["real_next_obs"], info["real_next_action_mask"], info["real_next_global_obs"]
         )
 
         if "won_episode" in info:
@@ -369,8 +369,9 @@ def async_multiagent_worker(  # CCR001
 
             if command == "reset":
                 observation, info = env.reset(**data)
-                info["real_next_obs"] = observation
+                info["real_next_obs"] = observation["agents_view"]
                 info["real_next_action_mask"] = info["action_mask"]
+                info["real_next_global_obs"] = observation.get("global_state", None)
                 if shared_memory:
                     write_to_shared_memory(observation_space, index, observation, shared_memory)
                     observation = None
@@ -385,8 +386,9 @@ def async_multiagent_worker(  # CCR001
                     truncated,
                     info,
                 ) = env.step(data)
-                info["real_next_obs"] = observation
+                info["real_next_obs"] = observation["agents_view"]
                 info["real_next_action_mask"] = info["action_mask"]
+                info["real_next_global_obs"] = observation.get("global_state", None)
                 if np.logical_or(terminated, truncated).all():
                     observation, new_info = env.reset()
                     info["action_mask"] = new_info["action_mask"]
