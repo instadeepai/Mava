@@ -94,7 +94,7 @@ def rollout(
         apply_fns (Tuple): Functions for running the actor and critic networks.
         actor_device (Device): Actor device to use for rollout.
         seeds (List[int]): Seeds for initializing the environment.
-        thread_lifetime (ThreadLifetime): Manages the thread's lifecycle.
+        stop_event (threading.Event): Manages the thread's lifecycle.
     """
     name = threading.current_thread().name
     print(f"{Fore.BLUE}{Style.BRIGHT}Thread {name} started{Style.RESET_ALL}")
@@ -157,16 +157,11 @@ def rollout(
                 last_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
                 last_dones = move_to_device(last_dones)
 
-                # Sample action from the policy and squeeze out the batch dimension.
+                # Sample action from the policy.
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
                     action, log_prob, value, hstates = act_fn(
                         params, last_obs, last_dones, last_hstates, act_key
-                    )
-                    value, action, log_prob = (
-                        value,
-                        action,
-                        log_prob,
                     )
                     cpu_action = jax.device_get(action)
 
@@ -187,7 +182,6 @@ def rollout(
                     )
                 )
                 last_hstates = hstates
-
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
         # Send trajectories to learner
@@ -261,7 +255,7 @@ def get_learner_step_fn(
                     key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
-                    # Rerun Network
+                    # Rerun network
 
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, actor_policy = actor_apply_fn(
@@ -271,8 +265,8 @@ def get_learner_step_fn(
 
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
-                    loss_actor1 = ratio * gae
-                    loss_actor2 = (
+                    actor_loss1 = ratio * gae
+                    actor_loss2 = (
                         jnp.clip(
                             ratio,
                             1.0 - config.system.clip_eps,
@@ -280,13 +274,13 @@ def get_learner_step_fn(
                         )
                         * gae
                     )
-                    loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
-                    loss_actor = loss_actor.mean()
+                    actor_loss = -jnp.minimum(actor_loss1, actor_loss2)
+                    actor_loss = actor_loss.mean()
                     # The seed will be used in the TanhTransformedDistribution:
                     entropy = actor_policy.entropy(seed=key).mean()
 
-                    total_loss = loss_actor - config.system.ent_coef * entropy
-                    return total_loss, (loss_actor, entropy)
+                    total_loss = actor_loss - config.system.ent_coef * entropy
+                    return total_loss, (actor_loss, entropy)
 
                 def _critic_loss_fn(
                     critic_params: FrozenDict,
@@ -294,13 +288,13 @@ def get_learner_step_fn(
                     targets: chex.Array,
                 ) -> Tuple:
                     """Calculate the critic loss."""
-                    # Rerun Network
+                    # Rerun network
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, value = critic_apply_fn(
                         critic_params, traj_batch.hstates.critic_hidden_state[0], obs_and_done
                     )
 
-                    # Calculate Value Loss
+                    # Calculate value loss
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
                         -config.system.clip_eps, config.system.clip_eps
                     )
@@ -366,7 +360,6 @@ def get_learner_step_fn(
                 return (new_params, new_opt_state, key), loss_info
 
             params, opt_states, traj_batch, advantages, targets, key = update_state
-
             key = jnp.squeeze(key, axis=0)  # Remove the learner_devices axis
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
             key = jnp.expand_dims(key, axis=0)  # Add the learner_devices axis for shape consitency
@@ -414,6 +407,7 @@ def get_learner_step_fn(
 
         params, opt_states, traj_batch, advantages, targets, key = update_state
 
+        # hstates is replaced in learner thread
         learner_state = RNNLearnerState(
             params,
             opt_states,
@@ -571,14 +565,14 @@ def learner_setup(
         optax.adam(critic_lr, eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
-    init_obs = env.reset().observation
-    init_agents_view = init_obs.agents_view[0][jnp.newaxis, jnp.newaxis, :]
-    init_action_mask = init_obs.action_mask[0][jnp.newaxis, jnp.newaxis, :]
-    init_global_state = init_obs.global_state[0][jnp.newaxis, jnp.newaxis, :]  # type: ignore
-    single_obs = ObservationGlobalState(init_agents_view, init_action_mask, init_global_state)
+    # Initialise observation.
+    single_obs = env.single_observation_space.sample()
+    local_obs = jnp.array([[single_obs["agents_view"]]])
+    global_obs = jnp.array([[single_obs["global_state"]]])
+    init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
+    init_obs = ObservationGlobalState(local_obs, init_action_mask, global_obs)
     init_done = jnp.zeros((1, config.arch.num_envs, config.system.num_agents), dtype=bool)
-    init_x = (single_obs, init_done)
+    init_x = (init_obs, init_done)
 
     # Initialise hidden states.
     init_policy_hstate = ScannedRNN.initialize_carry(
