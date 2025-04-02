@@ -12,20 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Copyright 2022 InstaDeep Ltd. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License
-
 import copy
 from functools import partial
 
@@ -68,7 +54,7 @@ for num_time_steps in _num_time_steps:
     obs_dim = 11
     seq_len = num_agents * num_time_steps
 
-    retnet_embed_dim = 32
+    retnet_embed_dim = 128
     retnet_num_heads = 2
     retnet_num_blocks = 2
     num_chunks = 1
@@ -205,6 +191,7 @@ for num_time_steps in _num_time_steps:
     print(f"Total value error: {total_value_error}")
 
     total_obs_error = jnp.mean(jnp.abs(train_obs_rep_out - inference_encoded_obs))
+
     print(f"Total encoded obs error: {total_obs_error}")
 
     seq_ave_obs_error = jnp.mean(jnp.abs(train_obs_rep_out - inference_encoded_obs), axis=-1)
@@ -216,7 +203,7 @@ for num_time_steps in _num_time_steps:
         go.Scatter(
             x=list(range(len(single_obs_error))),
             y=single_obs_error.tolist(),  # Convert from jax array to list
-            name=f"Seq len = {seq_len}",
+            name=f"Total Timesteps - {num_time_steps}",
             mode="lines",
         )
     )
@@ -225,7 +212,7 @@ for num_time_steps in _num_time_steps:
         go.Scatter(
             x=list(range(len(ave_over_batch_obs_error))),
             y=ave_over_batch_obs_error.tolist(),  # Convert from jax array to list
-            name=f"Seq len = {seq_len}",
+            name=f"Total Timesteps - {num_time_steps}",
             mode="lines",
         )
     )
@@ -336,7 +323,7 @@ for num_time_steps in _num_time_steps:
         go.Scatter(
             x=list(range(len(single_logits_error))),
             y=single_logits_error.tolist(),  # Convert from jax array to list
-            name=f"Seq len = {seq_len}",
+            name=f"Total Timesteps - {num_time_steps}",
             mode="lines",
         )
     )
@@ -345,6 +332,8 @@ for num_time_steps in _num_time_steps:
         go.Scatter(
             x=list(range(len(ave_over_batch_logits_error))),
             y=ave_over_batch_logits_error.tolist(),  # Convert from jax array to list
+            name=f"Total Timesteps - {num_time_steps}",
+            mode="lines",
         )
     )
 
@@ -430,7 +419,7 @@ for num_time_steps in _num_time_steps:
         go.Scatter(
             x=list(range(len(single_obs_error))),
             y=single_obs_error.tolist(),  # Convert from jax array to list
-            name=f"Seq len = {seq_len}",
+            name=f"Total Timesteps - {num_time_steps}",
             mode="lines",
         )
     )
@@ -439,6 +428,8 @@ for num_time_steps in _num_time_steps:
         go.Scatter(
             x=list(range(len(ave_over_batch_obs_error))),
             y=ave_over_batch_obs_error.tolist(),  # Convert from jax array to list
+            name=f"Total Timesteps - {num_time_steps}",
+            mode="lines",
         )
     )
 
@@ -518,7 +509,7 @@ for num_time_steps in _num_time_steps:
         go.Scatter(
             x=list(range(len(single_logits_error))),
             y=single_logits_error.tolist(),  # Convert from jax array to list
-            name=f"Seq len = {seq_len}",
+            name=f"Total Timesteps - {num_time_steps}",
             mode="lines",
         )
     )
@@ -527,6 +518,8 @@ for num_time_steps in _num_time_steps:
         go.Scatter(
             x=list(range(len(ave_over_batch_logits_error))),
             y=ave_over_batch_logits_error.tolist(),  # Convert from jax array to list
+            name=f"Total Timesteps - {num_time_steps}",
+            mode="lines",
         )
     )
 
@@ -534,7 +527,7 @@ for num_time_steps in _num_time_steps:
 enc_fig.update_layout(
     xaxis_title="Sequence",
     yaxis_title="Mean absolute error",
-    # yaxis_type="log",
+    yaxis=dict(tickformat=".0e"),  # Scientific notation format
     title="Encoder SABLE Network Error",
     width=1000,
     height=500,
@@ -544,7 +537,7 @@ enc_fig.update_layout(
 enc_done_fig.update_layout(
     xaxis_title="Sequence",
     yaxis_title="Mean absolute error",
-    # yaxis_type="log",
+    yaxis=dict(tickformat=".0e"),  # Scientific notation format
     title="RESETS - Encoder SABLE Network Error",
     width=1000,
     height=500,
@@ -553,7 +546,7 @@ enc_done_fig.update_layout(
 enc_ave_over_batch_fig.update_layout(
     xaxis_title="Sequence",
     yaxis_title="Mean absolute error",
-    # yaxis_type="log",
+    yaxis=dict(tickformat=".0e"),  # Scientific notation format
     title="Encoder SABLE Network Error",
     width=1000,
     height=500,
@@ -563,7 +556,7 @@ enc_ave_over_batch_fig.update_layout(
 enc_done_ave_over_batch_fig.update_layout(
     xaxis_title="Sequence",
     yaxis_title="Mean absolute error",
-    # yaxis_type="log",
+    yaxis=dict(tickformat=".0e"),  # Scientific notation format
     title="RESETS - Encoder SABLE Network Error",
     width=1000,
     height=500,
@@ -573,7 +566,7 @@ enc_done_ave_over_batch_fig.update_layout(
 dec_fig.update_layout(
     xaxis_title="Sequence",
     yaxis_title="Mean absolute error",
-    # yaxis_type="log",
+    yaxis=dict(tickformat=".0e"),  # Scientific notation format
     title="Decoder SABLE Network Error",
     width=1000,
     height=500,
@@ -583,7 +576,7 @@ dec_fig.update_layout(
 dec_done_fig.update_layout(
     xaxis_title="Sequence",
     yaxis_title="Mean absolute error",
-    # yaxis_type="log",
+    yaxis=dict(tickformat=".0e"),  # Scientific notation format
     title="RESETS - Decoder SABLE Network Error",
     width=1000,
     height=500,
@@ -592,7 +585,7 @@ dec_done_fig.update_layout(
 dec_ave_over_batch_fig.update_layout(
     xaxis_title="Sequence",
     yaxis_title="Mean absolute error",
-    # yaxis_type="log",
+    yaxis=dict(tickformat=".0e"),  # Scientific notation format
     title="Decoder SABLE Network Error",
     width=1000,
     height=500,
@@ -602,56 +595,64 @@ dec_ave_over_batch_fig.update_layout(
 dec_done_ave_over_batch_fig.update_layout(
     xaxis_title="Sequence",
     yaxis_title="Mean absolute error",
-    # yaxis_type="log",
+    yaxis=dict(tickformat=".0e"),  # Scientific notation format
     title="RESETS - Decoder SABLE Network Error",
     width=1000,
     height=500,
     template="plotly_white",
 )
 # Save the interactive HTML plot
-enc_fig.write_html(f"error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}.html")
-dec_fig.write_html(f"error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}.html")
+enc_fig.write_html(
+    f"outputs/error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}.html"
+)
+dec_fig.write_html(
+    f"outputs/error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}.html"
+)
 enc_ave_over_batch_fig.write_html(
-    f"error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}_ave_over_batch.html"
+    f"outputs/error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}_ave_over_batch.html"
 )
 dec_ave_over_batch_fig.write_html(
-    f"error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}_ave_over_batch.html"
+    f"outputs/error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}_ave_over_batch.html"
 )
 
 # save done plots
 enc_done_fig.write_html(
-    f"error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}_done.html"
+    f"outputs/error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}_done.html"
 )
 dec_done_fig.write_html(
-    f"error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}_done.html"
+    f"outputs/error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}_done.html"
 )
 enc_done_ave_over_batch_fig.write_html(
-    f"error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}_done_ave_over_batch.html"
+    f"outputs/error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}_done_ave_over_batch.html"
 )
 dec_done_ave_over_batch_fig.write_html(
-    f"error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}_done_ave_over_batch.html"
+    f"outputs/error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}_done_ave_over_batch.html"
 )
 
 # Also save as a static image for compatibility
-enc_fig.write_image(f"error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}.png")
-dec_fig.write_image(f"error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}.png")
+enc_fig.write_image(
+    f"outputs/error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}.png"
+)
+dec_fig.write_image(
+    f"outputs/error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}.png"
+)
 enc_ave_over_batch_fig.write_image(
-    f"error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}_ave_over_batch.png"
+    f"outputs/error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}_ave_over_batch.png"
 )
 dec_ave_over_batch_fig.write_image(
-    f"error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}_ave_over_batch.png"
+    f"outputs/error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}_ave_over_batch.png"
 )
 
 # save done plots
 enc_done_fig.write_image(
-    f"error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}_done.png"
+    f"outputs/error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}_done.png"
 )
 dec_done_fig.write_image(
-    f"error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}_done.png"
+    f"outputs/error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}_done.png"
 )
 enc_done_ave_over_batch_fig.write_image(
-    f"error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}_done_ave_over_batch.png"
+    f"outputs/error-plots/encoder/scale_factor_{memory_config.decay_scaling_factor!s}_done_ave_over_batch.png"
 )
 dec_done_ave_over_batch_fig.write_image(
-    f"error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}_done_ave_over_batch.png"
+    f"outputs/error-plots/decoder/scale_factor_{memory_config.decay_scaling_factor!s}_done_ave_over_batch.png"
 )
