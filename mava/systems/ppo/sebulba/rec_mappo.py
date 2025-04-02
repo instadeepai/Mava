@@ -124,8 +124,6 @@ def rollout(
         action = actor_policy.sample(seed=key).squeeze(0)
         log_prob = actor_policy.log_prob(action).squeeze(0)
         value = value.squeeze(0)
-        # It may be faster to calculate the values in the learner as
-        # then we won't need to pass critic params to actors.
 
         hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
         return action, log_prob, value, hstates
@@ -646,7 +644,7 @@ def learner_setup(
 
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
-    _config.logger.system_name = "rec_mappo_sebulba.yaml"
+    _config.logger.system_name = "rec_mappo_sebulba"
     config = copy.deepcopy(_config)
 
     local_devices = jax.local_devices()
