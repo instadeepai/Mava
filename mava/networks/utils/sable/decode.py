@@ -39,6 +39,7 @@ def discrete_train_decoder_fn(
     action: chex.Array,
     legal_actions: chex.Array,
     hstates: chex.Array,
+    scales: chex.Array,
     dones: chex.Array,
     step_count: chex.Array,
     n_agents: int,
@@ -57,6 +58,7 @@ def discrete_train_decoder_fn(
         action=shifted_actions,
         obs_rep=obs_rep,
         hstates=hstates,
+        scales=scales,
         dones=dones,
         step_count=step_count,
         num_chunks=num_chunks,
@@ -103,6 +105,7 @@ def discrete_autoregressive_act(
     decoder: nn.Module,
     obs_rep: chex.Array,
     hstates: chex.Array,
+    scales: chex.Array,
     legal_actions: chex.Array,
     step_count: chex.Array,
     key: chex.PRNGKey,
@@ -121,6 +124,7 @@ def discrete_autoregressive_act(
             action=shifted_actions[:, i : i + 1, :],
             obs_rep=obs_rep[:, i : i + 1, :],
             hstates=hstates,
+            scales=scales,
             step_count=step_count[:, i : i + 1],
         )
         masked_logits = jnp.where(
@@ -150,6 +154,7 @@ def continuous_train_decoder_fn(
     action: chex.Array,
     legal_actions: chex.Array,
     hstates: chex.Array,
+    scales: chex.Array,
     dones: chex.Array,
     step_count: chex.Array,
     n_agents: int,
@@ -179,6 +184,7 @@ def continuous_train_decoder_fn(
             action=chunk_shifted_actions,
             obs_rep=chunked_obs_rep,
             hstates=hstates,
+            scales=scales,
             dones=chunk_dones,
             step_count=chunk_step_count,
         )
@@ -216,6 +222,7 @@ def continuous_autoregressive_act(
     decoder: nn.Module,
     obs_rep: chex.Array,
     hstates: chex.Array,
+    scales: chex.Array,
     legal_actions: chex.Array,
     step_count: chex.Array,
     action_dim: int,
@@ -235,6 +242,7 @@ def continuous_autoregressive_act(
             action=shifted_actions[:, i : i + 1, :],
             obs_rep=obs_rep[:, i : i + 1, :],
             hstates=hstates,
+            scales=scales,
             step_count=step_count[:, i : i + 1],
         )
         action_std = jax.nn.softplus(decoder.log_std) + _MIN_SCALE

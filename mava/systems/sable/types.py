@@ -20,6 +20,8 @@ from jumanji.types import TimeStep
 from optax._src.base import OptState
 from typing_extensions import NamedTuple
 
+from mava.types import Observation
+
 
 class SableNetworkConfig(NamedTuple):
     """Configuration for the Sable network."""
@@ -54,6 +56,7 @@ class RecLearnerState(NamedTuple):
     env_state: Array
     timestep: TimeStep
     hstates: HiddenStates
+    scales: Scales
 
 
 class FFLearnerState(NamedTuple):
@@ -67,9 +70,9 @@ class FFLearnerState(NamedTuple):
 
 
 ActorApply = Callable[
-    [FrozenDict, Array, Array, HiddenStates, PRNGKey],
-    Tuple[Array, Array, Array, Array, HiddenStates],
+    [FrozenDict, Observation, HiddenStates, Scales, PRNGKey],
+    Tuple[Array, Array, Array, HiddenStates, Scales],
 ]
 LearnerApply = Callable[
-    [FrozenDict, Array, Array, Array, HiddenStates, Array, PRNGKey], Tuple[Array, Array, Array]
+    [FrozenDict, Array, Array, HiddenStates, Scales, Array, PRNGKey], Tuple[Array, Array, Array]
 ]

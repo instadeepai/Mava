@@ -167,7 +167,7 @@ class Encoder(nn.Module):
 
     def recurrent(
         self, obs: chex.Array, hstate: chex.Array, scale: chex.Array, step_count: chex.Array
-    ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array]:
+    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         """Apply recurrent encoding."""
         updated_hstate = jnp.zeros_like(hstate)
         obs_rep = self.obs_encoder(obs)
@@ -183,7 +183,7 @@ class Encoder(nn.Module):
         # Compute the value function
         value = self.head(obs_rep)
 
-        return value, obs_rep, updated_hstate, scale
+        return value, obs_rep, updated_hstate
 
 
 class DecodeBlock(nn.Module):
@@ -501,6 +501,7 @@ class SableNetwork(nn.Module):
             encoder=self.encoder,
             obs=obs,
             hstate=hstates[0],
+            scale=scales[0],
             dones=dones,
             step_count=step_count,
         )
@@ -511,6 +512,7 @@ class SableNetwork(nn.Module):
             action=action,
             legal_actions=legal_actions,
             hstates=hstates[1:],
+            scales=scales[1:],
             dones=dones,
             step_count=step_count,
             rng_key=rng_key,
@@ -525,7 +527,7 @@ class SableNetwork(nn.Module):
         hstates: HiddenStates,
         scales: Scales,
         key: chex.PRNGKey,
-    ) -> Tuple[chex.Array, chex.Array, chex.Array, HiddenStates]:
+    ) -> Tuple[chex.Array, chex.Array, chex.Array, HiddenStates, Scales]:
         """Inference phase."""
         obs, legal_actions, step_count = (
             observation.agents_view,
@@ -547,6 +549,7 @@ class SableNetwork(nn.Module):
             encoder=self.encoder,
             obs=obs,
             decayed_hstate=decayed_hstates[0],
+            scale=new_scales[0],
             step_count=step_count,
         )
 
@@ -555,6 +558,7 @@ class SableNetwork(nn.Module):
             obs_rep=obs_rep,
             legal_actions=legal_actions,
             hstates=decayed_hstates[1:],
+            scales=new_scales[1:],
             step_count=step_count,
             key=key,
         )
@@ -574,4 +578,4 @@ class SableNetwork(nn.Module):
         )
 
         value = jnp.squeeze(value, axis=-1)
-        return output_actions, output_actions_log, value, updated_hs
+        return output_actions, output_actions_log, value, updated_hs, updated_scales

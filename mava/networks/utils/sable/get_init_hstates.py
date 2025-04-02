@@ -14,7 +14,7 @@
 
 import jax.numpy as jnp
 
-from mava.systems.sable.types import HiddenStates, SableNetworkConfig
+from mava.systems.sable.types import HiddenStates, SableNetworkConfig, Scales
 
 
 def get_init_hidden_state(actor_net_config: SableNetworkConfig, batch_size: int) -> HiddenStates:
@@ -41,3 +41,21 @@ def get_init_hidden_state(actor_net_config: SableNetworkConfig, batch_size: int)
         decoder_cross_retn=dec_hs_cross_retn,
     )
     return hidden_states
+
+
+def get_init_scales(actor_net_config: SableNetworkConfig, batch_size: int) -> Scales:
+    """Initializes the scales for the encoder and decoder."""
+    # Define the shape of the scales
+    scale_shape = (
+        batch_size,
+        actor_net_config.n_head,
+        actor_net_config.n_block,
+        1,
+        1,
+    )
+    scales = Scales(
+        encoder=jnp.ones(scale_shape),
+        decoder_self_retn=jnp.ones(scale_shape),
+        decoder_cross_retn=jnp.ones(scale_shape),
+    )
+    return scales
