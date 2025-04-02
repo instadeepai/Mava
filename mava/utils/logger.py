@@ -160,8 +160,7 @@ class NeptuneLogger(BaseLogger):
         self.logger = neptune.init_run(project=project, tags=tags, mode=mode)
 
         self.logger["config"] = stringify_unsupported(cfg)
-        if cfg.logger.kwargs.neptune_group_tag:
-            self.logger["sys/group_tags"].add(list(cfg.logger.kwargs.neptune_group_tag))
+        self.logger["sys/group_tags"].add(list(cfg.logger.kwargs.neptune_group_tag))
 
         self.detailed_logging = cfg.logger.kwargs.detailed_neptune_logging
 
