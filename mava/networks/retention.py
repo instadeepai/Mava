@@ -269,7 +269,7 @@ def reshape_qkv(
 def reshape_dones(dones: Array, num_chunks: int) -> Tuple[Array, Array]:
     # split sequence over chunks
     if num_chunks > 1:
-        dones = rearrange(dones, "B (nC Cs) -> B nC Cs")
+        dones = rearrange(dones, "B (nC Cs) -> B nC Cs", nC=num_chunks)
 
     # add a dummy chunk dim
     else:
@@ -395,26 +395,34 @@ class MultiScaleRetention(nn.Module):
             lambda: k_proj @ (v_proj * value_inner_decay),
         )
 
-        kv_recurrent = []
-        cross_scale = []
+        def single_chunk_hstate_update(carry, chunked_inputs):
+            hstate, kv_scale = carry
+            kv, chunk_decay, delta = chunked_inputs
 
-        for chunk in range(num_chunks):
-            kv_recurrent.append(hstate / kv_scale)
-            cross_scale.append(kv_scale)
+            kv_recurrent = hstate / kv_scale
+            cross_scale = kv_scale
+
             hstate = jax.lax.cond(
                 inference,
-                lambda hstate=hstate, chunk=chunk: hstate + kv[:, chunk],
-                lambda hstate=hstate, chunk=chunk: hstate
-                * _chunk_decay[chunk][jnp.newaxis, :, jnp.newaxis, jnp.newaxis]
-                * _delta[:, chunk]
-                + kv[:, chunk],
+                lambda hstate=hstate: hstate + kv,
+                lambda hstate=hstate, chunk_decay=chunk_decay, delta=delta: hstate
+                * chunk_decay[jnp.newaxis, :, jnp.newaxis, jnp.newaxis]
+                * delta
+                + kv,
             )
             kv_scale = jnp.clip(
                 jnp.abs(hstate).sum(axis=-2, keepdims=True).max(axis=-1, keepdims=True), min=1.0
             )
+            return (hstate, kv_scale), (kv_recurrent, cross_scale)
 
-        kv_recurrent = jnp.stack(kv_recurrent, axis=1)
-        cross_scale = jnp.stack(cross_scale, axis=1)
+        (hstate, kv_scale), (kv_recurrent, cross_scale) = jax.lax.scan(
+            jax.remat(single_chunk_hstate_update, prevent_cse=False),
+            (hstate, kv_scale),
+            (jnp.swapaxes(kv, 0, 1), _chunk_decay, jnp.swapaxes(_delta, 0, 1)),
+        )
+
+        kv_recurrent = jnp.swapaxes(kv_recurrent, 0, 1)
+        cross_scale = jnp.swapaxes(cross_scale, 0, 1)
 
         all_scale = jnp.maximum(inner_scale, cross_scale)
         align_inner_scale = all_scale / inner_scale
