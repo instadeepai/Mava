@@ -151,7 +151,7 @@ for num_time_steps in _num_time_steps:
             lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.ones_like(x), x), scale
         )
 
-        act_value, act_obs_rep, hstate, _ = enc_jit_inf(
+        act_value, act_obs_rep, hstate = enc_jit_inf(
             enc_network_params,
             obs_i,
             hstate,
@@ -370,7 +370,7 @@ for num_time_steps in _num_time_steps:
         dones_i = dones[:, step * num_agents : (step + 1) * num_agents]
         step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
 
-        act_value, act_obs_rep, hstate, _ = enc_jit_inf(
+        act_value, act_obs_rep, hstate = enc_jit_inf(
             enc_network_params,
             obs_i,
             hstate,

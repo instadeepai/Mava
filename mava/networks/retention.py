@@ -269,7 +269,7 @@ def reshape_qkv(
 def reshape_dones(dones: Array, num_chunks: int) -> Tuple[Array, Array]:
     # split sequence over chunks
     if num_chunks > 1:
-        dones = rearrange(dones, "B (nC Cs) -> B nC Cs")
+        dones = rearrange(dones, "B (nC Cs) -> B nC Cs", nC=num_chunks)
 
     # add a dummy chunk dim
     else:
