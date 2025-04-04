@@ -464,9 +464,9 @@ def learner_setup(
     )
 
     # Initialise observation.
-    init_obs = jnp.array([env.single_observation_space.sample()["agents_view"]])
+    single_obs = jnp.array([env.single_observation_space.sample()["agents_view"]])
     init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
-    init_x = Observation(init_obs, init_action_mask)
+    init_x = Observation(single_obs, init_action_mask)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(actor_key, init_x)
