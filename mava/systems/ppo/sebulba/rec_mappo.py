@@ -637,7 +637,7 @@ def learner_setup(
     init_learner_state = RNNLearnerState(params, opt_states, step_keys, None, None, dones, None)  # type: ignore
     env.close()
 
-    return learn, apply_fns, init_learner_state, learner_sharding  # type: ignore
+    return learn, apply_fns, init_learner_state, learner_sharding
 
 
 def run_experiment(_config: DictConfig) -> float:
