@@ -12,25 +12,26 @@ jobs:
       matrix:
         python-version: ["3.12", "3.11"]
 
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+
     steps:
       - name: Checkout mava
         uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v5
         with:
-          version: "0.5.4"
+          version: "0.6.12"
           enable-cache: true
-          cache-dependency-glob: "requirements/requirements**.txt"  # invalidate cache when requirements file changes
+          cache-dependency-glob: "uv.lock"  # invalidate cache when requirements file changes
 
       - uses: actions/setup-python@v5
         with:
             python-version: "${{ matrix.python-version }}"
 
       - name: Install python dependencies 🔧
-        run: uv pip install .[dev]
-        env:
-          UV_SYSTEM_PYTHON: 1
+        run: uv sync --locked --only-dev  # only install linters/type checkers
 
       - name: Run linters 🖌️
-        run: pre-commit run --all-files --verbose
+        run: uv run pre-commit run --all-files --verbose
