@@ -12,9 +12,6 @@ jobs:
       matrix:
         python-version: ["3.12", "3.11"]
 
-    env:
-      UV_PYTHON: ${{ matrix.python-version }}
-
     steps:
       - name: Checkout mava
         uses: actions/checkout@v4
@@ -25,6 +22,7 @@ jobs:
           version: "0.6.12"
           enable-cache: true
           cache-dependency-glob: "uv.lock"  # invalidate cache when requirements file changes
+          python-version: "${{ matrix.python-version }}"
 
       - uses: actions/setup-python@v5
         with:
