@@ -29,7 +29,9 @@ jobs:
             python-version: "${{ matrix.python-version }}"
 
       - name: Install python dependencies 🔧
-        run: uv sync --locked --only-dev  # only install linters/type checkers
+        run: uv pip install . --group dev
+        env:
+          UV_SYSTEM_PYTHON: 1
 
       - name: Run linters 🖌️
-        run: uv run pre-commit run --all-files --verbose
+        run: pre-commit run --all-files --verbose

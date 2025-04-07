@@ -2,9 +2,9 @@ name: Integration Tests 🧪
 
 on:
   push
-    # TODO: add this back - just for testing with act
-    # branches:
-    #   - develop
+  # push:
+  #   branches:
+  #     - develop
 
 jobs:
   integration-tests:
@@ -26,14 +26,16 @@ jobs:
           version: "0.6.12"
           enable-cache: true
           cache-dependency-glob: "uv.lock"  # invalidate cache when requirements file changes
-          python-version: ${{ matrix.python-version }}
+          python-version: "${{ matrix.python-version }}"
 
       - uses: actions/setup-python@v5
         with:
             python-version: "${{ matrix.python-version }}"
 
       - name: Install python dependencies 🔧
-        run: uv sync --locked --no-dev  # don't install linters/type checkers
+        run: uv pip install . --group dev
+        env:
+          UV_SYSTEM_PYTHON: 1
 
       - name: Run integration tests 🧪
-        run: uv run pytest test/integration_test.py -p no:warnings
+        run: pytest test/integration_test.py -p no:warnings
