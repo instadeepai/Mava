@@ -1,10 +1,9 @@
 name: Integration Tests 🧪
 
 on:
-  push
-  # push:
-  #   branches:
-  #     - develop
+  push:
+    branches:
+      - develop
 
 jobs:
   integration-tests:
