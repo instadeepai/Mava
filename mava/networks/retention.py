@@ -341,7 +341,6 @@ class MultiScaleRetention(nn.Module):
         step_count: Array,
         num_chunks: int,
         kv_scale: Array,
-        inference: bool = False,
     ) -> Tuple[Array, Array, Array]:
         """Chunkwise (default) representation of the multi-scale retention mechanism"""
         B, C, _ = value.shape
@@ -389,11 +388,7 @@ class MultiScaleRetention(nn.Module):
         _xi_scale_factor = jnp.repeat(_xi_scale_factor, self.n_agents, axis=-2)
         _xi = _xi / (_scale / _xi_scale_factor)
 
-        kv = jax.lax.cond(
-            inference,
-            lambda: k_proj @ v_proj,
-            lambda: k_proj @ (v_proj * value_inner_decay),
-        )
+        kv = k_proj @ (v_proj * value_inner_decay)
 
         kv_recurrent = []
         cross_scale = []
@@ -401,13 +396,11 @@ class MultiScaleRetention(nn.Module):
         for chunk in range(num_chunks):
             kv_recurrent.append(hstate / kv_scale)
             cross_scale.append(kv_scale)
-            hstate = jax.lax.cond(
-                inference,
-                lambda hstate=hstate, chunk=chunk: hstate + kv[:, chunk],
-                lambda hstate=hstate, chunk=chunk: hstate
+            hstate = (
+                hstate
                 * _chunk_decay[chunk][jnp.newaxis, :, jnp.newaxis, jnp.newaxis]
                 * _delta[:, chunk]
-                + kv[:, chunk],
+                + kv[:, chunk]
             )
             kv_scale = jnp.clip(
                 jnp.abs(hstate).sum(axis=-2, keepdims=True).max(axis=-1, keepdims=True), min=1.0
@@ -420,11 +413,7 @@ class MultiScaleRetention(nn.Module):
         align_inner_scale = all_scale / inner_scale
         align_cross_scale = all_scale / cross_scale
 
-        cross_output = jax.lax.cond(
-            inference,
-            lambda: q_proj @ kv_recurrent,
-            lambda: (q_proj * _xi) @ kv_recurrent,
-        )
+        cross_output = (q_proj * _xi) @ kv_recurrent
 
         ret_output = cross_output / align_cross_scale + inner_output / align_inner_scale
 

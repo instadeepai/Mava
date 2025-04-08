@@ -170,7 +170,6 @@ train_value_out, train_obs_rep_out, _, _ = enc_jit_apply(
     dones,
     step_counts,
     num_chunks=num_chunks,
-    inference=False,
 )
 
 print(train_obs_rep_out.shape)
@@ -275,7 +274,6 @@ train_logits, _ = dec_jit_apply(
     dones,
     step_counts,
     num_chunks=num_chunks,
-    inference=False,
 )
 
 print(train_logits.shape)
@@ -343,7 +341,6 @@ train_value_out, train_obs_rep_out, _, _ = enc_jit_apply(
     dones,
     step_counts,
     num_chunks=num_chunks,
-    inference=False,
 )
 
 print(train_obs_rep_out.shape)
@@ -414,7 +411,6 @@ train_logits, _ = dec_jit_apply(
     dones,
     step_counts,
     num_chunks=num_chunks,
-    inference=False,
 )
 
 total_logits_error = jnp.mean(jnp.abs(train_logits - act_logits))

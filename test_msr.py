@@ -139,7 +139,6 @@ train_out, _, _ = enc_jit_apply(
     step_counts,
     num_chunks=num_chunks,
     kv_scale=scale,
-    inference=False,
 )
 print(train_out.shape)
 
@@ -225,7 +224,6 @@ train_out, _, _ = dec_jit_apply(
     step_counts,
     num_chunks=num_chunks,
     kv_scale=scale,
-    inference=False,
 )
 print(train_out.shape)
 
@@ -287,7 +285,6 @@ train_out, _, _ = enc_jit_apply(
     step_counts,
     num_chunks=1,
     kv_scale=scale,
-    inference=False,
 )
 print(train_out.shape)
 
@@ -348,7 +345,6 @@ train_out, _, _ = dec_jit_apply(
     step_counts,
     num_chunks=num_chunks,
     kv_scale=scale,
-    inference=False,
 )
 
 print(train_out.shape)

@@ -181,7 +181,6 @@ for num_time_steps in _num_time_steps:
         dones,
         step_counts,
         num_chunks=num_chunks,
-        inference=False,
     )
 
     print(train_obs_rep_out.shape)
@@ -254,9 +253,15 @@ for num_time_steps in _num_time_steps:
     act_logits = []
 
     for step in range(num_time_steps):
-        new_scale = jax.tree.map(lambda x: x * jnp.exp(decay_kappas) + 1.0, scale)
+        new_scale = jax.tree.map(
+            lambda x, decay_kappas=decay_kappas: x * jnp.exp(decay_kappas) + 1.0, scale
+        )
         hstate_scale_factor = jax.tree.map(
-            lambda x, y: jnp.sqrt(x) * jnp.exp(decay_kappas) / jnp.sqrt(y), scale, new_scale
+            lambda x, y, decay_kappas=decay_kappas: jnp.sqrt(x)
+            * jnp.exp(decay_kappas)
+            / jnp.sqrt(y),
+            scale,
+            new_scale,
         )
         hstate = jax.tree.map(lambda x, y: x * y, hstate, hstate_scale_factor)
         scale = new_scale
@@ -307,7 +312,6 @@ for num_time_steps in _num_time_steps:
         dones,
         step_counts,
         num_chunks=num_chunks,
-        inference=False,
     )
 
     print(train_logits.shape)
@@ -398,7 +402,6 @@ for num_time_steps in _num_time_steps:
         dones,
         step_counts,
         num_chunks=num_chunks,
-        inference=False,
     )
 
     print(train_obs_rep_out.shape)
@@ -440,9 +443,15 @@ for num_time_steps in _num_time_steps:
     act_logits = []
 
     for step in range(num_time_steps):
-        new_scale = jax.tree.map(lambda x: x * jnp.exp(decay_kappas) + 1.0, scale)
+        new_scale = jax.tree.map(
+            lambda x, decay_kappas=decay_kappas: x * jnp.exp(decay_kappas) + 1.0, scale
+        )
         hstate_scale_factor = jax.tree.map(
-            lambda x, y: jnp.sqrt(x) * jnp.exp(decay_kappas) / jnp.sqrt(y), scale, new_scale
+            lambda x, y, decay_kappas=decay_kappas: jnp.sqrt(x)
+            * jnp.exp(decay_kappas)
+            / jnp.sqrt(y),
+            scale,
+            new_scale,
         )
         hstate = jax.tree.map(lambda x, y: x * y, hstate, hstate_scale_factor)
         scale = new_scale
@@ -493,7 +502,6 @@ for num_time_steps in _num_time_steps:
         dones,
         step_counts,
         num_chunks=num_chunks,
-        inference=False,
     )
 
     print(train_logits.shape)

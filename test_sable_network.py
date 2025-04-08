@@ -58,8 +58,8 @@ memory_config = DictConfig(
         "type": "rec_sable",
         "decay_scaling_factor": 1.0,
         "timestep_positional_encoding": True,
-        "timestep_chunk_size": None,
-        "chunk_size": num_agents * num_time_steps,
+        "timestep_chunk_size": num_time_steps // num_chunks,
+        "chunk_size": num_agents * num_time_steps // num_chunks,
     }
 )
 
@@ -141,7 +141,7 @@ scales = copy.deepcopy(init_scales)
 for step in range(num_time_steps):
     key, step_key = jax.random.split(key)
     obs_i = jax.tree.map(
-        lambda x: x[:, step * num_agents : (step + 1) * num_agents, ...], observation
+        lambda x, step=step: x[:, step * num_agents : (step + 1) * num_agents, ...], observation
     )
     action_i, log_prob_i, value_i, hstates, scales = network.apply(
         params,

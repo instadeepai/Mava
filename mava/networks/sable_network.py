@@ -79,7 +79,6 @@ class EncodeBlock(nn.Module):
             step_count=step_count,
             num_chunks=num_chunks,
             kv_scale=scale,
-            inference=inference,
         )
         x = self.ln1(x + ret)
         output = self.ln2(x + self.ffn(x))
@@ -240,7 +239,6 @@ class DecodeBlock(nn.Module):
             step_count=step_count,
             num_chunks=num_chunks,
             kv_scale=_scales1,
-            inference=inference,
         )
         ret = self.ln1(x + ret)
 
@@ -254,7 +252,6 @@ class DecodeBlock(nn.Module):
             step_count=step_count,
             num_chunks=num_chunks,
             kv_scale=_scales2,
-            inference=inference,
         )
         y = self.ln2(obs_rep + ret2)
         output = self.ln3(y + self.ffn(y))
@@ -373,7 +370,6 @@ class Decoder(nn.Module):
                 dones=dones,
                 step_count=step_count,
                 num_chunks=num_chunks,
-                inference=inference,
             )
             updated_hstates = tree.map(
                 lambda x, y, j=i: x.at[:, :, j].set(y), updated_hstates, hs_new
