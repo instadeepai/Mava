@@ -7,15 +7,20 @@ loggers:
     enabled: True
   neptune:
     _target_: mava.utils.logger.NeptuneLogger
-    enabled: False
-
-    project: Instadeep/Mava
+    enabled: True
+    
+    # If specified will resume the run with this run ID.
+    # This is useful for resuming runs and logging from multiple processes.
+    # NOTE: it will overwrite the run unless you set the timestep correctly.
+    run_id: ~
+    project: Instadeep/mava-benchmark
     tag: [delete]
+    group_tag: [delete]
     detailed_logging: False  # having mean/std/min/max can clutter neptune so we make it optional
     architecture_name: ${arch.architecture_name}
     # Whether JSON file data should be uploaded to Neptune for downstream
     # aggregation and plotting of data from multiple experiments. Note that when uploading JSON files,
-    # `json_path` must be unset to ensure that uploaded json files don't continue getting larger
+    # `json.path` must be unset to ensure that uploaded json files don't continue getting larger
     # over time. Setting both will raise an error.
     upload_json_data: False
   json:

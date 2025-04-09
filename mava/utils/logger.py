@@ -204,8 +204,10 @@ class NeptuneLogger(BaseLogger):
         base_exp_path: PathLike,
         unique_token: str,
         system_name: str,
+        run_id: str | None,
         project: str,
         tag: list[str],
+        group_tag: list[str],
         detailed_logging: bool,
         architecture_name: str,
         upload_json_data: bool,
@@ -223,12 +225,14 @@ class NeptuneLogger(BaseLogger):
             architecture_name: Name of the architecture [anakin | sebulba].
             upload_json_data: Whether to upload JSON data to neptune.ai.
         """
-        project = project
-        tag = list(tag)
         # async logging leads to deadlocks in sebulba
         mode = "async" if architecture_name == "anakin" else "sync"
 
-        self.logger = neptune.init_run(project=project, tags=tag, mode=mode)
+        if run_id is not None:
+            self.logger = neptune.init_run(with_id=run_id, project=project, mode=mode)
+        else:
+            self.logger = neptune.init_run(project=project, tags=list(tag), mode=mode)
+            self.logger["sys/group_tags"].add(list(group_tag))
 
         self.detailed_logging = detailed_logging
         self.upload_json_data = upload_json_data
