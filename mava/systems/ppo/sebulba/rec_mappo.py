@@ -52,6 +52,7 @@ from mava.systems.ppo.types import (
 from mava.types import (
     Metrics,
     Observation,
+    ObservationGlobalState,
     RecActorApply,
     RecCriticApply,
     SebulbaLearnerFn,
@@ -252,7 +253,6 @@ def get_learner_step_fn(
                     key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
-                    # Rerun network
 
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, actor_policy = actor_apply_fn(
@@ -285,7 +285,6 @@ def get_learner_step_fn(
                     targets: chex.Array,
                 ) -> Tuple:
                     """Calculate the critic loss."""
-                    # Rerun network
                     obs_and_done = (traj_batch.obs, traj_batch.done)
                     _, value = critic_apply_fn(
                         critic_params, traj_batch.hstates.critic_hidden_state[0], obs_and_done
@@ -357,7 +356,6 @@ def get_learner_step_fn(
                 return (new_params, new_opt_state, key), loss_info
 
             params, opt_states, traj_batch, advantages, targets, key = update_state
-
             key = jnp.squeeze(key, axis=0)  # Remove the learner_devices axis
             key, shuffle_key, entropy_key = jax.random.split(key, 3)
             key = jnp.expand_dims(key, axis=0)  # Add the learner_devices axis for shape consitency
@@ -368,7 +366,6 @@ def get_learner_step_fn(
             num_recurrent_chunks = (
                 config.system.rollout_length // config.system.recurrent_chunk_size
             )
-
             batch_size = num_learner_envs * num_recurrent_chunks
             batch = tree.map(
                 lambda x: x.reshape(
@@ -480,6 +477,7 @@ def learner_thread(
                     .reshape(config.arch.num_envs, -1),
                     hstates=hstates,  # type: ignore
                 )
+
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
                     learner_state, train_metrics = learn_fn(learner_state, traj_batch)
@@ -512,7 +510,7 @@ def learner_setup(
     """Initialise learner_fn, network and learner state."""
 
     # Create temporory envoirnments.
-    env = environments.make_gym_env(config, config.arch.num_envs)
+    env = environments.make_gym_env(config, config.arch.num_envs, add_global_state=True)
 
     # Get number of agents and actions.
     action_space = env.single_action_space
@@ -548,6 +546,7 @@ def learner_setup(
         pre_torso=critic_pre_torso,
         post_torso=critic_post_torso,
         hidden_state_dim=config.network.hidden_state_dim,
+        centralised_critic=True,
     )
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
@@ -563,9 +562,11 @@ def learner_setup(
     )
 
     # Initialise observation.
-    single_obs = jnp.array([[env.single_observation_space.sample()["agents_view"]]])
-    init_action_mask = jnp.ones((1, config.system.num_agents, config.system.num_actions))
-    init_obs = Observation(single_obs, init_action_mask)
+    single_obs = env.single_observation_space.sample()
+    local_obs = jnp.array([[single_obs["agents_view"]]])
+    global_obs = jnp.array([[single_obs["global_state"]]])
+    init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
+    init_obs = ObservationGlobalState(local_obs, init_action_mask, global_obs)
     init_done = jnp.zeros((1, config.arch.num_envs, config.system.num_agents), dtype=bool)
     init_x = (init_obs, init_done)
 
@@ -641,7 +642,7 @@ def learner_setup(
 
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
-    _config.logger.system_name = "rec_ippo_sebulba"
+    _config.logger.system_name = "rec_mappo_sebulba"
     config = copy.deepcopy(_config)
 
     local_devices = jax.local_devices()
@@ -706,7 +707,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Executor setup and launch.
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
-    # The rollout queue/ pipe between actor and learner
+    # The rollout queue/ the pipe between actor and learner
     pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding)
     pipe.start()
 
@@ -732,7 +733,7 @@ def run_experiment(_config: DictConfig) -> float:
                 args=(
                     act_key,
                     # We have to do this here, creating envs inside actor threads causes deadlocks
-                    environments.make_gym_env(config, config.arch.num_envs),
+                    environments.make_gym_env(config, config.arch.num_envs, add_global_state=True),
                     config,
                     pipe,
                     params_source,
@@ -835,7 +836,7 @@ def run_experiment(_config: DictConfig) -> float:
 
 @hydra.main(
     config_path="../../../configs/default/",
-    config_name="rec_ippo_sebulba.yaml",
+    config_name="rec_mappo_sebulba.yaml",
     version_base="1.2",
 )
 def hydra_entry_point(cfg: DictConfig) -> float:
@@ -845,7 +846,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
 
     # Run experiment.
     eval_performance = run_experiment(cfg)
-    print(f"{Fore.CYAN}{Style.BRIGHT}Recurrent IPPO experiment completed{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}{Style.BRIGHT}Recurrent MAPPO experiment completed{Style.RESET_ALL}")
     return eval_performance
 
 

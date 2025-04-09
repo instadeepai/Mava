@@ -86,7 +86,7 @@ def rollout(
         apply_fns (Tuple): Functions for running the actor and critic networks.
         actor_device (Device): Actor device to use for rollout.
         seeds (List[int]): Seeds for initializing the environment.
-        thread_lifetime (ThreadLifetime): Manages the thread's lifecycle.
+        stop_event (threading.Event): Manages the thread's lifecycle.
     """
     name = threading.current_thread().name
     print(f"{Fore.BLUE}{Style.BRIGHT}Thread {name} started{Style.RESET_ALL}")
@@ -463,10 +463,10 @@ def learner_setup(
         optax.adam(critic_lr, eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
-    init_obs = jnp.array([env.single_observation_space.sample()])
+    # Initialise observation.
+    single_obs = jnp.array([env.single_observation_space.sample()["agents_view"]])
     init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
-    init_x = Observation(init_obs, init_action_mask)
+    init_x = Observation(single_obs, init_action_mask)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(actor_key, init_x)
