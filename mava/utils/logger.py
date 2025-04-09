@@ -111,7 +111,7 @@ class MavaLogger:
         self.logger.log_config(cfg)  # type: ignore
 
     def log(self, metrics: Dict, t: int, t_eval: int, event: LogEvent) -> None:
-        """Log a dictionary metrics at a given timestep.
+        """Log a dictionary of metrics at a given timestep.
 
         Args:
         ----
@@ -204,13 +204,13 @@ class NeptuneLogger(BaseLogger):
         base_exp_path: PathLike,
         unique_token: str,
         system_name: str,
-        run_id: str | None,
         project: str,
         tag: list[str],
         group_tag: list[str],
         detailed_logging: bool,
         architecture_name: str,
         upload_json_data: bool,
+        run_id: str | None = None,
     ) -> None:
         """
         Initialize neptune.ai logger for experiment tracking.
@@ -221,9 +221,12 @@ class NeptuneLogger(BaseLogger):
             system_name: Name of the system/algorithm being logged.
             project: neptune.ai project name.
             tag: List of tags for the neptune.ai experiment.
+            group_tag: List of group tags - useful for keeping track of a group of experiments.
             detailed_logging: Whether to log detailed metrics (incl. std/min/max).
             architecture_name: Name of the architecture [anakin | sebulba].
             upload_json_data: Whether to upload JSON data to neptune.ai.
+            run_id: ID of the run you wish to resume - None if you don't want to resume the run.
+                Note this will overwrite the run if you restart the step from 0.
         """
         # async logging leads to deadlocks in sebulba
         mode = "async" if architecture_name == "anakin" else "sync"
