@@ -49,6 +49,8 @@ git clone https://github.com/instadeepai/Mava.git
 cd Mava
 # Create a virtual environment and install all dependencies
 uv sync
+# Activate the virtual environment
+source .venv/bin/activate
 ```
 
 Alternatively with pip, create a virtual environment and then:
