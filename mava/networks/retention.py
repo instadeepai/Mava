@@ -17,10 +17,14 @@ from typing import Tuple
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+import numpy as np
 from chex import Array
 from omegaconf import DictConfig
 
 from mava.networks.utils.sable import PositionalEncoding
+
+np.set_printoptions(edgeitems=30, linewidth=1000000)
+jnp.set_printoptions(edgeitems=30, linewidth=1000000)
 
 # General shapes legend:
 # B: batch size
