@@ -65,7 +65,7 @@ class EvalActFn(Protocol):
 
 def get_num_eval_envs(config: DictConfig, absolute_metric: bool) -> int:
     """Returns the number of vmapped envs/batch size during evaluation."""
-    n_devices = jax.device_count()
+    n_devices = jax.device_count() if config.arch.architecture_name == "anakin" else 1
     n_parallel_envs = config.arch.num_envs * n_devices
 
     if absolute_metric:

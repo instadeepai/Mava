@@ -470,7 +470,7 @@ def learner_setup(
     # B: Batch (dummy dimension size = 1)
     # A: Agent
     # Make dummy inputs to init recurrent Q network -> need shape (T, B, A, ...)
-    init_agents_view = jnp.array(env.single_observation_space.sample())
+    init_agents_view = jnp.array(env.single_observation_space.sample()["agents_view"])
     init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
     init_obs = Observation(init_agents_view, init_action_mask)  # (A, ...)
     # (B, T, A, ...)

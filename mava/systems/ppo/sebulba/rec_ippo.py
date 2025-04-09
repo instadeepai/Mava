@@ -92,7 +92,7 @@ def rollout(
         apply_fns (Tuple): Functions for running the actor and critic networks.
         actor_device (Device): Actor device to use for rollout.
         seeds (List[int]): Seeds for initializing the environment.
-        thread_lifetime (ThreadLifetime): Manages the thread's lifecycle.
+        stop_event (threading.Event): Manages the thread's lifecycle.
     """
     name = threading.current_thread().name
     print(f"{Fore.BLUE}{Style.BRIGHT}Thread {name} started{Style.RESET_ALL}")
@@ -562,8 +562,8 @@ def learner_setup(
         optax.adam(critic_lr, eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
-    single_obs = jnp.array([[env.single_observation_space.sample()]])
+    # Initialise observation.
+    single_obs = jnp.array([[env.single_observation_space.sample()["agents_view"]]])
     init_action_mask = jnp.ones((1, config.system.num_agents, config.system.num_actions))
     init_obs = Observation(single_obs, init_action_mask)
     init_done = jnp.zeros((1, config.arch.num_envs, config.system.num_agents), dtype=bool)
@@ -704,7 +704,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Executor setup and launch.
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
-    # The rollout queue/ the pipe between actor and learner
+    # The rollout queue/ pipe between actor and learner
     pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding)
     pipe.start()
 
