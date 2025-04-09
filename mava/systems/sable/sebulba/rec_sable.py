@@ -68,6 +68,10 @@ from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 from mava.wrappers.gym import GymToJumanji, TimeStep
 
+LearnFnType = Callable[
+    [LearnerState, Transition, HiddenStates, HiddenStates], Tuple[LearnerState, Metrics]
+]
+
 
 def rollout(
     key: chex.PRNGKey,
@@ -135,7 +139,7 @@ def rollout(
 
                 obs_tpu = tree.map(move_to_device, timestep.observation)
 
-                prev_dones = jnp.repeat(timestep.last(), config.system.num_agents).reshape(
+                prev_dones = np.repeat(timestep.last(), config.system.num_agents).reshape(
                     config.arch.num_envs, -1
                 )
 
@@ -180,7 +184,7 @@ def get_learner_step_fn(
     apply_fns: Tuple[ActorApply, LearnerApply],
     update_fn: optax.TransformUpdateFn,
     config: DictConfig,
-) -> Callable[[LearnerState, Transition, HiddenStates, HiddenStates], Tuple[LearnerState, Metrics]]:
+) -> LearnFnType:
     """Get the learner function."""
 
     num_envs = config.arch.num_envs
@@ -192,29 +196,29 @@ def get_learner_step_fn(
     def _update_step(
         learner_state: LearnerState,
         traj_batch: Transition,
-        prev_hstates: HiddenStates,
-        updated_hstates: HiddenStates,
+        initial_hstate: HiddenStates,
+        last_hstate: HiddenStates,
     ) -> Tuple[LearnerState, Metrics]:
         """A single update of the network.
-
         This function calculates advantages and targets based on the trajectories
         from the actor and updates the actor and critic networks based on the losses.
-
         Args:
             learner_state (LearnerState): contains all the items needed for learning.
             traj_batch (PPOTransition): the batch of data to learn with.
+            initial_hstate (HiddenState): the hidden state from the start of the rollout.
+            final_hstate (HiddenState): the last hidden state of the rollout.
         """
 
         # Calculate advantage
         params, opt_states, key, _, final_timestep = learner_state
         key = jnp.squeeze(key, axis=0)
-        _, _, current_val, _ = sable_action_select_fn(  # type: ignore
+        _, _, last_val, _ = sable_action_select_fn(  # type: ignore
             params,
             observation=final_timestep.observation,
-            hstates=updated_hstates,
+            hstates=last_hstate,
             key=key,
         )
-        current_done = tree.map(
+        last_done = tree.map(
             lambda x: jnp.repeat(x, config.system.num_agents).reshape(num_learner_envs, -1),
             final_timestep.last(),
         )
@@ -222,8 +226,8 @@ def get_learner_step_fn(
         # Use the unified calculate_gae function
         advantages, targets = calculate_gae(
             traj_batch=traj_batch,
-            last_val=current_val,
-            last_done=current_done,
+            last_val=last_val,
+            last_done=last_done,
             gamma=config.system.gamma,
             gae_lambda=config.system.gae_lambda,
             unroll=16,
@@ -235,14 +239,14 @@ def get_learner_step_fn(
             def _update_minibatch(train_state: Tuple, batch_info: Tuple) -> Tuple:
                 """Update the network for a single minibatch."""
                 params, opt_state, key = train_state
-                traj_batch, advantages, targets, prev_hstates = batch_info
+                traj_batch, advantages, targets, initial_hstate = batch_info
 
                 def _loss_fn(
                     params: Params,
                     traj_batch: Transition,
                     gae: chex.Array,
                     value_targets: chex.Array,
-                    prev_hstates: HiddenStates,
+                    initial_hstate: HiddenStates,
                     rng_key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate Sable loss."""
@@ -251,7 +255,7 @@ def get_learner_step_fn(
                         params,
                         traj_batch.obs,
                         traj_batch.action,
-                        prev_hstates,
+                        initial_hstate,
                         traj_batch.done,
                         rng_key,
                     )
@@ -297,7 +301,7 @@ def get_learner_step_fn(
                     traj_batch,
                     advantages,
                     targets,
-                    prev_hstates,
+                    initial_hstate,
                     entropy_key,
                 )
 
@@ -318,7 +322,7 @@ def get_learner_step_fn(
 
                 return (new_params, new_opt_state, key), loss_info
 
-            params, opt_states, traj_batch, advantages, targets, key, prev_hstates = update_state
+            params, opt_states, traj_batch, advantages, targets, key, initial_hstate = update_state
             key, shuffle_key, agent_shuffle_key, entropy_key = jax.random.split(key, 4)
 
             # Shuffle batch
@@ -328,7 +332,7 @@ def get_learner_step_fn(
             batch = tree.map(lambda x: jnp.take(x, batch_perm, axis=1), batch)
 
             # Shuffle hidden states
-            prev_hstates = tree.map(lambda x: jnp.take(x, batch_perm, axis=0), prev_hstates)
+            initial_hstate = tree.map(lambda x: jnp.take(x, batch_perm, axis=0), initial_hstate)
 
             # Shuffle agents
             agent_perm = jax.random.permutation(agent_shuffle_key, config.system.num_agents)
@@ -342,22 +346,30 @@ def get_learner_step_fn(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 batch,
             )
-            prev_hs_minibatch = tree.map(
+            last_hs_minibatch = tree.map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
-                prev_hstates,
+                initial_hstate,
             )
 
             # Update minibatches
             (params, opt_states, entropy_key), loss_info = jax.lax.scan(
                 _update_minibatch,
                 (params, opt_states, entropy_key),
-                (*minibatches, prev_hs_minibatch),
+                (*minibatches, last_hs_minibatch),
             )
 
-            update_state = (params, opt_states, traj_batch, advantages, targets, key, prev_hstates)
+            update_state = (
+                params,
+                opt_states,
+                traj_batch,
+                advantages,
+                targets,
+                key,
+                initial_hstate,
+            )
             return update_state, loss_info
 
-        update_state = (params, opt_states, traj_batch, advantages, targets, key, prev_hstates)
+        update_state = (params, opt_states, traj_batch, advantages, targets, key, initial_hstate)
         # Update epochs
         update_state, loss_info = jax.lax.scan(
             _update_epoch, update_state, None, config.system.ppo_epochs
@@ -371,7 +383,7 @@ def get_learner_step_fn(
     def learner_fn(
         learner_state: LearnerState,
         traj_batch: Transition,
-        prev_hstates: HiddenStates,
+        initial_hstate: HiddenStates,
         updated_hstates: HiddenStates,
     ) -> Tuple[LearnerState, Metrics]:
         """Learner function.
@@ -392,7 +404,7 @@ def get_learner_step_fn(
         # the first axis to be time
         traj_batch = tree.map(switch_leading_axes, traj_batch)
         learner_state, loss_info = _update_step(
-            learner_state, traj_batch, prev_hstates, updated_hstates
+            learner_state, traj_batch, initial_hstate, updated_hstates
         )
 
         return learner_state, loss_info
@@ -425,7 +437,7 @@ def learner_thread(
                         traj_batch,
                         rollout_time,
                         ep_metrics,
-                        (timestep, (prev_hstates, updated_hstates)),
+                        (timestep, (initial_hstate, updated_hstates)),
                     ) = pipeline.get(block=True)  # type: ignore
 
                 # Replace the timestep in the learner state with the latest timestep
@@ -435,7 +447,7 @@ def learner_thread(
                 # Update the networks
                 with RecordTimeTo(learn_times["learning_time"]):
                     learner_state, train_metrics = learn_fn(
-                        learner_state, traj_batch, prev_hstates, updated_hstates
+                        learner_state, traj_batch, initial_hstate, updated_hstates
                     )
 
                 metrics.append((ep_metrics, train_metrics))
@@ -458,7 +470,7 @@ def learner_thread(
 def learner_setup(
     key: chex.PRNGKey, config: DictConfig, learner_devices: List
 ) -> Tuple[
-    Callable[[LearnerState, Transition, HiddenStates, HiddenStates], Tuple[LearnerState, Metrics]],
+    LearnFnType,
     Callable,
     LearnerState,
     Sharding,
