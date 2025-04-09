@@ -155,9 +155,9 @@ def rollout(
 
                 # Updated the dones and Hstates
                 dones = timestep.last()
-                dones = jnp.expand_dims(dones, (1, 2, 3, 4))
+                dones = np.expand_dims(dones, (1, 2, 3, 4))
                 hstates = tree.map(
-                    lambda hs, dones=dones: jnp.where(dones, jnp.zeros_like(hs), hs), hstates
+                    lambda hs, dones=dones: np.where(dones, np.zeros_like(hs), hs), hstates
                 )
 
                 # Append data to storage
@@ -206,7 +206,7 @@ def get_learner_step_fn(
             learner_state (LearnerState): contains all the items needed for learning.
             traj_batch (PPOTransition): the batch of data to learn with.
             initial_hstate (HiddenState): the hidden state from the start of the rollout.
-            final_hstate (HiddenState): the last hidden state of the rollout.
+            last_hstate (HiddenState): the last hidden state of the rollout.
         """
 
         # Calculate advantage
