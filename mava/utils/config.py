@@ -44,6 +44,15 @@ def ppo_sebulba_checks(config: DictConfig) -> None:
     )
 
 
+def check_anakin_ppo_config(config: DictConfig) -> None:
+    """Checks that the config for PPO doesn't have any conflicting values."""
+    assert (
+        config.system.num_updates > config.arch.num_evaluation
+    ), "Number of updates per evaluation must be less than total number of updates."
+    assert (
+        config.arch.num_envs % config.system.num_minibatches == 0
+    ), "Number of envs must be divisible by number of minibatches."
+
 def check_total_timesteps(config: DictConfig) -> DictConfig:
     """Check if total_timesteps is set, if not, set it based on the other parameters"""
 
