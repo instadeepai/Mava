@@ -34,4 +34,4 @@ eps_decay: 1e5
 
 # --- Sebulba parameters ---
 replay_ratio : 4  # Average number of times the learner should sample each item from the replay buffer.
-error_tolerance: 4 # Maximum allowed deviation from the target sampling ratio. Controls how far the actual samples can vary from the ideal samples-per-insert ratio. Must be > 2 to prevent deadlocks.
+error_tolerance: 64 # Maximum allowed deviation from the target sampling ratio. Controls how far the actual samples can vary from the ideal samples-per-insert ratio. Must be > 2 to prevent deadlocks.
