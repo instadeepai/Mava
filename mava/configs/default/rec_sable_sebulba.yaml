@@ -1,0 +1,11 @@
+defaults:
+  - logger: logger
+  - arch: sebulba
+  - system: sable/rec_sable
+  - network: rec_retention
+  - env: rware_gym  # [rware_gym, lbf_gym, smaclite_gym, rware_puffer]
+  - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs

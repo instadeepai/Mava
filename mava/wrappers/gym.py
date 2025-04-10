@@ -315,7 +315,7 @@ class GymToJumanji:
         """Create an observation from the raw observation and environment state."""
 
         action_mask = np.stack(action_mask)
-        step_count = np.stack(step_count)[:, np.newaxis]
+        step_count = np.repeat(np.stack(step_count)[:, np.newaxis], self.num_agents, axis=1)
 
         obs_data = {"agents_view": obs, "action_mask": action_mask, "step_count": step_count}
 
