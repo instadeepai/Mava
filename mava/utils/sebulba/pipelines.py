@@ -84,7 +84,7 @@ class Pipeline(threading.Thread):
         self,
         traj: Sequence[MavaTransition],
         metrics: Tuple[Dict, List[Dict]],
-        final_timestep: Tuple[TimeStep, Optional[HiddenStates]],
+        final_timestep: Tuple[TimeStep, Any],
     ) -> None:
         """Put a trajectory on the queue to be consumed by the learner."""
         start_condition, end_condition = (threading.Condition(), threading.Condition())
