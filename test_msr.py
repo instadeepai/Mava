@@ -17,16 +17,20 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 from omegaconf import DictConfig
 
 from mava.networks.retention import MultiScaleRetention
 
 # jax.config.update("jax_enable_x64", True)
 
-bsz = 4
-num_agents = 4
+np.set_printoptions(edgeitems=30, linewidth=1000000)
+jnp.set_printoptions(edgeitems=30, linewidth=1000000)
+
+bsz = 1
+num_agents = 3
 obs_dim = 11
-num_time_steps = 128
+num_time_steps = 4
 seq_len = num_agents * num_time_steps
 
 retnet_embed_dim = 128
@@ -47,6 +51,8 @@ decay_kappas *= memory_config.decay_scaling_factor
 decay_kappas = jnp.log(decay_kappas)
 decay_kappas = decay_kappas[None, :, None, None]
 
+JIT_FUNCTIONS = False
+
 ################################################################################
 # Test unmasked MSR
 ################################################################################
@@ -65,7 +71,10 @@ key, subkey = jax.random.split(key)
 obs = jax.random.normal(subkey, (bsz, seq_len, retnet_embed_dim))
 
 # assuming no resets
-dones = jnp.zeros((bsz, seq_len), dtype=bool)
+# dones = jnp.zeros((bsz, seq_len), dtype=bool)
+dones = jnp.array(
+    [[False, False, False, True, True, True, False, False, False, False, False, False]]
+)
 
 init_hstate = jnp.zeros(
     (
@@ -93,20 +102,29 @@ msr_enc_params = msr_enc.init(
     init_scale[0:1, ...],
     method="recurrent",
 )
-enc_jit_apply = partial(jax.jit(msr_enc.apply, static_argnames="num_chunks"))
-enc_jit_inf = jax.jit(partial(msr_enc.apply, method="recurrent"))
+if JIT_FUNCTIONS:
+    enc_jit_apply = partial(jax.jit(msr_enc.apply, static_argnames="num_chunks"))
+    enc_jit_inf = jax.jit(partial(msr_enc.apply, method="recurrent"))
+else:
+    enc_jit_apply = msr_enc.apply
+    enc_jit_inf = partial(msr_enc.apply, method="recurrent")
 
 hstate = copy.deepcopy(init_hstate)
 scale = copy.deepcopy(init_scale)
 act_output = []
 
-# for the decoder we use the chunkwise
 for step in range(num_time_steps):
-    # todo: reset later
     new_scale = scale * jnp.exp(decay_kappas) + 1.0
     hstate_scale_factor = jnp.sqrt(scale) * jnp.exp(decay_kappas) / jnp.sqrt(new_scale)
     hstate = hstate * hstate_scale_factor
     scale = new_scale
+    reset_done = dones[:, step * num_agents, None, None, None]
+    hstate = jax.tree.map(
+        lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
+    )
+    scale = jax.tree.map(
+        lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.ones_like(x), x), scale
+    )
     obs_i = obs[:, step * num_agents : (step + 1) * num_agents, ...]
     dones_i = dones[:, step * num_agents : (step + 1) * num_agents]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
@@ -122,7 +140,7 @@ for step in range(num_time_steps):
     )
     act_output.append(out)
 
-print("Never done test:")
+print("Simple small scale test:")
 print("Encoder:")
 act_output = jnp.concatenate(act_output, axis=1)
 print(act_output.shape)
@@ -168,8 +186,13 @@ msr_dec_params = msr_dec.init(
     init_scale[0:1, ...],
     method="recurrent",
 )
-dec_jit_apply = partial(jax.jit(msr_dec.apply, static_argnames="num_chunks"))
-dec_jit_inf = jax.jit(partial(msr_dec.apply, method="recurrent"))
+
+if JIT_FUNCTIONS:
+    dec_jit_apply = partial(jax.jit(msr_dec.apply, static_argnames="num_chunks"))
+    dec_jit_inf = jax.jit(partial(msr_dec.apply, method="recurrent"))
+else:
+    dec_jit_apply = msr_dec.apply
+    dec_jit_inf = partial(msr_dec.apply, method="recurrent")
 
 hstate = copy.deepcopy(init_hstate)
 scale = copy.deepcopy(init_scale)
@@ -187,6 +210,9 @@ for step in range(num_time_steps):
     reset_done = dones[:, step * num_agents, None, None, None]
     hstate = jax.tree.map(
         lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
+    )
+    scale = jax.tree.map(
+        lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.ones_like(x), x), scale
     )
     timestep_outputs = []
     for agent in range(num_agents):
@@ -283,7 +309,7 @@ train_out, _, _ = enc_jit_apply(
     hstate,
     dones,
     step_counts,
-    num_chunks=1,
+    num_chunks=num_chunks,
     kv_scale=scale,
 )
 print(train_out.shape)
