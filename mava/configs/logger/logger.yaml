@@ -8,7 +8,7 @@ loggers:
   neptune:
     _target_: mava.utils.logger.NeptuneLogger
     enabled: True
-    
+
     # If specified will resume the run with this run ID.
     # This is useful for resuming runs and logging from multiple processes.
     # NOTE: it will overwrite the run unless you set the timestep correctly.
