@@ -560,7 +560,6 @@ def learner_setup(
     )
 
     # Load model from checkpoint if specified.
-    # TODO: check if this is working
     if config.logger.checkpointing.load_model:
         loaded_checkpoint = Checkpointer(
             model_name=config.logger.system_name,
@@ -568,7 +567,7 @@ def learner_setup(
         )
         # Restore the learner state from the checkpoint
         restored_params, restored_hstates = loaded_checkpoint.restore_params(
-            input_params=params, restore_hstates=True, THiddenState=HiddenStates
+            input_params=params, restore_hstates=False, THiddenState=HiddenStates
         )
         # Update the params and hidden states
         params = restored_params
