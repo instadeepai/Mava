@@ -18,19 +18,25 @@ import os
 import zipfile
 from datetime import datetime
 from enum import Enum
-from typing import ClassVar, Dict, List, Union
+from os import PathLike
+from typing import Callable, ClassVar, Dict, List, Union
 
+import hydra
 import jax
 import neptune
 import numpy as np
 from colorama import Fore, Style
+from etils.epath import Path
 from jax import tree
 from jax.typing import ArrayLike
 from marl_eval.json_tools import JsonLogger as MarlEvalJsonLogger
 from neptune.utils import stringify_unsupported
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from pandas.io.json._normalize import _simple_json_normalize as flatten_dict
+from rich.pretty import pprint
 from tensorboard_logger import configure, log_value
+
+from mava.types import Metrics
 
 
 class LogEvent(Enum):
@@ -41,33 +47,97 @@ class LogEvent(Enum):
     MISC = "misc"
 
 
-class MavaLogger:
-    """The main logger for Mava systems.
+def winrate_custom_metric(metrics: Metrics) -> Metrics:
+    """Calculate win rate from episode metrics.
 
-    Thin wrapper around the MultiLogger that is able to describe arrays of metrics
-    and calculate environment specific metrics if required (e.g winrate).
+    This is an example of a possible custom metric function. Define a new function for your own
+    custom metrics. A custom metrics function needs to take in metrics and process the metrics into
+    a form that will then be logged.
+
+    In this example we process the 'won_episode' and 'is_terminal_step' metrics into a winrate by
+    dividing the number of wins by the number of episodes.
+
+    Args:
+    ----
+        metrics: Dictionary of metrics containing 'won_episode' and 'is_terminal_step'.
+        config: The system config.
+
+    Returns:
+    -------
+        Dictionary with added 'win_rate' metric and 'won_episode' removed.
     """
+    if "won_episode" not in metrics:
+        return metrics
 
-    def __init__(self, config: DictConfig) -> None:
+    # Count the number of terminal steps to determine episode count
+    is_terminal_steps = metrics.get("is_terminal_step", np.array([]))
+    n_episodes: int = np.sum(is_terminal_steps)
+
+    # If no episodes were completed, return unchanged metrics
+    if n_episodes == 0:
+        return metrics
+
+    # Calculate the win rate
+    n_won_episodes: int = np.sum(metrics["won_episode"])
+    win_rate: float = (n_won_episodes / n_episodes) * 100
+
+    # Update metrics
+    metrics["win_rate"] = win_rate
+    metrics.pop("won_episode")
+
+    return metrics
+
+
+class MavaLogger:
+    def __init__(
+        self,
+        config: DictConfig,
+        custom_metrics_fn: Callable[[Metrics], Metrics] = winrate_custom_metric,
+    ) -> None:
+        """The main logger for Mava systems.
+
+        Thin wrapper around the MultiLogger that is able to describe arrays of metrics
+        and calculate environment specific metrics if required (e.g winrate).
+
+        Args:
+        ____
+            config: The system config.
+            custom_metrics_fn: A function that can process the metrics to produce custom metrics.
+                This function takes in all metrics and can use data over a rollout to procudce
+                environment specific metrics, which it then adds to the metrics dictionary.
+                For example a win-rate.
+        """
         self.logger: BaseLogger = _make_multi_logger(config)
         self.cfg = config
+        self.custom_metrics_fn = custom_metrics_fn
 
-    def log(self, metrics: Dict, t: int, t_eval: int, event: LogEvent) -> None:
-        """Log a dictionary metrics at a given timestep.
+    def log_config(self, config: Dict | None = None) -> None:
+        """Log configuration dictionary.
 
         Args:
         ----
-            metrics (Dict): dictionary of metrics to log.
+            config: Configuration to log. If None, uses the config provided during initialization.
+        """
+        cfg = config if config is not None else OmegaConf.to_container(self.cfg, resolve=True)
+        self.logger.log_config(cfg)  # type: ignore
+
+    def log(self, metrics: Metrics, t: int, t_eval: int, event: LogEvent) -> None:
+        """Log a dictionary of metrics at a given timestep.
+
+        Args:
+        ----
+            metrics (Metrics): dictionary of metrics to log.
             t (int): the current timestep.
             t_eval (int): the number of previous evaluations.
             event (LogEvent): the event that the metrics are associated with.
 
         """
-        # Ideally we want to avoid special metrics like this as much as possible.
-        # Might be better to calculate this outside as we want to keep the number of these
-        # if statements to a minimum.
-        if "won_episode" in metrics:
-            metrics = self.calc_winrate(metrics, event)
+        # Apply custom metrics calculation
+        metrics = self.custom_metrics_fn(metrics)
+
+        # Remove the is_terminal_step flag if it exists since we're done with it
+        if "is_terminal_step" in metrics:
+            metrics.pop("is_terminal_step")
 
         if event == LogEvent.TRAIN:
             # We only want to log mean losses, max/min/std don't matter.
@@ -79,27 +149,6 @@ class MavaLogger:
 
         self.logger.log_dict(metrics, t, t_eval, event)
 
-    def calc_winrate(self, episode_metrics: Dict, event: LogEvent) -> Dict:
-        """Log the win rate of the environment's episodes."""
-        # Get the number of episodes used to evaluate.
-        if event == LogEvent.ABSOLUTE:
-            # To measure the absolute metric, we evaluate the best policy
-            # found across training over 10 times the evaluation episodes.
-            # For more details on the absolute metric please see:
-            # https://arxiv.org/abs/2209.10485.
-            n_episodes = self.cfg.arch.num_eval_episodes * 10
-        else:
-            n_episodes = self.cfg.arch.num_eval_episodes
-
-        # Calculate the win rate.
-        n_won_episodes: int = np.sum(episode_metrics["won_episode"])
-        win_rate = (n_won_episodes / n_episodes) * 100
-
-        episode_metrics["win_rate"] = win_rate
-        episode_metrics.pop("won_episode")
-
-        return episode_metrics
-
     def stop(self) -> None:
         """Stop the logger."""
         self.logger.stop()
@@ -107,7 +156,7 @@ class MavaLogger:
 
 class BaseLogger(abc.ABC):
     @abc.abstractmethod
-    def __init__(self, cfg: DictConfig, unique_token: str) -> None:
+    def __init__(self, base_exp_path: PathLike, unique_token: str, system_name: str) -> None:
         pass
 
     @abc.abstractmethod
@@ -115,7 +164,17 @@ class BaseLogger(abc.ABC):
         """Log a single metric."""
         raise NotImplementedError
 
-    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
+    @abc.abstractmethod
+    def log_config(self, config: Dict) -> None:
+        """Log configuration dictionary.
+
+        Args:
+        ----
+            config: Configuration dictionary to log.
+        """
+        raise NotImplementedError
+
+    def log_dict(self, data: Metrics, step: int, eval_step: int, event: LogEvent) -> None:
         """Log a dictionary of metrics."""
         # in case the dict is nested, flatten it.
         data = flatten_dict(data, sep="/")
@@ -129,16 +188,19 @@ class BaseLogger(abc.ABC):
 
 
 class MultiLogger(BaseLogger):
-    """Logger that can log to multiple loggers at oncce."""
-
     def __init__(self, loggers: List[BaseLogger]) -> None:
+        """Logger that can log to multiple loggers at once."""
         self.loggers = loggers
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         for logger in self.loggers:
             logger.log_stat(key, value, step, eval_step, event)
 
-    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
+    def log_config(self, config: Dict) -> None:
+        for logger in self.loggers:
+            logger.log_config(config)
+
+    def log_dict(self, data: Metrics, step: int, eval_step: int, event: LogEvent) -> None:
         for logger in self.loggers:
             logger.log_dict(data, step, eval_step, event)
 
@@ -148,29 +210,51 @@ class MultiLogger(BaseLogger):
 
 
 class NeptuneLogger(BaseLogger):
-    """Logger for neptune.ai."""
+    def __init__(
+        self,
+        base_exp_path: PathLike,
+        unique_token: str,
+        system_name: str,
+        project: str,
+        tag: list[str],
+        group_tag: list[str],
+        detailed_logging: bool,
+        architecture_name: str,
+        upload_json_data: bool,
+        run_id: str | None = None,
+    ) -> None:
+        """
+        Initialize neptune.ai logger for experiment tracking.
 
-    def __init__(self, cfg: DictConfig, unique_token: str) -> None:
-        tags = list(cfg.logger.kwargs.neptune_tag)
-        project = cfg.logger.kwargs.neptune_project
-        mode = (
-            "async" if cfg.arch.architecture_name == "anakin" else "sync"
-        )  # async logging leads to deadlocks in sebulba
+        Args:
+            base_exp_path: Base path where all logs are stored.
+            unique_token: Unique identifier string for this run.
+            system_name: Name of the system/algorithm being logged.
+            project: neptune.ai project name.
+            tag: List of tags for the neptune.ai experiment.
+            group_tag: List of group tags - useful for keeping track of a group of experiments.
+            detailed_logging: Whether to log detailed metrics (incl. std/min/max).
+            architecture_name: Name of the architecture [anakin | sebulba].
+            upload_json_data: Whether to upload JSON data to neptune.ai.
+            run_id: ID of the run you wish to resume - None if you don't want to resume the run.
+                Note this will overwrite the run if you restart the step from 0.
+        """
+        # async logging leads to deadlocks in sebulba
+        mode = "async" if architecture_name == "anakin" else "sync"
 
-        self.logger = neptune.init_run(project=project, tags=tags, mode=mode)
+        if run_id is not None:
+            self.logger = neptune.init_run(with_id=run_id, project=project, mode=mode)
+        else:
+            self.logger = neptune.init_run(project=project, tags=list(tag), mode=mode)
+            self.logger["sys/group_tags"].add(list(group_tag))
 
-        self.logger["config"] = stringify_unsupported(cfg)
-        self.logger["sys/group_tags"].add(list(cfg.logger.kwargs.neptune_group_tag))
-
-        self.detailed_logging = cfg.logger.kwargs.detailed_neptune_logging
+        self.detailed_logging = detailed_logging
+        self.upload_json_data = upload_json_data
 
         # Store json path for uploading json data to Neptune.
-        json_exp_path = get_logger_path(cfg, "json")
-        self.json_file_path = os.path.join(
-            cfg.logger.base_exp_path, f"{json_exp_path}/{unique_token}/metrics.json"
-        )
+        json_exp_path = get_logger_path(system_name, "json")
+        self.json_file_path = Path(base_exp_path, json_exp_path, unique_token, "metrics.json")
         self.unique_token = unique_token
-        self.upload_json_data = cfg.logger.kwargs.upload_json_data
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         # Main metric if it's the mean of a list of metrics (ends with '/mean')
@@ -183,6 +267,9 @@ class NeptuneLogger(BaseLogger):
         value = value.item() if isinstance(value, (jax.Array, np.ndarray)) else value
         self.logger[f"{event.value}/{key}"].log(value, step=step)
 
+    def log_config(self, config: Dict) -> None:
+        self.logger["config"] = stringify_unsupported(config)
+
     def stop(self) -> None:
         if self.upload_json_data:
             self._zip_and_upload_json()
@@ -190,7 +277,7 @@ class NeptuneLogger(BaseLogger):
 
     def _zip_and_upload_json(self) -> None:
         # Create the zip file path by replacing '.json' with '.zip'
-        zip_file_path = self.json_file_path.rsplit(".json", 1)[0] + ".zip"
+        zip_file_path = self.json_file_path.with_suffix(".zip").as_posix()
 
         # Create a zip file containing the specified JSON file
         with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
@@ -200,11 +287,17 @@ class NeptuneLogger(BaseLogger):
 
 
 class TensorboardLogger(BaseLogger):
-    """Logger for tensorboard"""
+    def __init__(self, base_exp_path: PathLike, unique_token: str, system_name: str) -> None:
+        """
+        Initialize TensorBoard logger for visualization.
 
-    def __init__(self, cfg: DictConfig, unique_token: str) -> None:
-        tb_exp_path = get_logger_path(cfg, "tensorboard")
-        tb_logs_path = os.path.join(cfg.logger.base_exp_path, f"{tb_exp_path}/{unique_token}")
+        Args:
+            base_exp_path: Base path where logs will be stored
+            unique_token: Unique identifier string for this run
+            system_name: Name of the system/algorithm being logged
+        """
+        tb_exp_path = get_logger_path(system_name, "tensorboard")
+        tb_logs_path = os.path.join(base_exp_path, Path(tb_exp_path, unique_token))
 
         configure(tb_logs_path)
         self.log = log_value
@@ -213,29 +306,47 @@ class TensorboardLogger(BaseLogger):
         t = step if event != LogEvent.EVAL else eval_step
         self.log(f"{event.value}/{key}", value, t)
 
+    def log_config(self, config: Dict) -> None: ...
+
 
 class JsonLogger(BaseLogger):
-    """Json logger for marl-eval."""
-
     # These are the only metrics that marl-eval needs to plot.
     _METRICS_TO_LOG: ClassVar[List[str]] = ["episode_return/mean", "win_rate", "steps_per_second"]
 
-    def __init__(self, cfg: DictConfig, unique_token: str) -> None:
-        json_exp_path = get_logger_path(cfg, "json")
-        json_logs_path = os.path.join(cfg.logger.base_exp_path, f"{json_exp_path}/{unique_token}")
+    def __init__(
+        self,
+        base_exp_path: PathLike,
+        unique_token: str,
+        system_name: str,
+        path: PathLike | None,
+        task_name: str,
+        env_name: str,
+        seed: int,
+    ) -> None:
+        """
+        Initialize JSON logger for marl-eval compatibility.
 
+        Args:
+            base_exp_path: Base path where all logs are stored.
+            unique_token: Unique identifier string for this run.
+            system_name: Name of the system/algorithm being logged.
+            path: Optional custom path for JSON logs (if None, uses default).
+            task_name: Name of the scenario/task being evaluated.
+            env_name: Name of the environment.
+            seed: Random seed used in the experiment.
+        """
+        json_exp_path = get_logger_path(system_name, "json")
+        json_logs_path = Path(base_exp_path, json_exp_path, unique_token, "metrics.json")
         # if a custom path is specified, use that instead
-        if cfg.logger.kwargs.json_path is not None:
-            json_logs_path = os.path.join(
-                cfg.logger.base_exp_path, "json", cfg.logger.kwargs.json_path
-            )
+        if path is not None:
+            json_logs_path = Path(base_exp_path, "json", path)
 
         self.logger = MarlEvalJsonLogger(
             path=json_logs_path,
-            algorithm_name=cfg.logger.system_name,
-            task_name=cfg.env.scenario.task_name,
-            environment_name=cfg.env.env_name,
-            seed=cfg.system.seed,
+            algorithm_name=system_name,
+            task_name=task_name,
+            environment_name=env_name,
+            seed=seed,
         )
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
@@ -256,10 +367,10 @@ class JsonLogger(BaseLogger):
         if event == LogEvent.ABSOLUTE or event == LogEvent.EVAL:
             self.logger.write(step, key, value, eval_step, event == LogEvent.ABSOLUTE)
 
+    def log_config(self, config: Dict) -> None: ...
+
 
 class ConsoleLogger(BaseLogger):
-    """Logger for writing to stdout."""
-
     _EVENT_COLOURS: ClassVar[Dict[LogEvent, str]] = {
         LogEvent.TRAIN: Fore.MAGENTA,
         LogEvent.EVAL: Fore.GREEN,
@@ -268,7 +379,15 @@ class ConsoleLogger(BaseLogger):
         LogEvent.MISC: Fore.YELLOW,
     }
 
-    def __init__(self, cfg: DictConfig, unique_token: str) -> None:
+    def __init__(self, base_exp_path: PathLike, unique_token: str, system_name: str) -> None:
+        """
+        Initialize console logger for stdout output.
+
+        Args:
+            base_exp_path: Base path for all experiment logs (not used directly).
+            unique_token: Unique identifier string for this run.
+            system_name: Name of the system/algorithm being logged.
+        """
         self.logger = logging.getLogger()
 
         self.logger.handlers = []
@@ -290,7 +409,7 @@ class ConsoleLogger(BaseLogger):
             f"{colour}{Style.BRIGHT}{event.value.upper()} - {key}: {value:.3f}{Style.RESET_ALL}"
         )
 
-    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
+    def log_dict(self, data: Metrics, step: int, eval_step: int, event: LogEvent) -> None:
         # in case the dict is nested, flatten it.
         data = flatten_dict(data, sep=" ")
 
@@ -308,17 +427,21 @@ class ConsoleLogger(BaseLogger):
             f"{colour}{Style.BRIGHT}{event.value.upper()} - {log_str}{Style.RESET_ALL}"
         )
 
+    def log_config(self, config: Metrics) -> None:
+        colour = self._EVENT_COLOURS[LogEvent.MISC]
+        self.logger.info(f"{colour}{Style.BRIGHT}CONFIG{Style.RESET_ALL}")
+        pprint(config)
 
-def _make_multi_logger(cfg: DictConfig) -> BaseLogger:
-    """Creates a MultiLogger given a config"""
-    loggers: List[BaseLogger] = []
+
+def _make_multi_logger(cfg: DictConfig) -> MultiLogger:
+    """Instantiate only enabled loggers and remove the 'enabled' flag."""
     unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 
     if (
-        cfg.logger.use_neptune
-        and cfg.logger.use_json
-        and cfg.logger.kwargs.upload_json_data
-        and cfg.logger.kwargs.json_path
+        cfg.logger.loggers.neptune.enabled
+        and cfg.logger.loggers.json.enabled
+        and cfg.logger.loggers.neptune.upload_json_data
+        and cfg.logger.loggers.json.path
     ):
         raise ValueError(
             "Cannot upload json data to Neptune when `json_path` is set in the base logger config. "
@@ -327,22 +450,26 @@ def _make_multi_logger(cfg: DictConfig) -> BaseLogger:
             "upload your json data but store a large file locally or set `json_path: ~` in "
             "the base logger config."
         )
+    loggers: List[BaseLogger] = []
+    for _logger_config in cfg.logger.loggers.values():
+        logger_config = dict(_logger_config)  # Create a copy to avoid modifying the original
 
-    if cfg.logger.use_neptune:
-        loggers.append(NeptuneLogger(cfg, unique_token))
-    if cfg.logger.use_tb:
-        loggers.append(TensorboardLogger(cfg, unique_token))
-    if cfg.logger.use_json:
-        loggers.append(JsonLogger(cfg, unique_token))
-    if cfg.logger.use_console:
-        loggers.append(ConsoleLogger(cfg, unique_token))
+        # Check if logger is enabled (default to True if not specified)
+        if logger_config.pop("enabled", True):
+            logger = hydra.utils.instantiate(
+                logger_config,
+                base_exp_path=cfg.logger.base_exp_path,
+                unique_token=unique_token,
+                system_name=cfg.logger.system_name,
+            )
+            loggers.append(logger)
 
     return MultiLogger(loggers)
 
 
-def get_logger_path(config: DictConfig, logger_type: str) -> str:
+def get_logger_path(system_name: str, logger_type: str) -> Path:
     """Helper function to create the experiment path."""
-    return f"{logger_type}/{config.logger.system_name}"
+    return Path(logger_type, system_name)
 
 
 def describe(x: ArrayLike) -> Union[Dict[str, ArrayLike], ArrayLike]:

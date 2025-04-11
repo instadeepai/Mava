@@ -1,23 +1,45 @@
 # --- Logging options ---
+# Loggers can be enabled or disabled through the `enable` option. `_target_` specifies the class that is instantiated.
+# All other options are specific to the logger.
+# Custom loggers can be added by creating a new item in the `loggers` dictionary containing `_target_` and `enabled` keys.
 
-base_exp_path: results # Base path for logging.
-use_console: True # Whether to log to stdout.
-use_tb: False # Whether to use tensorboard logging.
-use_json: False # Whether to log marl-eval style to json files.
-use_neptune: False  # Whether to log to neptune.ai.
+base_exp_path: results/
 
-# --- Other logger kwargs ---
-kwargs:
-  neptune_project: Instadeep/mava-benchmark
-  neptune_tag: [delete]
-  neptune_group_tag: [delete]
-  detailed_neptune_logging: False  # having mean/std/min/max can clutter neptune so we make it optional
-  json_path: ~ # If set, json files will be logged to a set path so that multiple experiments can
-    # write to the same json file for easy downstream aggregation and plotting with marl-eval.
-  upload_json_data: False # Whether JSON file data should be uploaded to Neptune for downstream
+loggers:
+  console:
+    _target_: mava.utils.logger.ConsoleLogger
+    enabled: True
+  neptune:
+    _target_: mava.utils.logger.NeptuneLogger
+    enabled: False
+
+    # If specified will resume the run with this run ID.
+    # This is useful for resuming runs and logging from multiple processes.
+    # NOTE: it will overwrite the run unless you set the timestep correctly.
+    run_id: ~
+    project: Instadeep/mava-benchmark
+    tag: [delete]
+    group_tag: [delete]
+    detailed_logging: False  # having mean/std/min/max can clutter neptune so we make it optional
+    architecture_name: ${arch.architecture_name}  # this is required because async logging causes deadlocks in sebulba
+    # Whether JSON file data should be uploaded to Neptune for downstream
     # aggregation and plotting of data from multiple experiments. Note that when uploading JSON files,
-    # `json_path` must be unset to ensure that uploaded json files don't continue getting larger
-    # over time. Setting both will break.
+    # `json.path` must be unset to ensure that uploaded json files don't continue getting larger
+    # over time. Setting both will raise an error.
+    upload_json_data: False
+  json:
+    _target_: mava.utils.logger.JsonLogger
+    enabled: False
+
+    # If set, json files will be logged to a set path so that multiple experiments can
+    # write to the same json file for easy downstream aggregation and plotting with marl-eval.
+    path: ~
+    task_name: ${env.scenario.task_name}
+    env_name: ${env.env_name}
+    seed: ${system.seed}
+  tensorboard:
+    _target_: mava.utils.logger.TensorboardLogger
+    enabled: False
 
 # --- Checkpointing ---
 checkpointing:
@@ -27,7 +49,7 @@ checkpointing:
     max_to_keep: 1 # Maximum number of checkpoints to keep.
     keep_period: ~ # Don't delete any checkpoint where step % keep_period == 0
     checkpoint_uid: ~ # Unique identifier for checkpoint to save. Defaults to timestamp
-
+    path: ~
   load_model: False # Whether to load model checkpoints.
   load_args:
     checkpoint_uid: "" # Unique identifier for checkpoint to load.

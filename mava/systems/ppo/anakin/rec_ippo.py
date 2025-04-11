@@ -14,7 +14,7 @@
 
 import copy
 import time
-from typing import Any, Dict, Tuple
+from typing import Any, Tuple
 
 import chex
 import flax
@@ -26,7 +26,6 @@ from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from jax import tree
 from omegaconf import DictConfig, OmegaConf
-from rich.pretty import pprint
 
 from mava.evaluator import get_eval_fn, get_num_eval_envs, make_rec_eval_act_fn
 from mava.networks import RecurrentActor as Actor
@@ -140,7 +139,8 @@ def get_learner_fn(
             learner_state = RNNLearnerState(
                 params, opt_states, key, env_state, timestep, done, hstates
             )
-            return learner_state, (transition, timestep.extras["episode_metrics"])
+            metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
+            return learner_state, (transition, metrics)
 
         # Step environment for rollout length
         learner_state, (traj_batch, episode_metrics) = jax.lax.scan(
@@ -588,9 +588,7 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Logger setup
     logger = MavaLogger(config)
-    cfg: Dict = OmegaConf.to_container(config, resolve=True)
-    cfg["arch"]["devices"] = jax.devices()
-    pprint(cfg)
+    logger.log_config(OmegaConf.to_container(config, resolve=True))
 
     # Set up checkpointer
     save_checkpoint = config.logger.checkpointing.save_model

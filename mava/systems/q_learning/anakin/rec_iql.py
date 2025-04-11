@@ -31,7 +31,6 @@ from flax.linen import FrozenDict
 from jax import Array, tree
 from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
-from rich.pretty import pprint
 
 from mava.evaluator import ActorState, get_eval_fn, get_num_eval_envs
 from mava.networks import RecQNetwork, ScannedRNN
@@ -275,7 +274,8 @@ def make_update_fns(
             next_term_or_trunc,
         )
 
-        return new_act_state, next_timestep.extras["episode_metrics"]
+        metrics = next_timestep.extras["episode_metrics"] | next_timestep.extras["env_metrics"]
+        return new_act_state, metrics
 
     # ---- Training functions ----
 
@@ -504,10 +504,9 @@ def run_experiment(cfg: DictConfig) -> float:
     # Number of steps to do in the scanned update method (how many anakin steps).
     cfg.system.scan_steps = int(steps_per_rollout / anakin_act_steps)
 
-    pprint(OmegaConf.to_container(cfg, resolve=True))
-
     # Initialise system and make learning/evaluation functions
     (env, eval_env), q_net, opt, rb, learner_state, logger, key = init(cfg)
+    logger.log_config(OmegaConf.to_container(cfg, resolve=True))
     update = make_update_fns(cfg, env, q_net, opt, rb)
 
     cfg.system.num_agents = env.num_agents
