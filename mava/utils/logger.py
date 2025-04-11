@@ -266,7 +266,7 @@ class NeptuneLogger(BaseLogger):
 
     def _zip_and_upload_json(self) -> None:
         # Create the zip file path by replacing '.json' with '.zip'
-        zip_file_path = self.json_file_path.rsplit(".json", 1)[0] + ".zip"
+        zip_file_path = self.json_file_path.with_suffix(".zip").as_posix()
 
         # Create a zip file containing the specified JSON file
         with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
