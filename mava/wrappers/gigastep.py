@@ -95,8 +95,9 @@ class GigastepWrapper(Wrapper):
         state = GigastepState(state, key, 0, adversary_actions)
 
         obs = self._create_observation(obs_team1, obs, state)
+        metrics = {"env_metrics": {"won_episode": False}}
 
-        timestep = restart(obs, shape=(self.num_agents,), extras={"won_episode": False})
+        timestep = restart(obs, shape=(self.num_agents,), extras=metrics)
         return state, timestep
 
     def step(self, state: GigastepState, action: Array) -> Tuple[GigastepState, TimeStep]:
@@ -135,13 +136,14 @@ class GigastepWrapper(Wrapper):
         step_type = jax.lax.select(ep_done, StepType.LAST, StepType.MID)
 
         current_winner = ep_done & self.won_episode(env_state)
+        metrics = {"env_metrics": {"won_episode": current_winner}}
 
         ts = TimeStep(
             step_type=step_type,
             reward=rewards,
             discount=1.0 - dones,
             observation=obs,
-            extras={"won_episode": current_winner},
+            extras=metrics,
         )
         return GigastepState(env_state, key, state.step + 1, adversary_actions), ts
 

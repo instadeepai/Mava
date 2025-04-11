@@ -35,7 +35,6 @@ from jax.experimental.shard_map import shard_map
 from jax.sharding import Mesh, NamedSharding, PartitionSpec, Sharding
 from numpy.typing import NDArray
 from omegaconf import DictConfig, OmegaConf
-from rich.pretty import pprint
 
 from mava.evaluator import get_num_eval_envs, make_rec_eval_act_fn
 from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
@@ -179,7 +178,8 @@ def rollout(
                     )
                 )
                 last_hstates = hstates
-                episode_metrics.append(timestep.extras["episode_metrics"])
+                metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
+                episode_metrics.append(metrics)
 
         # Send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
@@ -683,9 +683,7 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Logger setup
     logger = MavaLogger(config)
-    print_cfg: Dict = OmegaConf.to_container(config, resolve=True)
-    print_cfg["arch"]["devices"] = jax.devices()
-    pprint(print_cfg)
+    logger.log_config(OmegaConf.to_container(config, resolve=True))
 
     # Set up checkpointer
     save_checkpoint = config.logger.checkpointing.save_model

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from functools import cached_property
-from typing import Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 import chex
 import jax.numpy as jnp
@@ -54,7 +54,8 @@ class MatraxWrapper(Wrapper):
             obs_data["global_state"] = global_state
             return timestep.replace(observation=ObservationGlobalState(**obs_data))
 
-        return timestep.replace(observation=Observation(**obs_data))
+        metrics: Dict[str, Any] = {"env_metrics": {}}
+        return timestep.replace(observation=Observation(**obs_data), extras=metrics)
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment."""

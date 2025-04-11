@@ -206,9 +206,10 @@ class JaxMarlWrapper(Wrapper, ABC):
         key, reset_key = jax.random.split(key)
         obs, env_state = self._env.reset(reset_key)
 
+        metrics: Dict[str, Any] = {"env_metrics": {}}  # default to no metrics
         obs = self._create_observation(obs, env_state)
         state = JaxMarlState(env_state, key, jnp.array(0, dtype=int))
-        timestep = restart(obs, shape=(self.num_agents,))
+        timestep = restart(obs, shape=(self.num_agents,), extras=metrics)
 
         return state, timestep
 
@@ -220,6 +221,7 @@ class JaxMarlWrapper(Wrapper, ABC):
             step_key, state.state, unbatchify(action, self.agents)
         )
 
+        metrics: Dict[str, Any] = {"env_metrics": {}}  # default to no metrics
         obs = self._create_observation(obs, env_state)
         obs = obs._replace(step_count=jnp.repeat(state.step, self.num_agents))
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
@@ -229,6 +231,7 @@ class JaxMarlWrapper(Wrapper, ABC):
             reward=batchify(reward, self.agents),
             discount=(1.0 - batchify(done, self.agents)).astype(float),
             observation=obs,
+            extras=metrics,
         )
         state = JaxMarlState(env_state, key, state.step + jnp.array(1, dtype=int))
 
@@ -346,7 +349,7 @@ class SmaxWrapper(JaxMarlWrapper):
         self, key: PRNGKey
     ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
         state, ts = super().reset(key)
-        extras = {"won_episode": False}
+        extras = {"env_metrics": {"won_episode": False}}
         ts = ts.replace(extras=extras)
         return state, ts
 
@@ -356,7 +359,7 @@ class SmaxWrapper(JaxMarlWrapper):
         state, ts = super().step(state, action)
 
         current_winner = (ts.step_type == StepType.LAST) & jnp.all(ts.reward >= 1.0)
-        extras = {"won_episode": current_winner}
+        extras = {"env_metrics": {"won_episode": current_winner}}
         ts = ts.replace(extras=extras)
         return state, ts
 

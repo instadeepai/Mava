@@ -348,7 +348,7 @@ class GymToJumanji:
         )
 
         if "won_episode" in info:
-            extras["won_episode"] = info["won_episode"]
+            extras["env_metrics"] = {"won_episode": info["won_episode"]}
 
         return TimeStep(
             step_type=step_type,
