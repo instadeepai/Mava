@@ -41,11 +41,20 @@ Mava allows researchers to experiment with multi-agent reinforcement learning (M
 
 ## Installation 🎬
 
-At the moment Mava is not meant to be installed as a library, but rather to be used as a research tool. We recommend cloning the Mava repo and pip installing as follows:
+At the moment Mava is not meant to be installed as a library, but rather to be used as a research tool. We recommend cloning the Mava repo and installing dependencies using [uv](https://github.com/astral-sh/uv) as follows:
 
 ```bash
-git clone https://github.com/instadeepai/mava.git
-cd mava
+# Clone the repository
+git clone https://github.com/instadeepai/Mava.git
+cd Mava
+# Create a virtual environment and install all dependencies
+uv sync
+# Activate the virtual environment
+source .venv/bin/activate
+```
+
+Alternatively with pip, create a virtual environment and then:
+```bash
 pip install -e .
 ```
 
