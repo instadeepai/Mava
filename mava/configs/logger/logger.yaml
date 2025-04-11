@@ -1,4 +1,8 @@
 # --- Logging options ---
+# Loggers can be enabled or disabled through the `enable` option. `_target_` specifies the class that is instantiated.
+# All other options are specific to the logger.
+# Custom loggers can be added by creating a new item in the `loggers` dictionary containing `_target_` and `enabled` keys.
+
 base_exp_path: results/
 
 loggers:
@@ -17,7 +21,7 @@ loggers:
     tag: [delete]
     group_tag: [delete]
     detailed_logging: False  # having mean/std/min/max can clutter neptune so we make it optional
-    architecture_name: ${arch.architecture_name}
+    architecture_name: ${arch.architecture_name}  # this is required because async logging causes deadlocks in sebulba
     # Whether JSON file data should be uploaded to Neptune for downstream
     # aggregation and plotting of data from multiple experiments. Note that when uploading JSON files,
     # `json.path` must be unset to ensure that uploaded json files don't continue getting larger
