@@ -36,6 +36,8 @@ from pandas.io.json._normalize import _simple_json_normalize as flatten_dict
 from rich.pretty import pprint
 from tensorboard_logger import configure, log_value
 
+from mava.types import Metrics
+
 
 class LogEvent(Enum):
     ACT = "actor"
@@ -45,12 +47,19 @@ class LogEvent(Enum):
     MISC = "misc"
 
 
-def winrate_custom_metric(metrics: Dict, config: DictConfig) -> Dict:
+def winrate_custom_metric(metrics: Metrics) -> Metrics:
     """Calculate win rate from episode metrics.
+
+    This is an example of a possible custom metric function. Define a new function for your own
+    custom metrics. A custom metrics function needs to take in metrics and process the metrics into
+    a form that will then be logged.
+
+    In this example we process the 'won_episode' and 'is_terminal_step' metrics into a winrate by
+    dividing the number of wins by the number of episodes.
 
     Args:
     ----
-        metrics: Dictionary containing 'won_episode' and 'is_terminal_step'.
+        metrics: Dictionary of metrics containing 'won_episode' and 'is_terminal_step'.
         config: The system config.
 
     Returns:
@@ -83,7 +92,7 @@ class MavaLogger:
     def __init__(
         self,
         config: DictConfig,
-        custom_metrics_fn: Callable[[Dict, DictConfig], Dict] = winrate_custom_metric,
+        custom_metrics_fn: Callable[[Metrics], Metrics] = winrate_custom_metric,
     ) -> None:
         """The main logger for Mava systems.
 
@@ -93,7 +102,9 @@ class MavaLogger:
         Args:
         ____
             config: The system config.
-            custom_metrics_fn: A function that can edit the metrics to produce custom metrics.
+            custom_metrics_fn: A function that can process the metrics to produce custom metrics.
+                This function takes in all metrics and can use data over a rollout to procudce
+                environment specific metrics, which it then adds to the metrics dictionary.
                 For example a win-rate.
         """
         self.logger: BaseLogger = _make_multi_logger(config)
@@ -110,19 +121,19 @@ class MavaLogger:
         cfg = config if config is not None else OmegaConf.to_container(self.cfg, resolve=True)
         self.logger.log_config(cfg)  # type: ignore
 
-    def log(self, metrics: Dict, t: int, t_eval: int, event: LogEvent) -> None:
+    def log(self, metrics: Metrics, t: int, t_eval: int, event: LogEvent) -> None:
         """Log a dictionary of metrics at a given timestep.
 
         Args:
         ----
-            metrics (Dict): dictionary of metrics to log.
+            metrics (Metrics): dictionary of metrics to log.
             t (int): the current timestep.
             t_eval (int): the number of previous evaluations.
             event (LogEvent): the event that the metrics are associated with.
 
         """
         # Apply custom metrics calculation
-        metrics = self.custom_metrics_fn(metrics, self.cfg)
+        metrics = self.custom_metrics_fn(metrics)
 
         # Remove the is_terminal_step flag if it exists since we're done with it
         if "is_terminal_step" in metrics:
@@ -163,7 +174,7 @@ class BaseLogger(abc.ABC):
         """
         raise NotImplementedError
 
-    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
+    def log_dict(self, data: Metrics, step: int, eval_step: int, event: LogEvent) -> None:
         """Log a dictionary of metrics."""
         # in case the dict is nested, flatten it.
         data = flatten_dict(data, sep="/")
@@ -189,7 +200,7 @@ class MultiLogger(BaseLogger):
         for logger in self.loggers:
             logger.log_config(config)
 
-    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
+    def log_dict(self, data: Metrics, step: int, eval_step: int, event: LogEvent) -> None:
         for logger in self.loggers:
             logger.log_dict(data, step, eval_step, event)
 
@@ -398,7 +409,7 @@ class ConsoleLogger(BaseLogger):
             f"{colour}{Style.BRIGHT}{event.value.upper()} - {key}: {value:.3f}{Style.RESET_ALL}"
         )
 
-    def log_dict(self, data: Dict, step: int, eval_step: int, event: LogEvent) -> None:
+    def log_dict(self, data: Metrics, step: int, eval_step: int, event: LogEvent) -> None:
         # in case the dict is nested, flatten it.
         data = flatten_dict(data, sep=" ")
 
@@ -416,7 +427,7 @@ class ConsoleLogger(BaseLogger):
             f"{colour}{Style.BRIGHT}{event.value.upper()} - {log_str}{Style.RESET_ALL}"
         )
 
-    def log_config(self, config: Dict) -> None:
+    def log_config(self, config: Metrics) -> None:
         colour = self._EVENT_COLOURS[LogEvent.MISC]
         self.logger.info(f"{colour}{Style.BRIGHT}CONFIG{Style.RESET_ALL}")
         pprint(config)
