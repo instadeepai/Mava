@@ -94,11 +94,11 @@ key, init_key = jax.random.split(key)
 
 msr_enc_params = msr_enc.init(
     init_key,
-    obs[0:1, 0:1, ...],
-    obs[0:1, 0:1, ...],
-    obs[0:1, 0:1, ...],
+    obs[0:1, 0:num_agents, ...],
+    obs[0:1, 0:num_agents, ...],
+    obs[0:1, 0:num_agents, ...],
     init_hstate[0:1, ...],
-    step_counts[0:1, 0:1],
+    step_counts[0:1, 0:num_agents],
     init_scale[0:1, ...],
     method="recurrent",
 )
