@@ -27,15 +27,15 @@ from mava.networks.retention import MultiScaleRetention
 np.set_printoptions(edgeitems=30, linewidth=1000000)
 jnp.set_printoptions(edgeitems=30, linewidth=1000000)
 
-bsz = 1
+bsz = 16
 num_agents = 4
 obs_dim = 11
-num_time_steps = 512
+num_time_steps = 8
 seq_len = num_agents * num_time_steps
 
-retnet_embed_dim = 64
+retnet_embed_dim = 128
 retnet_num_heads = 2
-num_chunks = 4
+num_chunks = 2
 
 memory_config = DictConfig(
     {
@@ -51,7 +51,7 @@ decay_kappas *= memory_config.decay_scaling_factor
 decay_kappas = jnp.log(decay_kappas)
 decay_kappas = decay_kappas[None, :, None, None]
 
-JIT_FUNCTIONS = False
+JIT_FUNCTIONS = True
 
 ################################################################################
 # Test unmasked MSR
@@ -72,10 +72,6 @@ obs = jax.random.normal(subkey, (bsz, seq_len, retnet_embed_dim))
 
 # assuming no resets
 dones = jnp.zeros((bsz, seq_len), dtype=bool)
-# dones = jnp.array(
-#     [[False, False, False, True, True, True, False, False, False, False, False, False]]
-# )
-
 init_hstate = jnp.zeros(
     (
         bsz,
@@ -101,10 +97,10 @@ msr_enc_params = msr_enc.init(
     num_chunks=1,
 )
 if JIT_FUNCTIONS:
-    enc_jit_apply = jax.jit(partial(msr_enc.apply, num_chunks=num_chunks))
+    enc_jit_apply = jax.jit(msr_enc.apply, static_argnames=["num_chunks"])
     enc_jit_inf = jax.jit(partial(msr_enc.apply, num_chunks=1))
 else:
-    enc_jit_apply = partial(msr_enc.apply, num_chunks=num_chunks)
+    enc_jit_apply = msr_enc.apply
     enc_jit_inf = partial(msr_enc.apply, num_chunks=1)
 
 hstate = copy.deepcopy(init_hstate)
@@ -131,7 +127,7 @@ for step in range(num_time_steps):
     )
     act_output.append(out)
 
-print("Simple small scale test:")
+print("Never done test:")
 print("Encoder:")
 act_output = jnp.concatenate(act_output, axis=1)
 print(act_output.shape)
@@ -145,11 +141,13 @@ train_out, _ = enc_jit_apply(
     hstate,
     dones,
     step_counts,
+    num_chunks=num_chunks,
 )
 print(train_out.shape)
 
 total_error = jnp.mean(jnp.abs(train_out - act_output))
-print(total_error)
+print(f"Mean absolute error: {total_error}")
+print(f"Max absolute error: {jnp.max(jnp.abs(train_out - act_output))}")
 
 ################################################################################
 # Test masked MSR
@@ -175,10 +173,10 @@ msr_dec_params = msr_dec.init(
 )
 
 if JIT_FUNCTIONS:
-    dec_jit_apply = jax.jit(partial(msr_dec.apply, num_chunks=num_chunks))
+    dec_jit_apply = jax.jit(msr_dec.apply, static_argnames=["num_chunks"])
     dec_jit_inf = jax.jit(partial(msr_dec.apply, method="recurrent"))
 else:
-    dec_jit_apply = partial(msr_dec.apply, num_chunks=num_chunks)
+    dec_jit_apply = msr_dec.apply
     dec_jit_inf = partial(msr_dec.apply, method="recurrent")
 
 hstate = copy.deepcopy(init_hstate)
@@ -231,7 +229,8 @@ train_out, _ = dec_jit_apply(
 print(train_out.shape)
 
 total_error = jnp.mean(jnp.abs(train_out - act_output))
-print(total_error)
+print(f"Mean absolute error: {total_error}")
+print(f"Max absolute error: {jnp.max(jnp.abs(train_out - act_output))}")
 
 print()
 print("With done test:")
@@ -283,7 +282,8 @@ train_out, _ = enc_jit_apply(
 print(train_out.shape)
 
 total_error = jnp.mean(jnp.abs(train_out - act_output))
-print(total_error)
+print(f"Mean absolute error: {total_error}")
+print(f"Max absolute error: {jnp.max(jnp.abs(train_out - act_output))}")
 
 print()
 print("Decoder:")
@@ -335,4 +335,5 @@ train_out, _ = dec_jit_apply(
 print(train_out.shape)
 
 total_error = jnp.mean(jnp.abs(train_out - act_output))
-print(total_error)
+print(f"Mean absolute error: {total_error}")
+print(f"Max absolute error: {jnp.max(jnp.abs(train_out - act_output))}")
