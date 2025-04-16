@@ -15,6 +15,7 @@
 from typing import Tuple
 
 import chex
+import jax.numpy as jnp
 from flax import linen as nn
 
 # General shapes legend:
@@ -27,7 +28,6 @@ def train_encoder_fn(
     encoder: nn.Module,
     obs: chex.Array,
     hstate: chex.Array,
-    scale: chex.Array,
     dones: chex.Array,
     step_count: chex.Array,
     chunk_size: int,
@@ -37,7 +37,7 @@ def train_encoder_fn(
 
     # Apply the encoder per chunk
     num_chunks = S // chunk_size
-    v_loc, obs_rep, hstate, _ = encoder(obs, hstate, scale, dones, step_count, num_chunks)
+    v_loc, obs_rep, hstate = encoder(obs, hstate, dones, step_count, num_chunks)
 
     return v_loc, obs_rep, hstate
 
@@ -46,7 +46,6 @@ def act_encoder_fn(
     encoder: nn.Module,
     obs: chex.Array,
     decayed_hstate: chex.Array,
-    scale: chex.Array,
     step_count: chex.Array,
     chunk_size: int,
 ) -> Tuple[chex.Array, chex.Array, chex.Array]:
@@ -54,11 +53,13 @@ def act_encoder_fn(
     B, C = obs.shape[:2]
 
     # Apply the encoder per chunk
-    v_loc, obs_rep, decayed_hstate = encoder.recurrent(
+    act_dones = jnp.zeros((B, C), dtype=bool)
+    v_loc, obs_rep, decayed_hstate = encoder(
         obs,
         decayed_hstate,
-        scale,
+        act_dones,
         step_count,
+        num_chunks=1,
     )
 
     return v_loc, obs_rep, decayed_hstate

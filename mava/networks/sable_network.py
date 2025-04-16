@@ -32,7 +32,7 @@ from mava.networks.utils.sable import (
     discrete_train_decoder_fn,
     train_encoder_fn,
 )
-from mava.systems.sable.types import HiddenStates, SableNetworkConfig, Scales
+from mava.systems.sable.types import HiddenStates, SableNetworkConfig
 from mava.types import Observation
 from mava.utils.network_utils import _CONTINUOUS, _DISCRETE
 
@@ -459,7 +459,6 @@ class SableNetwork(nn.Module):
         observation: Observation,
         action: chex.Array,
         hstates: HiddenStates,
-        scales: Scales,
         dones: chex.Array,
         rng_key: Optional[chex.PRNGKey] = None,
     ) -> Tuple[chex.Array, chex.Array, chex.Array]:
@@ -473,7 +472,6 @@ class SableNetwork(nn.Module):
             encoder=self.encoder,
             obs=obs,
             hstate=hstates[0],
-            scale=scales[0],
             dones=dones,
             step_count=step_count,
         )
@@ -484,7 +482,6 @@ class SableNetwork(nn.Module):
             action=action,
             legal_actions=legal_actions,
             hstates=hstates[1:],
-            scales=scales[1:],
             dones=dones,
             step_count=step_count,
             rng_key=rng_key,
@@ -497,9 +494,8 @@ class SableNetwork(nn.Module):
         self,
         observation: Observation,
         hstates: HiddenStates,
-        scales: Scales,
         key: chex.PRNGKey,
-    ) -> Tuple[chex.Array, chex.Array, chex.Array, HiddenStates, Scales]:
+    ) -> Tuple[chex.Array, chex.Array, chex.Array, HiddenStates]:
         """Inference phase."""
         obs, legal_actions, step_count = (
             observation.agents_view,
@@ -507,21 +503,18 @@ class SableNetwork(nn.Module):
             observation.step_count,
         )
 
-        # Decay the hidden states: each timestep we decay the hidden states once
-        new_scales = tree.map(lambda x: x * jnp.exp(self.decay_kappas) + 1.0, scales)
-        hstate_scale_factor = tree.map(
-            lambda x, y: jnp.sqrt(x) * jnp.exp(self.decay_kappas) / jnp.sqrt(y), scales, new_scales
+        encoder_hstate = hstates[0]
+        decoder_hstate_1 = hstates[1]
+        decoder_hstate_2 = hstates[2]
+        decayed_decoder_hstates = (
+            decoder_hstate_1 * jnp.exp(self.decay_kappas),
+            decoder_hstate_2 * jnp.exp(self.decay_kappas),
         )
-        # tree.map wants the pytrees to have the same structure to map over so convert the
-        # scale factor to a HiddenStates object
-        hstate_scale_factor = HiddenStates(**hstate_scale_factor._asdict())
-        decayed_hstates = tree.map(lambda x, y: x * y, hstates, hstate_scale_factor)
 
         value, obs_rep, updated_enc_hs = self.act_encoder_fn(
             encoder=self.encoder,
             obs=obs,
-            decayed_hstate=decayed_hstates[0],
-            scale=new_scales[0],
+            decayed_hstate=encoder_hstate,
             step_count=step_count,
         )
 
@@ -529,8 +522,7 @@ class SableNetwork(nn.Module):
             decoder=self.decoder,
             obs_rep=obs_rep,
             legal_actions=legal_actions,
-            hstates=decayed_hstates[1:],
-            scales=new_scales[1:],
+            hstates=decayed_decoder_hstates,
             step_count=step_count,
             key=key,
         )
@@ -540,14 +532,5 @@ class SableNetwork(nn.Module):
             decoder_self_retn=updated_dec_hs[0],
             decoder_cross_retn=updated_dec_hs[1],
         )
-        # Double check this. The scale gets updated inside the encoder but for the decoder we do it
-        # manually outside.
-        updated_scales = Scales(
-            # encoder=updated_enc_scale,
-            encoder=new_scales[0],
-            decoder_self_retn=new_scales[1],
-            decoder_cross_retn=new_scales[2],
-        )
-
         value = jnp.squeeze(value, axis=-1)
-        return output_actions, output_actions_log, value, updated_hs, updated_scales
+        return output_actions, output_actions_log, value, updated_hs
