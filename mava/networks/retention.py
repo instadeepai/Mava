@@ -389,19 +389,22 @@ class MultiScaleRetention(nn.Module):
 
         kv = k_proj @ (v_proj * value_inner_decay)
 
-        kv_recurrent = []
+        def single_chunk_hstate_update(
+            hstate: Array, chunked_inputs: Tuple[Array, Array, Array]
+        ) -> Tuple[Array, Array]:
+            kv, chunk_decay, delta = chunked_inputs
 
-        for chunk in range(num_chunks):
-            kv_recurrent.append(hstate)
-            hstate = (
-                hstate
-                * _chunk_decay[chunk][jnp.newaxis, :, jnp.newaxis, jnp.newaxis]
-                * _delta[:, chunk]
-                + kv[:, chunk]
-            )
+            kv_recurrent = hstate
+            hstate = hstate * chunk_decay[jnp.newaxis, :, jnp.newaxis, jnp.newaxis] * delta + kv
 
-        kv_recurrent = jnp.stack(kv_recurrent, axis=1)
+            return hstate, kv_recurrent
 
+        hstate, kv_recurrent = jax.lax.scan(
+            jax.remat(single_chunk_hstate_update, prevent_cse=False),
+            hstate,
+            (jnp.swapaxes(kv, 0, 1), _chunk_decay, jnp.swapaxes(_delta, 0, 1)),
+        )
+        kv_recurrent = jnp.swapaxes(kv_recurrent, 0, 1)
         cross_output = (q_proj * _xi) @ kv_recurrent
 
         ret_output = cross_output + inner_output

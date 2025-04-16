@@ -40,13 +40,13 @@ base_seed = 2
 bsz = 16
 num_agents = 4
 obs_dim = 11
-num_time_steps = 256
+num_time_steps = 512
 seq_len = num_agents * num_time_steps
 
 retnet_embed_dim = 128
 retnet_num_heads = 2
 retnet_num_blocks = 2
-num_chunks = 4
+num_chunks = 8
 
 act_dim = 5
 
@@ -71,7 +71,7 @@ decay_kappas *= memory_config.decay_scaling_factor
 decay_kappas = jnp.log(decay_kappas)
 decay_kappas = decay_kappas[None, :, None, None, None]
 
-JIT_FUNCTIONS = False
+JIT_FUNCTIONS = True
 
 key = jax.random.PRNGKey(base_seed)
 key, subkey = jax.random.split(key)

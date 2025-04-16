@@ -47,7 +47,7 @@ obs_dim = 11
 
 seq_len = num_agents * num_time_steps
 
-retnet_embed_dim = 32
+retnet_embed_dim = 128
 retnet_num_heads = 2
 retnet_num_blocks = 2
 num_chunks = 8

@@ -30,12 +30,12 @@ jnp.set_printoptions(edgeitems=30, linewidth=1000000)
 bsz = 16
 num_agents = 4
 obs_dim = 11
-num_time_steps = 8
+num_time_steps = 512
 seq_len = num_agents * num_time_steps
 
 retnet_embed_dim = 128
 retnet_num_heads = 2
-num_chunks = 2
+num_chunks = 8
 
 memory_config = DictConfig(
     {
