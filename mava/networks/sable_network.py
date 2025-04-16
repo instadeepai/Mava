@@ -63,36 +63,33 @@ class EncodeBlock(nn.Module):
         self,
         x: chex.Array,
         hstate: chex.Array,
-        scale: chex.Array,
         dones: chex.Array,
         step_count: chex.Array,
         num_chunks: int,
-        inference: bool = False,
     ) -> chex.Array:
         """Applies Chunkwise MultiScaleRetention."""
-        ret, updated_hstate, updated_scale = self.retn(
-            key=x,
-            query=x,
-            value=x,
+        ln_x = self.ln1(x)
+        ret, updated_hstate = self.retn(
+            key=ln_x,
+            query=ln_x,
+            value=ln_x,
             hstate=hstate,
             dones=dones,
             step_count=step_count,
             num_chunks=num_chunks,
-            kv_scale=scale,
         )
-        x = self.ln1(x + ret)
-        output = self.ln2(x + self.ffn(x))
-        return output, updated_hstate, updated_scale
+        y = x + ret
+        output = y + self.ffn(self.ln2(y))
+        return output, updated_hstate
 
-    def recurrent(
-        self, x: chex.Array, hstate: chex.Array, scale: chex.Array, step_count: chex.Array
-    ) -> chex.Array:
+    def recurrent(self, x: chex.Array, hstate: chex.Array, step_count: chex.Array) -> chex.Array:
         """Applies Recurrent MultiScaleRetention."""
+        ln_x = self.ln1(x)
         ret, updated_hstate = self.retn.recurrent(
-            key_n=x, query_n=x, value_n=x, hstate=hstate, step_count=step_count, kv_scale=scale
+            key_n=ln_x, query_n=ln_x, value_n=ln_x, hstate=hstate, step_count=step_count
         )
-        x = self.ln1(x + ret)
-        output = self.ln2(x + self.ffn(x))
+        y = x + ret
+        output = y + self.ffn(self.ln2(y))
         return output, updated_hstate
 
 
@@ -104,8 +101,6 @@ class Encoder(nn.Module):
     n_agents: int
 
     def setup(self) -> None:
-        self.ln = nn.RMSNorm()
-
         self.obs_encoder = nn.Sequential(
             [
                 nn.RMSNorm(),
@@ -138,31 +133,24 @@ class Encoder(nn.Module):
         self,
         obs: chex.Array,
         hstate: chex.Array,
-        scale: chex.Array,
         dones: chex.Array,
         step_count: chex.Array,
         num_chunks: int,
-        inference: bool = False,
-    ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array]:
+    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
         """Apply chunkwise encoding."""
         updated_hstate = jnp.zeros_like(hstate)
-        updated_scale = jnp.ones_like(scale)
         obs_rep = self.obs_encoder(obs)
 
         # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
             hs = hstate[:, :, i]  # Get the hidden state for the current block
-            _scale = scale[:, :, i]  # Get the scale for the current block
             # Apply the chunkwise encoder block
-            obs_rep, hs_new, _scale_new = block(
-                self.ln(obs_rep), hs, _scale, dones, step_count, num_chunks, inference
-            )
+            obs_rep, hs_new = block(obs_rep, hs, dones, step_count, num_chunks)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
-            updated_scale = updated_scale.at[:, :, i].set(_scale_new)
 
         value = self.head(obs_rep)
 
-        return value, obs_rep, updated_hstate, updated_scale
+        return value, obs_rep, updated_hstate
 
     def recurrent(
         self, obs: chex.Array, hstate: chex.Array, scale: chex.Array, step_count: chex.Array
@@ -174,9 +162,8 @@ class Encoder(nn.Module):
         # Apply the encoder blocks
         for i, block in enumerate(self.blocks):
             hs = hstate[:, :, i]  # Get the hidden state for the current block
-            _scale = scale[:, :, i]  # Get the scale for the current block
             # Apply the recurrent encoder block
-            obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs, _scale, step_count)
+            obs_rep, hs_new = block.recurrent(obs_rep, hs, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
         # Compute the value function
@@ -193,7 +180,12 @@ class DecodeBlock(nn.Module):
     n_agents: int
 
     def setup(self) -> None:
-        self.ln1, self.ln2, self.ln3 = nn.RMSNorm(), nn.RMSNorm(), nn.RMSNorm()
+        self.ln1, self.ln2, self.ln3, self.ln4 = (
+            nn.RMSNorm(),
+            nn.RMSNorm(),
+            nn.RMSNorm(),
+            nn.RMSNorm(),
+        )
 
         self.retn1 = MultiScaleRetention(
             embed_dim=self.net_config.embed_dim,
@@ -219,73 +211,71 @@ class DecodeBlock(nn.Module):
         x: chex.Array,
         obs_rep: chex.Array,
         hstates: Tuple[chex.Array, chex.Array],
-        scales: Tuple[chex.Array, chex.Array],
         dones: chex.Array,
         step_count: chex.Array,
         num_chunks: int,
-        inference: bool = False,
-    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array], Tuple[chex.Array, chex.Array]]:
+    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Applies Chunkwise MultiScaleRetention."""
         hs1, hs2 = hstates
-        _scales1, _scales2 = scales
 
         # Apply the self-retention over actions
-        ret, hs1_new, _scale1_new = self.retn1(
-            key=x,
-            query=x,
-            value=x,
+        ln_x = self.ln1(x)
+        ret, hs1_new = self.retn1(
+            key=ln_x,
+            query=ln_x,
+            value=ln_x,
             hstate=hs1,
             dones=dones,
             step_count=step_count,
             num_chunks=num_chunks,
-            kv_scale=_scales1,
         )
-        ret = self.ln1(x + ret)
+        y = x + ret
+        ln_y = self.ln2(y)
+        ln_obs_rep = self.ln3(obs_rep)
 
         # Apply the cross-retention over obs x action
-        ret2, hs2_new, _scale2_new = self.retn2(
-            key=ret,
-            query=obs_rep,
-            value=ret,
+        ret2, hs2_new = self.retn2(
+            key=ln_y,
+            query=ln_obs_rep,
+            value=ln_y,
             hstate=hs2,
             dones=dones,
             step_count=step_count,
             num_chunks=num_chunks,
-            kv_scale=_scales2,
         )
-        y = self.ln2(obs_rep + ret2)
-        output = self.ln3(y + self.ffn(y))
+        y = obs_rep + ret2
+        output = y + self.ffn(self.ln4(y))
 
-        return output, (hs1_new, hs2_new), (_scale1_new, _scale2_new)
+        return output, (hs1_new, hs2_new)
 
     def recurrent(
         self,
         x: chex.Array,
         obs_rep: chex.Array,
         hstates: Tuple[chex.Array, chex.Array],
-        scales: Tuple[chex.Array, chex.Array],
         step_count: chex.Array,
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Applies Recurrent MultiScaleRetention."""
         hs1, hs2 = hstates
-        _scales1, _scales2 = scales
         # Apply the self-retention over actions
+        ln_x = self.ln1(x)
         ret, hs1_new = self.retn1.recurrent(
-            key_n=x, query_n=x, value_n=x, hstate=hs1, step_count=step_count, kv_scale=_scales1
+            key_n=ln_x, query_n=ln_x, value_n=ln_x, hstate=hs1, step_count=step_count
         )
-        ret = self.ln1(x + ret)
+        y = x + ret
+        ln_y = self.ln2(y)
+        ln_obs_rep = self.ln3(obs_rep)
 
         # Apply the cross-retention over obs x action
         ret2, hs2_new = self.retn2.recurrent(
-            key_n=ret,
-            query_n=obs_rep,
-            value_n=ret,
+            key_n=ln_y,
+            query_n=ln_obs_rep,
+            value_n=ln_y,
             hstate=hs2,
             step_count=step_count,
-            kv_scale=_scales2,
         )
-        y = self.ln2(obs_rep + ret2)
-        output = self.ln3(y + self.ffn(y))
+        y = obs_rep + ret2
+        output = y + self.ffn(self.ln4(y))
 
         return output, (hs1_new, hs2_new)
 
@@ -300,8 +290,6 @@ class Decoder(nn.Module):
     action_space_type: str = _DISCRETE
 
     def setup(self) -> None:
-        self.ln = nn.RMSNorm()
-
         use_bias = self.action_space_type == _CONTINUOUS
         self.action_encoder = nn.Sequential(
             [
@@ -346,36 +334,28 @@ class Decoder(nn.Module):
         action: chex.Array,
         obs_rep: chex.Array,
         hstates: Tuple[chex.Array, chex.Array],
-        scales: Tuple[chex.Array, chex.Array],
         dones: chex.Array,
         step_count: chex.Array,
         num_chunks: int,
-        inference: bool = False,
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Apply chunkwise decoding."""
         updated_hstates = tree.map(jnp.zeros_like, hstates)
-        updated_scales = tree.map(jnp.ones_like, scales)
         action_embeddings = self.action_encoder(action)
-        x = self.ln(action_embeddings)
+        x = action_embeddings
 
         # Apply the decoder blocks
         for i, block in enumerate(self.blocks):
             hs = tree.map(lambda x, j=i: x[:, :, j], hstates)
-            _scales = tree.map(lambda x, j=i: x[:, :, j], scales)
-            x, hs_new, _scales_new = block(
+            x, hs_new = block(
                 x=x,
                 obs_rep=obs_rep,
                 hstates=hs,
-                scales=_scales,
                 dones=dones,
                 step_count=step_count,
                 num_chunks=num_chunks,
             )
             updated_hstates = tree.map(
                 lambda x, y, j=i: x.at[:, :, j].set(y), updated_hstates, hs_new
-            )
-            updated_scales = tree.map(
-                lambda x, y, j=i: x.at[:, :, j].set(y), updated_scales, _scales_new
             )
 
         logit = self.head(x)
@@ -387,21 +367,17 @@ class Decoder(nn.Module):
         action: chex.Array,
         obs_rep: chex.Array,
         hstates: Tuple[chex.Array, chex.Array],
-        scales: Tuple[chex.Array, chex.Array],
         step_count: chex.Array,
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Apply recurrent decoding."""
         updated_hstates = tree.map(jnp.zeros_like, hstates)
         action_embeddings = self.action_encoder(action)
-        x = self.ln(action_embeddings)
+        x = action_embeddings
 
         # Apply the decoder blocks
         for i, block in enumerate(self.blocks):
             hs = tree.map(lambda x, i=i: x[:, :, i], hstates)
-            _scales = tree.map(lambda x, i=i: x[:, :, i], scales)
-            x, hs_new = block.recurrent(
-                x=x, obs_rep=obs_rep, hstates=hs, scales=_scales, step_count=step_count
-            )
+            x, hs_new = block.recurrent(x=x, obs_rep=obs_rep, hstates=hs, step_count=step_count)
             updated_hstates = tree.map(
                 lambda x, y, j=i: x.at[:, :, j].set(y), updated_hstates, hs_new
             )
