@@ -340,10 +340,10 @@ class MultiScaleRetention(nn.Module):
         dones: Array,
         step_count: Array,
         num_chunks: int,
-        kv_scale: Array,
     ) -> Tuple[Array, Array, Array]:
         """Chunkwise (default) representation of the multi-scale retention mechanism"""
         B, C, _ = value.shape
+        chunk_size = C // num_chunks
 
         # Positional encoding of the current step
         if self.memory_config.timestep_positional_encoding:
@@ -354,9 +354,24 @@ class MultiScaleRetention(nn.Module):
         v_proj = value @ self.w_v
         k_proj *= self.scaling
 
-        # (B, num_chunks, num_heads, chunk_size, head_size)
-        q_proj, k_proj, v_proj = reshape_qkv(q_proj, k_proj, v_proj, self.n_head, num_chunks)
-        k_proj = k_proj.transpose(0, 1, 2, -1, -2)
+        q_proj = q_proj.reshape(B, C, self.n_head, self.head_size).transpose(
+            0, 2, 1, 3
+        )  # (B, nh, Cs, hs)
+        k_proj = k_proj.reshape(B, C, self.n_head, self.head_size).transpose(
+            0, 2, 1, 3
+        )  # (B, nh, Cs, hs)
+
+        q_proj = q_proj.reshape(B, self.n_head, num_chunks, chunk_size, self.head_size).transpose(
+            0, 2, 1, 3, 4
+        )  # (B, nC, nh, Cs, hs)
+        k_proj = k_proj.reshape(B, self.n_head, num_chunks, chunk_size, self.head_size).transpose(
+            0, 2, 1, 3, 4
+        )  # (B, nC, nh, Cs, hs)
+        v_proj = v_proj.reshape(B, num_chunks, chunk_size, self.n_head, self.head_size).transpose(
+            0, 1, 3, 2, 4
+        )  # (B, nC, nh, Cs, hs)
+
+        k_proj = k_proj.transpose(0, 1, 2, 4, 3)  # (B, nC, nh, hs, Cs)
 
         dones = reshape_dones(dones, num_chunks)
 
@@ -365,60 +380,35 @@ class MultiScaleRetention(nn.Module):
             dones, self.decay_kappas, self.n_agents, self.masked
         )
 
-        _scale = jnp.sqrt(_decay_matrix_timesteps.sum(axis=-1, keepdims=True))
-        _scale = jnp.repeat(_scale, self.n_agents, axis=-2)
-        _normalised_decay_matrix = _decay_matrix / _scale
-
         qk_mat = q_proj @ k_proj
-        qk_mat = qk_mat * _normalised_decay_matrix
+        qk_mat = qk_mat * _decay_matrix
 
-        # Compute inner scale on timestep level
-        qk_mat_timesteps = qk_mat[:, :, :, :: self.n_agents, :: self.n_agents]
-        inner_scale = jnp.clip(jnp.abs(qk_mat_timesteps).sum(axis=-1, keepdims=True), min=1.0)
-        inner_scale = jnp.repeat(inner_scale, self.n_agents, axis=-2)
-        qk_mat = qk_mat / inner_scale
         inner_output = qk_mat @ v_proj
 
-        value_decay_scale_factor = _decay_matrix_timesteps[:, :, :, -1].sum(axis=-1, keepdims=True)
-        value_inner_decay = (_decay_matrix[:, :, :, -1] / value_decay_scale_factor)[
-            ..., jnp.newaxis
-        ]
-
-        _xi_scale_factor = _decay_matrix_timesteps.sum(axis=-1, keepdims=True)
-        _xi_scale_factor = jnp.repeat(_xi_scale_factor, self.n_agents, axis=-2)
-        _xi = _xi / (_scale / _xi_scale_factor)
+        value_inner_decay = _decay_matrix[:, :, :, -1][..., jnp.newaxis]
 
         kv = k_proj @ (v_proj * value_inner_decay)
 
         kv_recurrent = []
-        cross_scale = []
 
         for chunk in range(num_chunks):
-            kv_recurrent.append(hstate / kv_scale)
-            cross_scale.append(kv_scale)
+            kv_recurrent.append(hstate)
             hstate = (
                 hstate
                 * _chunk_decay[chunk][jnp.newaxis, :, jnp.newaxis, jnp.newaxis]
                 * _delta[:, chunk]
                 + kv[:, chunk]
             )
-            kv_scale = jnp.clip(
-                jnp.abs(hstate).sum(axis=-2, keepdims=True).max(axis=-1, keepdims=True), min=1.0
-            )
 
         kv_recurrent = jnp.stack(kv_recurrent, axis=1)
-        cross_scale = jnp.stack(cross_scale, axis=1)
-
-        all_scale = jnp.maximum(inner_scale, cross_scale)
-        align_inner_scale = all_scale / inner_scale
-        align_cross_scale = all_scale / cross_scale
 
         cross_output = (q_proj * _xi) @ kv_recurrent
 
-        ret_output = cross_output / align_cross_scale + inner_output / align_inner_scale
+        ret_output = cross_output + inner_output
 
         # Join chunks
-        ret_output = rearrange(ret_output, "B nC nh Cs hs -> B nh (nC Cs) hs", nh=self.n_head)
+        ret_output = ret_output.transpose(0, 1, 3, 2, 4)  # (B, nC, Cs, nh, hs)
+        ret_output = rearrange(ret_output, "B nC Cs nh hs -> B nh (nC Cs) hs", nh=self.n_head)
 
         # Joint heads again
         ret_output = rearrange(ret_output, "B nh C hs -> B C (nh hs)", nh=self.n_head)
@@ -428,7 +418,7 @@ class MultiScaleRetention(nn.Module):
 
         x = key
         output = (jax.nn.swish(x @ self.w_g) * ret_output) @ self.w_o
-        return output, hstate, kv_scale
+        return output, hstate
 
     def recurrent(
         self,
@@ -437,7 +427,6 @@ class MultiScaleRetention(nn.Module):
         value_n: Array,
         hstate: Array,
         step_count: Array,
-        kv_scale: Array,
     ) -> Tuple[Array, Array]:
         """Recurrent representation of the multi-scale retention mechanism"""
 
@@ -453,24 +442,20 @@ class MultiScaleRetention(nn.Module):
         k_proj *= self.scaling
 
         # Reshape exactly like retnet code
-        q_proj = rearrange(q_proj, "B S (nh hs) -> B nh S hs", nh=self.n_head, S=S)
-        k_proj = rearrange(k_proj, "B S (nh hs) -> B nh S hs", nh=self.n_head, S=S)
-        v_proj = rearrange(v_proj, "B S (nh hs) -> B nh S hs", nh=self.n_head, S=S)
+        q_proj = q_proj.reshape(B, S, self.n_head, self.head_size).transpose(
+            0, 2, 1, 3
+        )  # (B, nh, S, hs)
+        k_proj = k_proj.reshape(B, S, self.n_head, self.head_size).transpose(
+            0, 2, 1, 3
+        )  # (B, nh, S, hs)
+        v_proj = v_proj.reshape(B, self.n_head, self.head_size, 1)  # (B, nh, hs, 1)
 
-        k_proj = k_proj.transpose(0, 1, 3, 2)
-
-        # TODO: Using mat muls here. This is not exactly like the retnet code.
-        # But it was hard to get the chunkwise encoder passes to match up between inference
-        # and training. So doing this for now since the tests pass.
-
-        kv = k_proj @ v_proj
-        # kv = k_proj * v_proj
-        updated_hstate = hstate + kv / jnp.sqrt(kv_scale)
-        ret_output = q_proj @ updated_hstate
-        # ret_output = (q_proj * updated_hstate).sum(axis=-1)
+        kv = k_proj * v_proj  # (B, nh, S, hs)
+        updated_hstate = hstate + kv
+        ret_output = (q_proj * updated_hstate).sum(axis=-1)  # (B, nh, hs)
 
         # Add back dummy sequence dimension
-        # ret_output = ret_output[:, :, jnp.newaxis, :]
+        ret_output = ret_output[:, :, jnp.newaxis, :]
 
         # Rejoin heads
         ret_output = rearrange(ret_output, "B nh S hs -> B S (nh hs)", nh=self.n_head)
