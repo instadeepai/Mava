@@ -340,7 +340,7 @@ class MultiScaleRetention(nn.Module):
         dones: Array,
         step_count: Array,
         num_chunks: int,
-    ) -> Tuple[Array, Array, Array]:
+    ) -> Tuple[Array, Array]:
         """Chunkwise (default) representation of the multi-scale retention mechanism"""
         B, C, _ = value.shape
         chunk_size = C // num_chunks

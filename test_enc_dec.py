@@ -40,13 +40,13 @@ base_seed = 2
 bsz = 16
 num_agents = 4
 obs_dim = 11
-num_time_steps = 64
+num_time_steps = 256
 seq_len = num_agents * num_time_steps
 
-retnet_embed_dim = 32
+retnet_embed_dim = 128
 retnet_num_heads = 2
 retnet_num_blocks = 2
-num_chunks = 1
+num_chunks = 4
 
 act_dim = 5
 
@@ -71,6 +71,8 @@ decay_kappas *= memory_config.decay_scaling_factor
 decay_kappas = jnp.log(decay_kappas)
 decay_kappas = decay_kappas[None, :, None, None, None]
 
+JIT_FUNCTIONS = False
+
 key = jax.random.PRNGKey(base_seed)
 key, subkey = jax.random.split(key)
 
@@ -92,8 +94,6 @@ step_counts = jnp.arange(num_time_steps)
 step_counts = step_counts[None, ...].repeat(bsz, axis=0)[..., None].repeat(num_agents, axis=-1)
 step_counts = step_counts.reshape(bsz, seq_len)
 
-init_scale = jnp.ones((bsz, retnet_num_heads, retnet_num_blocks, 1, 1))
-
 key, init_key = jax.random.split(key)
 
 ################################################################################
@@ -110,41 +110,38 @@ enc_network_params = enc_network.init(
     init_key,
     obs[0:1, 0:num_agents, ...],
     init_hstate[0:1, ...],
-    init_scale[0:1, ...],
+    dones[0:1, 0:num_agents],
     step_counts[0:1, 0:num_agents],
-    method="recurrent",
+    num_chunks=1,
 )
 
-enc_jit_inf = jax.jit(partial(enc_network.apply, method="recurrent"))
-enc_jit_apply = partial(jax.jit(enc_network.apply, static_argnames="num_chunks"))
+if JIT_FUNCTIONS:
+    enc_jit_apply = jax.jit(enc_network.apply, static_argnames=["num_chunks"])
+    enc_jit_inf = jax.jit(partial(enc_network.apply, num_chunks=1))
+else:
+    enc_jit_apply = enc_network.apply
+    enc_jit_inf = partial(enc_network.apply, num_chunks=1)
 
 hstate = copy.deepcopy(init_hstate)
-scale = copy.deepcopy(init_scale)
 
 inference_encoded_obs = []
 inference_value = []
 
 for step in range(num_time_steps):
-    new_scale = scale * jnp.exp(decay_kappas) + 1.0
-    hstate_scale_factor = jnp.sqrt(scale) * jnp.exp(decay_kappas) / jnp.sqrt(new_scale)
-    hstate = hstate * hstate_scale_factor
-    scale = new_scale
     obs_i = obs[:, step * num_agents : (step + 1) * num_agents, ...]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
+    dones_i = dones[:, step * num_agents : (step + 1) * num_agents]
 
     reset_done = dones[:, step * num_agents, None, None, None, None]
     hstate = jax.tree.map(
         lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
-    )
-    scale = jax.tree.map(
-        lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.ones_like(x), x), scale
     )
 
     act_value, act_obs_rep, hstate = enc_jit_inf(
         enc_network_params,
         obs_i,
         hstate,
-        scale,
+        jnp.zeros_like(dones_i, dtype=bool),
         step_counts_i,
     )
 
@@ -160,13 +157,11 @@ print(inference_encoded_obs.shape)
 print(inference_value.shape)
 
 hstate = copy.deepcopy(init_hstate)
-scale = copy.deepcopy(init_scale)
 
-train_value_out, train_obs_rep_out, _, _ = enc_jit_apply(
+train_value_out, train_obs_rep_out, _ = enc_jit_apply(
     enc_network_params,
     obs,
     hstate,
-    scale,
     dones,
     step_counts,
     num_chunks=num_chunks,
@@ -176,12 +171,14 @@ print(train_obs_rep_out.shape)
 print(train_value_out.shape)
 
 total_value_error = jnp.mean(jnp.abs(train_value_out - inference_value))
-print(f"Total value error: {total_value_error}")
+print(f"Mean absolute value error: {total_value_error}")
+print(f"Max absolute value error: {jnp.max(jnp.abs(train_value_out - inference_value))}")
 
 total_obs_error = jnp.mean(jnp.abs(train_obs_rep_out - inference_encoded_obs))
-print(f"Total encoded obs error: {total_obs_error}")
-# print(f"Min encoded obs error: {jnp.min(jnp.abs(train_obs_rep_out - inference_encoded_obs))}")
-# print(f"Max encoded obs error: {jnp.max(jnp.abs(train_obs_rep_out - inference_encoded_obs))}")
+print(f"Mean absolute encoded obs error: {total_obs_error}")
+print(
+    f"Max absolute encoded obs error: {jnp.max(jnp.abs(train_obs_rep_out - inference_encoded_obs))}"
+)
 
 ################################################################################
 # Test Decoder
@@ -207,26 +204,23 @@ dec_network_params = dec_network.init(
     action=one_hot_actions[0:1, 0:1, ...],
     obs_rep=embedded_obs[0:1, 0:1, ...],
     hstates=(init_hstate[0:1, ...], init_hstate[0:1, ...]),
-    scales=(init_scale[0:1, ...], init_scale[0:1, ...]),
     step_count=step_counts[0:1, 0:1],
     method="recurrent",
 )
 
-dec_jit_apply = partial(jax.jit(dec_network.apply, static_argnames="num_chunks"))
-dec_jit_inf = jax.jit(partial(dec_network.apply, method="recurrent"))
+if JIT_FUNCTIONS:
+    dec_jit_apply = jax.jit(dec_network.apply, static_argnames=["num_chunks"])
+    dec_jit_inf = jax.jit(partial(dec_network.apply, method="recurrent"))
+else:
+    dec_jit_apply = dec_network.apply
+    dec_jit_inf = partial(dec_network.apply, method="recurrent")
 
 hstate = (copy.deepcopy(init_hstate), copy.deepcopy(init_hstate))
-scale = (copy.deepcopy(init_scale), copy.deepcopy(init_scale))
 
 act_logits = []
 
 for step in range(num_time_steps):
-    new_scale = jax.tree.map(lambda x: x * jnp.exp(decay_kappas) + 1.0, scale)
-    hstate_scale_factor = jax.tree.map(
-        lambda x, y: jnp.sqrt(x) * jnp.exp(decay_kappas) / jnp.sqrt(y), scale, new_scale
-    )
-    hstate = jax.tree.map(lambda x, y: x * y, hstate, hstate_scale_factor)
-    scale = new_scale
+    hstate = jax.tree.map(lambda x: x * jnp.exp(decay_kappas), hstate)
 
     obs_i = embedded_obs[:, step * num_agents : (step + 1) * num_agents, ...]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
@@ -236,10 +230,6 @@ for step in range(num_time_steps):
     hstate = jax.tree.map(
         lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
     )
-    scale = jax.tree.map(
-        lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.ones_like(x), x), scale
-    )
-
     timestep_outputs = []
     for agent in range(num_agents):
         obs_i_agent = obs_i[:, agent : agent + 1, ...]
@@ -250,7 +240,6 @@ for step in range(num_time_steps):
             actions_i_agent,
             obs_i_agent,
             hstate,
-            scale,
             step_counts_i_agent,
         )
         timestep_outputs.append(out)
@@ -263,14 +252,12 @@ print("Never done test:")
 print("Decoder:")
 print(act_logits.shape)
 hstate = (copy.deepcopy(init_hstate), copy.deepcopy(init_hstate))
-scale = (copy.deepcopy(init_scale), copy.deepcopy(init_scale))
 
 train_logits, _ = dec_jit_apply(
     dec_network_params,
     one_hot_actions,
     embedded_obs,
     hstate,
-    scale,
     dones,
     step_counts,
     num_chunks=num_chunks,
@@ -278,7 +265,8 @@ train_logits, _ = dec_jit_apply(
 
 print(train_logits.shape)
 total_logits_error = jnp.mean(jnp.abs(train_logits - act_logits))
-print(f"Total logits error: {total_logits_error}")
+print(f"Mean absolute logits error: {total_logits_error}")
+print(f"Max absolute logits error: {jnp.max(jnp.abs(train_logits - act_logits))}")
 
 print()
 print("With done test:")
@@ -290,25 +278,15 @@ dones = jnp.repeat(  # dones are the same per agent so repeat them
 
 print("Encoder:")
 hstate = copy.deepcopy(init_hstate)
-scale = copy.deepcopy(init_scale)
 
 inference_encoded_obs = []
 inference_value = []
 
 for step in range(num_time_steps):
-    new_scale = scale * jnp.exp(decay_kappas) + 1.0
-    hstate_scale_factor = jnp.sqrt(scale) * jnp.exp(decay_kappas) / jnp.sqrt(new_scale)
-    hstate = hstate * hstate_scale_factor
-    scale = new_scale
-
     reset_done = dones[:, step * num_agents, None, None, None, None]
     hstate = jax.tree.map(
         lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
     )
-    scale = jax.tree.map(
-        lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.ones_like(x), x), scale
-    )
-
     obs_i = obs[:, step * num_agents : (step + 1) * num_agents, ...]
     dones_i = dones[:, step * num_agents : (step + 1) * num_agents]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
@@ -317,7 +295,7 @@ for step in range(num_time_steps):
         enc_network_params,
         obs_i,
         hstate,
-        scale,
+        jnp.zeros_like(dones_i, dtype=bool),
         step_counts_i,
     )
 
@@ -331,13 +309,11 @@ print(inference_encoded_obs.shape)
 print(inference_value.shape)
 
 hstate = copy.deepcopy(init_hstate)
-scale = copy.deepcopy(init_scale)
 
-train_value_out, train_obs_rep_out, _, _ = enc_jit_apply(
+train_value_out, train_obs_rep_out, _ = enc_jit_apply(
     enc_network_params,
     obs,
     hstate,
-    scale,
     dones,
     step_counts,
     num_chunks=num_chunks,
@@ -347,25 +323,22 @@ print(train_obs_rep_out.shape)
 print(train_value_out.shape)
 
 total_value_error = jnp.mean(jnp.abs(train_value_out - inference_value))
-print(f"Total value error: {total_value_error}")
+print(f"Mean absolute value error: {total_value_error}")
+print(f"Max absolute value error: {jnp.max(jnp.abs(train_value_out - inference_value))}")
 
 total_obs_error = jnp.mean(jnp.abs(train_obs_rep_out - inference_encoded_obs))
-print(f"Total encoded obs error: {total_obs_error}")
+print(f"Mean absolute encoded obs error: {total_obs_error}")
+print(
+    f"Max absolute encoded obs error: {jnp.max(jnp.abs(train_obs_rep_out - inference_encoded_obs))}"
+)
 
 print("Decoder:")
 hstate = (copy.deepcopy(init_hstate), copy.deepcopy(init_hstate))
-scale = (copy.deepcopy(init_scale), copy.deepcopy(init_scale))
 
 act_logits = []
 
 for step in range(num_time_steps):
-    new_scale = jax.tree.map(lambda x: x * jnp.exp(decay_kappas) + 1.0, scale)
-    hstate_scale_factor = jax.tree.map(
-        lambda x, y: jnp.sqrt(x) * jnp.exp(decay_kappas) / jnp.sqrt(y), scale, new_scale
-    )
-    hstate = jax.tree.map(lambda x, y: x * y, hstate, hstate_scale_factor)
-    scale = new_scale
-
+    hstate = jax.tree.map(lambda x: x * jnp.exp(decay_kappas), hstate)
     obs_i = embedded_obs[:, step * num_agents : (step + 1) * num_agents, ...]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
     actions_i = one_hot_actions[:, step * num_agents : (step + 1) * num_agents, ...]
@@ -373,9 +346,6 @@ for step in range(num_time_steps):
     reset_done = dones[:, step * num_agents, None, None, None, None]
     hstate = jax.tree.map(
         lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
-    )
-    scale = jax.tree.map(
-        lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.ones_like(x), x), scale
     )
 
     timestep_outputs = []
@@ -388,7 +358,6 @@ for step in range(num_time_steps):
             actions_i_agent,
             obs_i_agent,
             hstate,
-            scale,
             step_counts_i_agent,
         )
         timestep_outputs.append(out)
@@ -400,18 +369,17 @@ act_logits = jnp.concatenate(act_logits, axis=1)
 print(act_logits.shape)
 
 hstate = (copy.deepcopy(init_hstate), copy.deepcopy(init_hstate))
-scale = (copy.deepcopy(init_scale), copy.deepcopy(init_scale))
 
 train_logits, _ = dec_jit_apply(
     dec_network_params,
     one_hot_actions,
     embedded_obs,
     hstate,
-    scale,
     dones,
     step_counts,
     num_chunks=num_chunks,
 )
 
 total_logits_error = jnp.mean(jnp.abs(train_logits - act_logits))
-print(f"Total logits error: {total_logits_error}")
+print(f"Mean absolute logits error: {total_logits_error}")
+print(f"Max absolute logits error: {jnp.max(jnp.abs(train_logits - act_logits))}")

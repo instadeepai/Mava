@@ -107,7 +107,6 @@ hstate = copy.deepcopy(init_hstate)
 act_output = []
 
 for step in range(num_time_steps):
-    # hstate = hstate * jnp.exp(decay_kappas)
     reset_done = dones[:, step * num_agents, None, None, None]
     hstate = jax.tree.map(
         lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
