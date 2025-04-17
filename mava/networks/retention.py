@@ -22,7 +22,46 @@ from chex import Array
 from einops import rearrange
 from omegaconf import DictConfig
 
-from mava.networks.utils.sable import PositionalEncoding
+
+def rotate_every_two(x: Array) -> Array:
+    """
+    x shape: (..., d) where d is even
+    Splits last dim into pairs (e0,e1), (e2,e3), … and rotates each pair.
+    """
+    x1 = x[..., ::2]  # even channels
+    x2 = x[..., 1::2]  # odd  channels
+    return jnp.stack((-x2, x1), axis=-1).reshape(x.shape)
+
+
+def theta_shift(x: Array, sin: Array, cos: Array) -> Array:
+    """
+    x   : (B, nh, C, hs)
+    sin : (B, 1, C, hs)
+    cos : (B, 1, C, hs)
+    """
+    return (x * cos) + (rotate_every_two(x) * sin)
+
+
+def sincos_from_stepcount(
+    step_count: Array,  # shape (B, C)
+    d_model: int,
+    num_heads: int,
+) -> Tuple[Array, Array]:
+    """
+    Build XPOS / rotary sin & cos from an (episode-local) step_count.
+    Each entry of step_count is an int in [0, T-1] that is identical
+    for all agent-tokens that belong to the same env step.
+    """
+    half = d_model // num_heads // 2
+    inv_freq = 1.0 / (10000 ** jnp.linspace(0, 1, half, dtype=jnp.float32))
+    inv_freq = jnp.repeat(inv_freq, 2)  # even/odd interleave
+
+    phase = step_count[..., None] * inv_freq  # (B, C, d_model)
+    sin_tbl = jnp.sin(phase)
+    cos_tbl = jnp.cos(phase)
+    # add head dimension when you apply θ-shift: (B, 1, C, d_model)
+    return sin_tbl[:, None, :, :], cos_tbl[:, None, :, :]
+
 
 # General shapes legend:
 # B: batch size
@@ -328,9 +367,6 @@ class MultiScaleRetention(nn.Module):
         )
         self.group_norm = nn.GroupNorm(num_groups=self.n_head)
 
-        # Create an instance of the positional encoding
-        self.pe = PositionalEncoding(self.embed_dim)
-
     def __call__(
         self,
         key: Array,
@@ -345,9 +381,8 @@ class MultiScaleRetention(nn.Module):
         B, C, _ = value.shape
         chunk_size = C // num_chunks
 
-        # Positional encoding of the current step
-        if self.memory_config.timestep_positional_encoding:
-            key, query, value = self.pe(key, query, value, step_count)
+        # # Positional encoding of the current step
+        _sin, _cos = sincos_from_stepcount(step_count, self.embed_dim, self.n_head)
 
         q_proj = query @ self.w_q
         k_proj = key @ self.w_k
@@ -360,6 +395,9 @@ class MultiScaleRetention(nn.Module):
         k_proj = k_proj.reshape(B, C, self.n_head, self.head_size).transpose(
             0, 2, 1, 3
         )  # (B, nh, Cs, hs)
+
+        q_proj = theta_shift(q_proj, _sin, _cos)
+        k_proj = theta_shift(k_proj, _sin, _cos)
 
         q_proj = q_proj.reshape(B, self.n_head, num_chunks, chunk_size, self.head_size).transpose(
             0, 2, 1, 3, 4
@@ -436,8 +474,7 @@ class MultiScaleRetention(nn.Module):
         B, S, _ = value_n.shape
 
         # Positional encoding of the current step if enabled
-        if self.memory_config.timestep_positional_encoding:
-            key_n, query_n, value_n = self.pe(key_n, query_n, value_n, step_count)
+        _sin, _cos = sincos_from_stepcount(step_count, self.embed_dim, self.n_head)
 
         q_proj = query_n @ self.w_q
         k_proj = key_n @ self.w_k
@@ -452,6 +489,9 @@ class MultiScaleRetention(nn.Module):
             0, 2, 1, 3
         )  # (B, nh, S, hs)
         v_proj = v_proj.reshape(B, self.n_head, self.head_size, 1)  # (B, nh, hs, 1)
+
+        q_proj = theta_shift(q_proj, _sin, _cos)
+        k_proj = theta_shift(k_proj, _sin, _cos)
 
         kv = k_proj * v_proj  # (B, nh, S, hs)
         updated_hstate = hstate + kv
