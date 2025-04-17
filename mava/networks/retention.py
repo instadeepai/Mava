@@ -376,7 +376,7 @@ class MultiScaleRetention(nn.Module):
         dones = reshape_dones(dones, num_chunks)
 
         # we use the timestep ones for computing normalised decay matrix
-        _decay_matrix, _xi, _chunk_decay, _delta, _decay_matrix_timesteps, _ = get_decay_matrices(
+        _decay_matrix, _xi, _chunk_decay, _delta, _, _ = get_decay_matrices(
             dones, self.decay_kappas, self.n_agents, self.masked
         )
 
@@ -419,7 +419,7 @@ class MultiScaleRetention(nn.Module):
             (B, C, self.embed_dim)
         )
 
-        x = key
+        x = query
         output = (jax.nn.swish(x @ self.w_g) * ret_output) @ self.w_o
         return output, hstate
 
@@ -467,6 +467,6 @@ class MultiScaleRetention(nn.Module):
             (B, S, self.embed_dim)
         )
 
-        x = key_n
+        x = query_n
         output = (jax.nn.swish(x @ self.w_g) * ret_output) @ self.w_o
         return output, updated_hstate

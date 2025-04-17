@@ -40,7 +40,7 @@ from mava.systems.sable.types import HiddenStates
 from mava.types import Observation
 
 base_seed = 2
-num_time_steps = 512
+num_time_steps = 4096
 bsz = 16
 num_agents = 4
 obs_dim = 11
@@ -50,7 +50,7 @@ seq_len = num_agents * num_time_steps
 retnet_embed_dim = 128
 retnet_num_heads = 2
 retnet_num_blocks = 2
-num_chunks = 8
+num_chunks = 16
 
 act_dim = 5
 

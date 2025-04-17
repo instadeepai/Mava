@@ -30,12 +30,12 @@ jnp.set_printoptions(edgeitems=30, linewidth=1000000)
 bsz = 16
 num_agents = 4
 obs_dim = 11
-num_time_steps = 512
+num_time_steps = 4096
 seq_len = num_agents * num_time_steps
 
 retnet_embed_dim = 128
 retnet_num_heads = 2
-num_chunks = 8
+num_chunks = 16
 
 memory_config = DictConfig(
     {
@@ -244,13 +244,12 @@ hstate = copy.deepcopy(init_hstate)
 
 act_output = []
 for step in range(num_time_steps):
-    # hstate = hstate * jnp.exp(decay_kappas)
     reset_done = dones[:, step * num_agents, None, None, None]
     hstate = jax.tree.map(
         lambda x, reset_done=reset_done: jnp.where(reset_done, jnp.zeros_like(x), x), hstate
     )
     obs_i = obs[:, step * num_agents : (step + 1) * num_agents, ...]
-    dones_i = dones[:, step : step + 1]
+    dones_i = dones[:, step * num_agents : (step + 1) * num_agents]
     step_counts_i = step_counts[:, step * num_agents : (step + 1) * num_agents]
 
     out, hstate = enc_jit_inf(
