@@ -19,7 +19,6 @@
 [![Collab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/Mava/blob/develop/examples/Quickstart.ipynb)
 </div>
 
-
 ## Welcome to Mava! 🦁
 
 <div align="center">
@@ -53,13 +52,20 @@ uv sync
 source .venv/bin/activate
 ```
 
-Alternatively with pip, create a virtual environment and then:
+To install MAVA with a GPU or TPU aware version of JAX
+
 ```bash
-pip install -e .
+uv sync --extra cuda12  # GPU aware JAX
+uv sync --extra tpu  # TPU aware JAX
 ```
 
-We have tested `Mava` on Python 3.11 and 3.12, but earlier versions may also work. Specifically, we use Python 3.10 for the Quickstart notebook on Google Colab since Colab uses Python 3.10 by default. Note that because the installation of JAX differs depending on your hardware accelerator,
-we advise users to explicitly install the correct JAX version (see the [official installation guide](https://github.com/google/jax#installation)). For more in-depth installation guides including Docker builds and virtual environments, please see our [detailed installation guide](docs/DETAILED_INSTALL.md).
+Alternatively with pip, create a virtual environment and then:
+
+```bash
+pip install -e ".[cuda12]"  # GPU aware JAX
+```
+
+We have tested `Mava` on Python 3.11 and 3.12, but earlier versions may also work. Specifically, we use Python 3.10 for the Quickstart notebook on Google Colab since Colab uses Python 3.10 by default.  For more in-depth installation guides including Docker builds and virtual environments, please see our [detailed installation guide](docs/DETAILED_INSTALL.md).
 
 ## Getting started ⚡
 
@@ -101,21 +107,22 @@ Mava has implementations of multiple on- and off-policy multi-agent algorithms t
 | MAT        | [`mat.py`](mava/systems/mat/anakin/mat.py)       | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/abs/2205.14953) | [Link](mava/systems/mat/README.md) |
 | Sable      | [`ff_sable.py`](mava/systems/sable/anakin/ff_sable.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/abs/2410.01706) | [Link](mava/systems/sable/README.md) |
 |            | [`rec_sable.py`](mava/systems/sable/anakin/rec_sable.py) | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/abs/2410.01706) | [Link](mava/systems/sable/README.md) |
+
 <h2>Environments</h2>
 
 These are the environments which Mava supports _out of the box_, to add a new environment, please use the [existing wrapper implementations](mava/wrappers/) as an example. We also indicate whether the environment is implemented in JAX or not. JAX-based environments can be used with algorithms that follow the Anakin distribution architecture, while non-JAX environments can be used with algorithms following the Sebulba architecture.
-
 
 | Environment                     | Action space        | JAX | Non-JAX | Paper | JAX Source | Non-JAX Source |
 |---------------------------------|---------------------|-----|-------|-------|------------|----------------|
 | Mulit-Robot Warehouse                 | Discrete            | ✅   | ✅     | [Link](http://arxiv.org/abs/2006.07869)  |    [Link](https://github.com/instadeepai/jumanji/tree/main/jumanji/environments/routing/robot_warehouse)   |       [Link](https://github.com/semitable/robotic-warehouse)      |
 | Level-based Foraging            | Discrete            | ✅   | ✅     | [Link](https://arxiv.org/abs/2006.07169)  |    [Link](https://github.com/instadeepai/jumanji/tree/main/jumanji/environments/routing/lbf)    |       [Link](https://github.com/semitable/lb-foraging)      |
-| StarCraft Multi-Agent Challenge | Discrete            | ✅   | ✅     | [Link](https://arxiv.org/abs/1902.04043)  |    [Link](https://github.com/FLAIROx/JaxMARL/tree/main/jaxmarl/environments/smax)    |       [Link](https://github.com/uoe-agents/smaclite)      |
+| StarCraft Multi-Agent Challenge | Discrete            | ✅   | ✅     | [Link](https://arxiv.org/abs/1902.04043)  |    [Link][jaxmarl]    |       [Link](https://github.com/uoe-agents/smaclite)      |
 | Multi-Agent Brax                          | Continuous          | ✅   |       | [Link](https://arxiv.org/abs/2003.06709)  |    [Link](https://github.com/FLAIROx/JaxMARL/tree/main/jaxmarl/environments/mabrax)    |             |
 | Matrax                          | Discrete            | ✅   |       | [Link](https://www.cs.toronto.edu/~cebly/Papers/_download_/multirl.pdf)  |    [Link](https://github.com/instadeepai/matrax)    |             |
 | Multi Particle Environments            | Discrete/Continuous | ✅   |       | [Link](https://arxiv.org/abs/1706.02275)  |    [Link](https://github.com/FLAIROx/JaxMARL/tree/main/jaxmarl/environments/mpe)    |            |
 
 ## Performance and Speed 🚀
+
 We have performed a rigorous benchmark across 45 different scenarios and 6 different environment suites to validate the performance of Mava's algorithm implementations. For more detailed results please see our [Sable paper][sable] and for all hyperparameters, please see the following [website](https://sites.google.com/view/sable-marl).
 
 <p align="center">
@@ -171,7 +178,7 @@ Please do follow along as we develop this next phase!
 **InstaDeep's MARL ecosystem in JAX.** In particular, we suggest users check out the following sister repositories:
 
 - 🔌 [OG-MARL](https://github.com/instadeepai/og-marl): datasets with baselines for offline MARL in JAX.
-- 🌴 [Jumanji](https://github.com/instadeepai/jumanji): a diverse suite of scalable reinforcement learning environments in JAX.
+- 🌴 [Jumanji][jumanji]: a diverse suite of scalable reinforcement learning environments in JAX.
 - 😎 [Matrax](https://github.com/instadeepai/matrax): a collection of matrix games in JAX.
 - ⚡ [Flashbax](https://github.com/instadeepai/flashbax): accelerated replay buffers in JAX.
 - 📈 [MARL-eval][marl_eval]: standardised experiment data aggregation and visualisation for MARL.
@@ -210,13 +217,8 @@ The development of Mava was supported with Cloud TPUs from Google's [TPU Researc
 [jumanji]: https://github.com/instadeepai/jumanji
 [cleanrl]: https://github.com/vwxyzjn/cleanrl
 [purejaxrl]: https://github.com/luchris429/purejaxrl
-[jumanji_rware]: https://instadeepai.github.io/jumanji/environments/robot_warehouse/
-[jumanji_lbf]: https://github.com/sash-a/jumanji/tree/feat/lbf-truncate
-[epymarl]: https://github.com/uoe-agents/epymarl
 [anakin_paper]: https://arxiv.org/abs/2104.06272
-[rware]: https://github.com/semitable/robotic-warehouse
 [jaxmarl]: https://github.com/flairox/jaxmarl
 [toward_standard_eval]: https://arxiv.org/pdf/2209.10485.pdf
 [marl_eval]: https://github.com/instadeepai/marl-eval
-[smax]: https://github.com/FLAIROx/JaxMARL/tree/main/jaxmarl/environments/smax
 [sable]: https://arxiv.org/pdf/2410.01706
