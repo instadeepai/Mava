@@ -43,6 +43,8 @@ class MatraxWrapper(Wrapper):
         self, timestep: TimeStep
     ) -> TimeStep[Union[Observation, ObservationGlobalState]]:
         """Modify the timestep for `step` and `reset`."""
+        metrics: Dict[str, Any] = {"env_metrics": {}}
+
         obs_data = {
             "agents_view": timestep.observation.agent_obs,
             "action_mask": self.action_mask,
@@ -52,9 +54,8 @@ class MatraxWrapper(Wrapper):
             global_state = jnp.concatenate(timestep.observation.agent_obs, axis=0)
             global_state = jnp.tile(global_state, (self.num_agents, 1))
             obs_data["global_state"] = global_state
-            return timestep.replace(observation=ObservationGlobalState(**obs_data))
+            return timestep.replace(observation=ObservationGlobalState(**obs_data), extras=metrics)
 
-        metrics: Dict[str, Any] = {"env_metrics": {}}
         return timestep.replace(observation=Observation(**obs_data), extras=metrics)
 
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
