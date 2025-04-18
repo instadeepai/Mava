@@ -499,7 +499,7 @@ def learner_setup(
 
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
-    _config.logger.system_name = "rec_sable_xpos_no_norm"
+    _config.logger.system_name = "rec_sable_xpos_base_ln_no_norm"
     config = copy.deepcopy(_config)
 
     n_devices = len(jax.devices())

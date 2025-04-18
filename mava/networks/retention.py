@@ -457,7 +457,7 @@ class MultiScaleRetention(nn.Module):
             (B, C, self.embed_dim)
         )
 
-        x = query
+        x = key
         output = (jax.nn.swish(x @ self.w_g) * ret_output) @ self.w_o
         return output, hstate
 
@@ -507,6 +507,6 @@ class MultiScaleRetention(nn.Module):
             (B, S, self.embed_dim)
         )
 
-        x = query_n
+        x = key_n
         output = (jax.nn.swish(x @ self.w_g) * ret_output) @ self.w_o
         return output, updated_hstate

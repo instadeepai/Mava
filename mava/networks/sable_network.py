@@ -68,28 +68,26 @@ class EncodeBlock(nn.Module):
         num_chunks: int,
     ) -> chex.Array:
         """Applies Chunkwise MultiScaleRetention."""
-        ln_x = self.ln1(x)
         ret, updated_hstate = self.retn(
-            key=ln_x,
-            query=ln_x,
-            value=ln_x,
+            key=x,
+            query=x,
+            value=x,
             hstate=hstate,
             dones=dones,
             step_count=step_count,
             num_chunks=num_chunks,
         )
-        y = x + ret
-        output = y + self.ffn(self.ln2(y))
+        x = self.ln1(x + ret)
+        output = self.ln2(x + self.ffn(x))
         return output, updated_hstate
 
     def recurrent(self, x: chex.Array, hstate: chex.Array, step_count: chex.Array) -> chex.Array:
         """Applies Recurrent MultiScaleRetention."""
-        ln_x = self.ln1(x)
         ret, updated_hstate = self.retn.recurrent(
-            key_n=ln_x, query_n=ln_x, value_n=ln_x, hstate=hstate, step_count=step_count
+            key_n=x, query_n=x, value_n=x, hstate=hstate, step_count=step_count
         )
-        y = x + ret
-        output = y + self.ffn(self.ln2(y))
+        x = self.ln1(x + ret)
+        output = self.ln2(x + self.ffn(x))
         return output, updated_hstate
 
 
@@ -101,6 +99,8 @@ class Encoder(nn.Module):
     n_agents: int
 
     def setup(self) -> None:
+        self.ln = nn.RMSNorm()
+
         self.obs_encoder = nn.Sequential(
             [
                 nn.RMSNorm(),
@@ -145,7 +145,7 @@ class Encoder(nn.Module):
         for i, block in enumerate(self.blocks):
             hs = hstate[:, :, i]  # Get the hidden state for the current block
             # Apply the chunkwise encoder block
-            obs_rep, hs_new = block(obs_rep, hs, dones, step_count, num_chunks)
+            obs_rep, hs_new = block(self.ln(obs_rep), hs, dones, step_count, num_chunks)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
         value = self.head(obs_rep)
@@ -163,7 +163,7 @@ class Encoder(nn.Module):
         for i, block in enumerate(self.blocks):
             hs = hstate[:, :, i]  # Get the hidden state for the current block
             # Apply the recurrent encoder block
-            obs_rep, hs_new = block.recurrent(obs_rep, hs, step_count)
+            obs_rep, hs_new = block.recurrent(self.ln(obs_rep), hs, step_count)
             updated_hstate = updated_hstate.at[:, :, i].set(hs_new)
 
         # Compute the value function
@@ -180,12 +180,7 @@ class DecodeBlock(nn.Module):
     n_agents: int
 
     def setup(self) -> None:
-        self.ln1, self.ln2, self.ln3, self.ln4 = (
-            nn.RMSNorm(),
-            nn.RMSNorm(),
-            nn.RMSNorm(),
-            nn.RMSNorm(),
-        )
+        self.ln1, self.ln2, self.ln3 = nn.RMSNorm(), nn.RMSNorm(), nn.RMSNorm()
 
         self.retn1 = MultiScaleRetention(
             embed_dim=self.net_config.embed_dim,
@@ -219,32 +214,29 @@ class DecodeBlock(nn.Module):
         hs1, hs2 = hstates
 
         # Apply the self-retention over actions
-        ln_x = self.ln1(x)
         ret, hs1_new = self.retn1(
-            key=ln_x,
-            query=ln_x,
-            value=ln_x,
+            key=x,
+            query=x,
+            value=x,
             hstate=hs1,
             dones=dones,
             step_count=step_count,
             num_chunks=num_chunks,
         )
-        y = x + ret
-        ln_y = self.ln2(y)
-        ln_obs_rep = self.ln3(obs_rep)
+        ret = self.ln1(x + ret)
 
         # Apply the cross-retention over obs x action
         ret2, hs2_new = self.retn2(
-            key=ln_y,
-            query=ln_obs_rep,
-            value=ln_y,
+            key=ret,
+            query=obs_rep,
+            value=ret,
             hstate=hs2,
             dones=dones,
             step_count=step_count,
             num_chunks=num_chunks,
         )
-        y = obs_rep + ret2
-        output = y + self.ffn(self.ln4(y))
+        y = self.ln2(obs_rep + ret2)
+        output = self.ln3(y + self.ffn(y))
 
         return output, (hs1_new, hs2_new)
 
@@ -258,24 +250,21 @@ class DecodeBlock(nn.Module):
         """Applies Recurrent MultiScaleRetention."""
         hs1, hs2 = hstates
         # Apply the self-retention over actions
-        ln_x = self.ln1(x)
         ret, hs1_new = self.retn1.recurrent(
-            key_n=ln_x, query_n=ln_x, value_n=ln_x, hstate=hs1, step_count=step_count
+            key_n=x, query_n=x, value_n=x, hstate=hs1, step_count=step_count
         )
-        y = x + ret
-        ln_y = self.ln2(y)
-        ln_obs_rep = self.ln3(obs_rep)
+        ret = self.ln1(x + ret)
 
         # Apply the cross-retention over obs x action
         ret2, hs2_new = self.retn2.recurrent(
-            key_n=ln_y,
-            query_n=ln_obs_rep,
-            value_n=ln_y,
+            key_n=ret,
+            query_n=obs_rep,
+            value_n=ret,
             hstate=hs2,
             step_count=step_count,
         )
-        y = obs_rep + ret2
-        output = y + self.ffn(self.ln4(y))
+        y = self.ln2(obs_rep + ret2)
+        output = self.ln3(y + self.ffn(y))
 
         return output, (hs1_new, hs2_new)
 
@@ -290,6 +279,8 @@ class Decoder(nn.Module):
     action_space_type: str = _DISCRETE
 
     def setup(self) -> None:
+        self.ln = nn.RMSNorm()
+
         use_bias = self.action_space_type == _CONTINUOUS
         self.action_encoder = nn.Sequential(
             [
@@ -341,7 +332,7 @@ class Decoder(nn.Module):
         """Apply chunkwise decoding."""
         updated_hstates = tree.map(jnp.zeros_like, hstates)
         action_embeddings = self.action_encoder(action)
-        x = action_embeddings
+        x = self.ln(action_embeddings)
 
         # Apply the decoder blocks
         for i, block in enumerate(self.blocks):
@@ -372,7 +363,7 @@ class Decoder(nn.Module):
         """Apply recurrent decoding."""
         updated_hstates = tree.map(jnp.zeros_like, hstates)
         action_embeddings = self.action_encoder(action)
-        x = action_embeddings
+        x = self.ln(action_embeddings)
 
         # Apply the decoder blocks
         for i, block in enumerate(self.blocks):
