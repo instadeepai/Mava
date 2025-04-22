@@ -20,14 +20,51 @@ import jax.numpy as jnp
 from chex import Array
 from omegaconf import DictConfig
 
-from mava.networks.utils.sable import PositionalEncoding
-
 # General shapes legend:
 # B: batch size
 # N: number of agents
 # S: sequence length
 # C: chunk size - T * N in a chunk
 # T: number of timesteps
+
+
+def rotate_every_two(x: Array) -> Array:
+    """
+    x shape: (..., d) where d is even
+    Splits last dim into pairs (e0,e1), (e2,e3), … and rotates each pair.
+    """
+    x1 = x[..., ::2]  # even channels
+    x2 = x[..., 1::2]  # odd  channels
+    return jnp.stack((-x2, x1), axis=-1).reshape(x.shape)
+
+
+def theta_shift(x: Array, sin: Array, cos: Array) -> Array:
+    """
+    x   : (B, nh, C, hs)
+    sin : (B, 1, C, hs)
+    cos : (B, 1, C, hs)
+    """
+    return (x * cos) + (rotate_every_two(x) * sin)
+
+
+def sincos_from_stepcount(
+    step_count: Array,  # shape (B, C)
+    d_model: int,
+    num_heads: int,
+) -> Tuple[Array, Array]:
+    """
+    Build XPOS / rotary sin & cos from an (episode-local) step_count.
+    Each entry of step_count is an int in [0, T-1] that is identical
+    for all agent-tokens that belong to the same env step.
+    """
+    half = d_model // num_heads // 2
+    inv_freq = 1.0 / (10000 ** jnp.linspace(0, 1, half, dtype=jnp.float32))
+    inv_freq = jnp.repeat(inv_freq, 2)  # even/odd interleave
+
+    phase = step_count[..., None] * inv_freq  # (B, C, d_model)
+    sin_tbl = jnp.sin(phase)
+    cos_tbl = jnp.cos(phase)
+    return sin_tbl, cos_tbl
 
 
 class SimpleRetention(nn.Module):
@@ -64,7 +101,13 @@ class SimpleRetention(nn.Module):
         )
 
     def __call__(
-        self, key: Array, query: Array, value: Array, hstate: Array, dones: Array
+        self,
+        key: Array,
+        query: Array,
+        value: Array,
+        hstate: Array,
+        dones: Array,
+        rotation_values: Tuple[Array, Array],
     ) -> Tuple[Array, Array]:
         """Chunkwise (default) representation of the retention mechanism."""
         B, C, _ = value.shape
@@ -73,6 +116,11 @@ class SimpleRetention(nn.Module):
         q_proj = query @ self.w_q
         k_proj = key @ self.w_k
         v_proj = value @ self.w_v
+
+        sin, cos = rotation_values
+        q_proj = theta_shift(q_proj, sin, cos)
+        k_proj = theta_shift(k_proj, sin, cos)
+
         k_proj = k_proj.transpose(0, -1, -2)
 
         # Compute next hidden state
@@ -100,13 +148,22 @@ class SimpleRetention(nn.Module):
         return ret, next_hstate
 
     def recurrent(
-        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array
+        self,
+        key_n: Array,
+        query_n: Array,
+        value_n: Array,
+        hstate: Array,
+        rotation_values: Tuple[Array, Array],
     ) -> Tuple[Array, Array]:
         """Recurrent representation of the retention mechanism."""
         # Apply projection to q_proj, k_proj, v_proj
         q_proj = query_n @ self.w_q
         k_proj = key_n @ self.w_k
         v_proj = value_n @ self.w_v
+
+        sin, cos = rotation_values
+        q_proj = theta_shift(q_proj, sin, cos)
+        k_proj = theta_shift(k_proj, sin, cos)
 
         # Apply the retention mechanism and update the hidden state
         updated_hstate = hstate + (k_proj.transpose(0, -1, -2) @ v_proj)
@@ -259,9 +316,6 @@ class MultiScaleRetention(nn.Module):
             for decay_kappa in self.decay_kappas
         ]
 
-        # Create an instance of the positional encoding
-        self.pe = PositionalEncoding(self.embed_dim)
-
     def __call__(
         self,
         key: Array,
@@ -276,11 +330,14 @@ class MultiScaleRetention(nn.Module):
 
         # Positional encoding of the current step
         if self.memory_config.timestep_positional_encoding:
-            key, query, value = self.pe(key, query, value, step_count)
+            # Positional encoding of the current step
+            _sin, _cos = sincos_from_stepcount(step_count, self.embed_dim, self.n_head)
 
         ret_output = jnp.zeros((B, C, self.embed_dim), dtype=value.dtype)
         for head in range(self.n_head):
-            y, new_hs = self.retention_heads[head](key, query, value, hstate[:, head], dones)
+            y, new_hs = self.retention_heads[head](
+                key, query, value, hstate[:, head], dones, (_sin, _cos)
+            )
             ret_output = ret_output.at[
                 :, :, self.head_size * head : self.head_size * (head + 1)
             ].set(y)
@@ -302,12 +359,12 @@ class MultiScaleRetention(nn.Module):
 
         # Positional encoding of the current step if enabled
         if self.memory_config.timestep_positional_encoding:
-            key_n, query_n, value_n = self.pe(key_n, query_n, value_n, step_count)
+            _sin, _cos = sincos_from_stepcount(step_count, self.embed_dim, self.n_head)
 
         ret_output = jnp.zeros((B, S, self.embed_dim), dtype=value_n.dtype)
         for head in range(self.n_head):
             y, new_hs = self.retention_heads[head].recurrent(
-                key_n, query_n, value_n, hstate[:, head]
+                key_n, query_n, value_n, hstate[:, head], (_sin, _cos)
             )
             ret_output = ret_output.at[
                 :, :, self.head_size * head : self.head_size * (head + 1)
