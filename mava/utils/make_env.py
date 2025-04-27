@@ -59,6 +59,7 @@ from mava.wrappers import (
     VectorConnectorWrapper,
     async_multiagent_worker,
 )
+from mava.wrappers.graph_wrapper import GraphWrapper
 
 # Registry mapping environment names to their generator and wrapper classes.
 _jumanji_registry = {
@@ -93,6 +94,9 @@ def add_extra_wrappers(
     if config.system.add_agent_id:
         train_env = AgentIDWrapper(train_env)
         eval_env = AgentIDWrapper(eval_env)
+
+    train_env = GraphWrapper(train_env)
+    eval_env = GraphWrapper(eval_env)
 
     train_env = AutoResetWrapper(train_env)
     train_env = RecordEpisodeMetrics(train_env)

@@ -13,7 +13,17 @@
 # limitations under the License.
 
 from functools import cached_property
-from typing import Any, Callable, Dict, Generic, Optional, Protocol, Tuple, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Optional,
+    Protocol,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 import chex
 import jax
@@ -113,6 +123,21 @@ class MarlEnv(Protocol):
         ...
 
 
+class GraphsTuple(NamedTuple):
+    """
+    This is a copy of jraph.GraphsTuple with ego_node_index
+    """
+
+    nodes: Optional[chex.ArrayTree]
+    edges: Optional[chex.ArrayTree]
+    receivers: Optional[chex.Array]  # with integer dtype
+    senders: Optional[chex.Array]  # with integer dtype
+    globals: Optional[chex.ArrayTree]
+    n_node: chex.Array  # with integer dtype
+    n_edge: chex.Array  # with integer dtype
+    ego_node_index: chex.Array
+
+
 class Observation(NamedTuple):
     """The observation that the agent sees.
 
@@ -124,6 +149,7 @@ class Observation(NamedTuple):
     agents_view: chex.Array  # (num_agents, num_obs_features)
     action_mask: chex.Array  # (num_agents, num_actions)
     step_count: Optional[chex.Array] = None  # (num_agents, )
+    graph: Optional[GraphsTuple] = None
 
 
 class ObservationGlobalState(NamedTuple):
@@ -137,6 +163,7 @@ class ObservationGlobalState(NamedTuple):
     action_mask: chex.Array  # (num_agents, num_actions)
     global_state: chex.Array  # (num_agents, num_agents * num_obs_features)
     step_count: Optional[chex.Array] = None  # (num_agents, )
+    graph: Optional[GraphsTuple] = None
 
 
 RNNObservation: TypeAlias = Tuple[Observation, Done]
