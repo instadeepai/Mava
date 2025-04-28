@@ -16,7 +16,7 @@ import copy
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, Tuple, TypeVar, Union
 
 import chex
 import jax
@@ -27,13 +27,18 @@ from gymnax.environments import spaces as gymnax_spaces
 from jaxmarl.environments import SMAX
 from jaxmarl.environments import spaces as jaxmarl_spaces
 from jaxmarl.environments.mabrax import MABraxEnv
+from jaxmarl.environments.mpe.simple import State as MPEState
 from jaxmarl.environments.mpe.simple_spread import SimpleSpreadMPE
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper
 
-from mava.types import Observation, ObservationGlobalState, State
+from mava.types import GraphsTuple, Observation, ObservationGlobalState, State
+from mava.wrappers.graph_wrapper import GraphWrapper
+
+# Define a TypeVar for the state, bound to the base State type
+JaxMarlStateType = TypeVar("JaxMarlStateType", bound=State)
 
 if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
     from dataclasses import dataclass
@@ -42,10 +47,10 @@ else:
 
 
 @dataclass
-class JaxMarlState:
+class JaxMarlState(Generic[JaxMarlStateType]):
     """Wrapper around a JaxMarl state to provide necessary attributes for jumanji environments."""
 
-    state: State
+    state: JaxMarlStateType
     key: chex.PRNGKey
     step: int
 
@@ -448,3 +453,136 @@ class MPEWrapper(JaxMarlWrapper):
         """Get global state from observation and copy it for each agent."""
         global_state = jnp.concatenate([obs[agent_id] for agent_id in obs])
         return jnp.tile(global_state, (self.num_agents, 1))
+
+
+class MPEGraphWrapper(GraphWrapper):
+    """Wrapper for the MPE environment that adds a graph to the observation."""
+
+    # This init isn't really needed as jumanji.Wrapper will forward the attributes,
+    # but mypy doesn't realize this.
+    def __init__(
+        self,
+        env: MPEWrapper,
+        add_self_loops: bool = True,
+        visibility_radius: float = 1,
+    ):
+        super().__init__(env)
+        self._env: MPEWrapper
+
+        self.add_self_loops = add_self_loops
+        self.visibility_radius = visibility_radius
+
+        self.num_agents = self._env.num_agents
+        self.time_limit = self._env.time_limit
+        self.action_dim = self._env.action_dim
+
+        self.num_entities = self._env.num_entities
+        self.node_features_dim = 4
+
+    def visibility_graph_for_ego(
+        self,
+        state: MPEState,
+        visibility_radius: float,
+        ego_idx: int,
+    ) -> GraphsTuple:
+        """Return a GraphsTuple for ONE ego agent, with edges defined by a
+        global, uniform visibility radius."""
+
+        positions = state.p_pos
+
+        dists = jnp.linalg.norm(positions[:, None, :] - positions[None, :, :], axis=-1)
+
+        mask = dists <= visibility_radius
+        if not self.add_self_loops:
+            mask = mask.at[jnp.arange(self.num_entities), jnp.arange(self.num_entities)].set(False)
+
+        max_n_edge = self.num_entities * self.num_entities
+        senders, receivers = jnp.nonzero(mask, size=max_n_edge, fill_value=-1)
+
+        # ------------------------------------------------------------------
+        # build a "safe" distance matrix
+        # *shape* = (N+1, N+1) so index N is guaranteed valid
+        # last row / col are all zeros
+        # ------------------------------------------------------------------
+        safe_dists = jnp.pad(  # (N, N)  ->  (N+1, N+1)
+            dists,
+            pad_width=((0, 1), (0, 1)),
+            mode="constant",
+            constant_values=0.0,
+        )
+        N = self.num_entities
+        safe_senders = jnp.where(senders < 0, N, senders)
+        safe_receivers = jnp.where(receivers < 0, N, receivers)
+        # for invalid edges, edge feature would be 0.0
+        edge_features = safe_dists[safe_senders, safe_receivers][..., None]
+
+        node_features = jnp.concatenate(
+            [positions - positions[ego_idx], state.p_vel - state.p_vel[ego_idx]], axis=-1
+        )
+        assert node_features.shape[-1] == self.node_features_dim, (
+            f"Node features dim specified in MPEWrapper is {self.node_features_dim}, "
+            f"but got {node_features.shape[-1]} for agent {ego_idx}."
+        )
+
+        n_node = jnp.asarray([self.num_entities])
+        n_edge = jnp.asarray([max_n_edge])
+
+        return GraphsTuple(
+            nodes=node_features,
+            edges=edge_features,
+            senders=senders,
+            receivers=receivers,
+            n_node=n_node,
+            n_edge=n_edge,
+            globals=None,
+            ego_node_index=jnp.asarray([ego_idx]),
+        )
+
+    def add_graph_to_observations(
+        self, state: JaxMarlState[MPEState], observation: Union[Observation, ObservationGlobalState]
+    ) -> Union[Observation, ObservationGlobalState]:
+        b_graph = jax.vmap(self.visibility_graph_for_ego, in_axes=(None, None, 0))(
+            state.state, self.visibility_radius, jnp.arange(self.num_agents)
+        )
+        observation = observation._replace(graph=b_graph)
+        return observation
+
+    @cached_property
+    def observation_spec(
+        self,
+    ) -> Union[specs.Spec[Observation], specs.Spec[ObservationGlobalState]]:
+        """Define the observation spec for the Jraph graph representation."""
+        obs_spec = self._env.observation_spec
+
+        max_n_edge = self.num_entities * self.num_entities
+
+        graph_spec = specs.Spec(
+            constructor=GraphsTuple,
+            name="graph",
+            nodes=specs.Array(
+                shape=(
+                    self.num_agents,
+                    self.num_entities,
+                    self.node_features_dim,
+                ),
+                dtype=jnp.float32,
+                name="nodes",
+            ),
+            edges=specs.Array(
+                shape=(self.num_agents, max_n_edge, 1), dtype=jnp.float32, name="edges"
+            ),
+            senders=specs.Array(
+                shape=(self.num_agents, max_n_edge), dtype=jnp.int32, name="senders"
+            ),
+            receivers=specs.Array(
+                shape=(self.num_agents, max_n_edge), dtype=jnp.int32, name="receivers"
+            ),
+            n_node=specs.Array(shape=(self.num_agents, 1), dtype=jnp.int32, name="n_node"),
+            n_edge=specs.Array(shape=(self.num_agents, 1), dtype=jnp.int32, name="n_edge"),
+            globals=None,
+            ego_node_index=specs.Array(
+                shape=(self.num_agents, 1), dtype=jnp.int32, name="ego_node_index"
+            ),
+        )
+
+        return obs_spec.replace(graph=graph_spec)
