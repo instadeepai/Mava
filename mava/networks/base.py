@@ -23,8 +23,14 @@ from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
 from mava.networks.distributions import MaskedEpsGreedyDistribution
+from mava.networks.gnn import GNN
 from mava.networks.torsos import MLPTorso
-from mava.types import Observation, ObservationGlobalState, RNNGlobalObservation, RNNObservation
+from mava.types import (
+    Observation,
+    ObservationGlobalState,
+    RNNGlobalObservation,
+    RNNObservation,
+)
 
 
 class FeedForwardActor(nn.Module):
@@ -143,7 +149,10 @@ class RecurrentActor(nn.Module):
         """Forward pass."""
         observation, done = observation_done
 
-        policy_embedding = self.pre_torso(observation.agents_view)
+        if isinstance(self.pre_torso, GNN):
+            policy_embedding = self.pre_torso(observation)
+        else:
+            policy_embedding = self.pre_torso(observation.agents_view)
         policy_rnn_input = (policy_embedding, done)
         policy_hidden_state, policy_embedding = ScannedRNN(self.hidden_state_dim)(
             policy_hidden_state, policy_rnn_input
@@ -180,7 +189,11 @@ class RecurrentValueNet(nn.Module):
             # Get single agent view in the case of a decentralised critic.
             observation = observation.agents_view
 
-        value_embedding = self.pre_torso(observation)
+        if isinstance(self.pre_torso, GNN):
+            value_embedding = self.pre_torso(observation_done[0])
+        else:
+            value_embedding = self.pre_torso(observation)
+
         value_rnn_input = (value_embedding, done)
         value_net_hidden_state, value_embedding = ScannedRNN(self.hidden_state_dim)(
             value_net_hidden_state, value_rnn_input
