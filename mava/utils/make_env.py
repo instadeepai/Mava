@@ -60,6 +60,7 @@ from mava.wrappers import (
     async_multiagent_worker,
 )
 from mava.wrappers.graph_wrapper import GraphWrapper
+from mava.wrappers.jaxmarl import MPEGraphWrapper
 
 # Registry mapping environment names to their generator and wrapper classes.
 _jumanji_registry = {
@@ -91,12 +92,21 @@ def add_extra_wrappers(
     # Disable the AgentID wrapper if the environment has implicit agent IDs.
     config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
+    if config.system.add_graph_wrapper:
+        if config.env.env_name == "MPE":
+            assert isinstance(train_env, MPEWrapper) and isinstance(
+                eval_env, MPEWrapper
+            ), "Attempting to add mpe graph wrapper to non-MPE environment"
+
+            train_env = MPEGraphWrapper(train_env)
+            eval_env = MPEGraphWrapper(eval_env)
+        else:
+            train_env = GraphWrapper(train_env)
+            eval_env = GraphWrapper(eval_env)
+
     if config.system.add_agent_id:
         train_env = AgentIDWrapper(train_env)
         eval_env = AgentIDWrapper(eval_env)
-
-    train_env = GraphWrapper(train_env)
-    eval_env = GraphWrapper(eval_env)
 
     train_env = AutoResetWrapper(train_env)
     train_env = RecordEpisodeMetrics(train_env)

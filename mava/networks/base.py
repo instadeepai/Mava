@@ -150,6 +150,10 @@ class RecurrentActor(nn.Module):
         observation, done = observation_done
 
         if isinstance(self.pre_torso, GNN):
+            assert observation.graph is not None, (
+                "Using GNN but no graph wrapper found. "
+                "Please set add_graph_wrapper to True in systems config"
+            )
             policy_embedding = self.pre_torso(observation)
         else:
             policy_embedding = self.pre_torso(observation.agents_view)
@@ -190,7 +194,12 @@ class RecurrentValueNet(nn.Module):
             observation = observation.agents_view
 
         if isinstance(self.pre_torso, GNN):
-            value_embedding = self.pre_torso(observation_done[0])
+            observation = observation_done[0]
+            assert observation.graph is not None, (
+                "Using GNN but no graph wrapper found. "
+                "Please set add_graph_wrapper to True in systems config"
+            )
+            value_embedding = self.pre_torso(observation)
         else:
             value_embedding = self.pre_torso(observation)
 
