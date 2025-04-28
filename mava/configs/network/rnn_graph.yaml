@@ -1,0 +1,30 @@
+# ---Recurrent Structure Networks---
+hidden_state_dim: 128 # The size of the RNN hiddenstate for each agent.
+
+actor_network:
+  pre_torso:
+    _target_: mava.networks.gnn.InforMARLNbrhdAggregationTorso
+    attention_query_layer_sizes: [128]
+    use_layer_norm: False
+    activation: relu
+    num_heads: 4
+    num_attention_layers: 1
+  post_torso:
+    _target_: mava.networks.torsos.MLPTorso
+    layer_sizes: [128]
+    use_layer_norm: False
+    activation: relu
+
+critic_network:
+  pre_torso:
+    _target_: mava.networks.gnn.InforMARLGlobalAggregationTorso
+    attention_query_layer_sizes: [128]
+    use_layer_norm: False
+    activation: relu
+    num_heads: 4
+    num_attention_layers: 1
+  post_torso:
+    _target_: mava.networks.torsos.MLPTorso
+    layer_sizes: [128]
+    use_layer_norm: False
+    activation: relu
