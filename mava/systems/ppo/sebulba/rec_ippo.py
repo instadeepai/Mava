@@ -35,7 +35,6 @@ from jax.experimental.shard_map import shard_map
 from jax.sharding import Mesh, NamedSharding, PartitionSpec, Sharding
 from numpy.typing import NDArray
 from omegaconf import DictConfig, OmegaConf
-from rich.pretty import pprint
 
 from mava.evaluator import get_num_eval_envs, make_rec_eval_act_fn
 from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
@@ -58,12 +57,14 @@ from mava.types import (
 )
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
-from mava.utils.config import check_sebulba_config, check_total_timesteps
+from mava.utils.config import check_total_timesteps
+from mava.utils.config import ppo_sebulba_checks as check_sebulba_config
 from mava.utils.jax_utils import switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
-from mava.utils.sebulba import ParamsSource, Pipeline, RecordTimeTo, ThreadLifetime
+from mava.utils.sebulba.pipelines import Pipeline
+from mava.utils.sebulba.utils import ParamsSource, RecordTimeTo, stop_sebulba
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 from mava.wrappers.gym import GymToJumanji
@@ -78,7 +79,7 @@ def rollout(
     apply_fns: Tuple[RecActorApply, RecCriticApply],
     actor_device: int,
     seeds: List[int],
-    thread_lifetime: ThreadLifetime,
+    stop_event: threading.Event,
 ) -> None:
     """Runs rollouts to collect trajectories from the environment.
 
@@ -91,7 +92,7 @@ def rollout(
         apply_fns (Tuple): Functions for running the actor and critic networks.
         actor_device (Device): Actor device to use for rollout.
         seeds (List[int]): Seeds for initializing the environment.
-        thread_lifetime (ThreadLifetime): Manages the thread's lifecycle.
+        stop_event (threading.Event): Manages the thread's lifecycle.
     """
     name = threading.current_thread().name
     print(f"{Fore.BLUE}{Style.BRIGHT}Thread {name} started{Style.RESET_ALL}")
@@ -138,7 +139,7 @@ def rollout(
     last_hstates = move_to_device(last_hstates)
 
     # Loop till the desired num_updates is reached.
-    while not thread_lifetime.should_stop():
+    while not stop_event.is_set():
         # Rollout
         traj: List[RNNPPOTransition] = []
         episode_metrics: List[Dict] = []
@@ -177,7 +178,8 @@ def rollout(
                     )
                 )
                 last_hstates = hstates
-                episode_metrics.append(timestep.extras["episode_metrics"])
+                metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
+                episode_metrics.append(metrics)
 
         # Send trajectories to learner
         with RecordTimeTo(actor_timings["rollout_put_time"]):
@@ -560,8 +562,8 @@ def learner_setup(
         optax.adam(critic_lr, eps=1e-5),
     )
 
-    # Initialise observation: Select only obs for a single agent.
-    single_obs = jnp.array([[env.single_observation_space.sample()]])
+    # Initialise observation.
+    single_obs = jnp.array([[env.single_observation_space.sample()["agents_view"]]])
     init_action_mask = jnp.ones((1, config.system.num_agents, config.system.num_actions))
     init_obs = Observation(single_obs, init_action_mask)
     init_done = jnp.zeros((1, config.arch.num_envs, config.system.num_agents), dtype=bool)
@@ -681,9 +683,7 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Logger setup
     logger = MavaLogger(config)
-    print_cfg: Dict = OmegaConf.to_container(config, resolve=True)
-    print_cfg["arch"]["devices"] = jax.devices()
-    pprint(print_cfg)
+    logger.log_config(OmegaConf.to_container(config, resolve=True))
 
     # Set up checkpointer
     save_checkpoint = config.logger.checkpointing.save_model
@@ -704,21 +704,19 @@ def run_experiment(_config: DictConfig) -> float:
     # Executor setup and launch.
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
-    # The rollout queue/ the pipe between actor and learner
-    pipe_lifetime = ThreadLifetime()
-    pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding, pipe_lifetime)
+    # The rollout queue/ pipe between actor and learner
+    pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding)
     pipe.start()
 
     params_sources: List[ParamsSource] = []
     actor_threads: List[threading.Thread] = []
-    actor_lifetime = ThreadLifetime()
-    params_sources_lifetime = ThreadLifetime()
+    actors_stop_event = threading.Event()
 
     # Create the actor threads
     print(f"{Fore.BLUE}{Style.BRIGHT}Starting up actor threads...{Style.RESET_ALL}")
     for actor_device in actor_devices:
         # Create 1 params source per device
-        params_source = ParamsSource(inital_params, actor_device, params_sources_lifetime)
+        params_source = ParamsSource(inital_params, actor_device)
         params_source.start()
         params_sources.append(params_source)
         # Create multiple rollout threads per actor device
@@ -739,7 +737,7 @@ def run_experiment(_config: DictConfig) -> float:
                     apply_fns,
                     actor_device,
                     seeds,
-                    actor_lifetime,
+                    actors_stop_event,
                 ),
                 name=f"Actor-{actor_device}-{thread_id}",
             )
@@ -804,6 +802,9 @@ def run_experiment(_config: DictConfig) -> float:
     evaluator_envs.close()
     eval_performance = float(np.mean(eval_metrics[config.env.eval_metric]))
 
+    # Gracefully shutting down all actors and resources.
+    stop_sebulba(actors_stop_event, pipe, params_sources, actor_threads)
+
     # Measure absolute metric.
     if config.arch.absolute_metric:
         print(f"{Fore.BLUE}{Style.BRIGHT}Measuring absolute metric...{Style.RESET_ALL}")
@@ -826,21 +827,6 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Stop all the threads.
     logger.stop()
-    actor_lifetime.stop()
-    pipe.clear()  # We clear the pipeline before stopping the actor threads to avoid deadlock
-    print(f"{Fore.RED}{Style.BRIGHT}Pipe cleared{Style.RESET_ALL}")
-    print(f"{Fore.RED}{Style.BRIGHT}Stopping actor threads...{Style.RESET_ALL}")
-    for actor in actor_threads:
-        actor.join()
-        print(f"{Fore.RED}{Style.BRIGHT}{actor.name} stopped{Style.RESET_ALL}")
-    print(f"{Fore.RED}{Style.BRIGHT}Stopping pipeline...{Style.RESET_ALL}")
-    pipe_lifetime.stop()
-    pipe.join()
-    print(f"{Fore.RED}{Style.BRIGHT}Stopping params sources...{Style.RESET_ALL}")
-    params_sources_lifetime.stop()
-    for params_source in params_sources:
-        params_source.join()
-    print(f"{Fore.RED}{Style.BRIGHT}All threads stopped...{Style.RESET_ALL}")
 
     return eval_performance
 

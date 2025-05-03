@@ -28,7 +28,6 @@ from flax.core.frozen_dict import FrozenDict as Params
 from jax import tree
 from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
-from rich.pretty import pprint
 
 from mava.evaluator import ActorState, EvalActFn, get_eval_fn, get_num_eval_envs
 from mava.networks import SableNetwork
@@ -115,7 +114,8 @@ def get_learner_fn(
                 prev_done, action, value, timestep.reward, log_prob, last_timestep.observation
             )
             learner_state = LearnerState(params, opt_states, key, env_state, timestep, hstates)
-            return learner_state, (transition, timestep.extras["episode_metrics"])
+            metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
+            return learner_state, (transition, metrics)
 
         # Copy old hidden states: to be used in the training loop
         prev_hstates = tree.map(lambda x: jnp.copy(x), learner_state.hstates)
@@ -535,9 +535,7 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Logger setup
     logger = MavaLogger(config)
-    cfg: Dict = OmegaConf.to_container(config, resolve=True)
-    cfg["arch"]["devices"] = jax.devices()
-    pprint(cfg)
+    logger.log_config(OmegaConf.to_container(config, resolve=True))
 
     # Set up checkpointer
     save_checkpoint = config.logger.checkpointing.save_model

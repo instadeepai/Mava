@@ -19,6 +19,7 @@ from typing import Any, Callable, Dict, Tuple
 
 import chex
 import flashbax as fbx
+import flax
 import hydra
 import jax
 import jax.numpy as jnp
@@ -35,7 +36,7 @@ from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
-from mava.types import ActorApply, CriticApply, ExperimentOutput, MarlEnv, MavaState
+from mava.types import ActorApply, CriticApply, ExperimentOutput, MarlEnv, MavaState, Metrics
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.jax_utils import (
     merge_leading_dims,
@@ -87,9 +88,11 @@ def get_learner_fn(
 
         """
 
-        def _env_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, PPOTransition]:
+        def _env_step(
+            learner_state: LearnerState, _: Any
+        ) -> Tuple[LearnerState, Tuple[PPOTransition, Metrics]]:
             """Step the environment."""
-            params, opt_states, key, env_state, last_timestep = learner_state
+            params, opt_states, key, env_state, last_timestep, dones = learner_state
 
             # SELECT ACTION
             key, policy_key = jax.random.split(key)
@@ -102,26 +105,28 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             # LOG EPISODE METRICS
-            done = tree.map(
-                lambda x: jnp.repeat(x, config.system.num_agents).reshape(config.arch.num_envs, -1),
-                timestep.last(),
-            )
-            info = timestep.extras["episode_metrics"]
+            done = timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
 
             transition = PPOTransition(
-                done, action, value, timestep.reward, log_prob, last_timestep.observation, info
+                done=done,
+                action=action,
+                value=value,
+                reward=timestep.reward,
+                log_prob=log_prob,
+                obs=last_timestep.observation,
             )
 
-            learner_state = LearnerState(params, opt_states, key, env_state, timestep)
-            return learner_state, transition
+            learner_state = LearnerState(params, opt_states, key, env_state, timestep, done)
+            metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
+            return learner_state, (transition, metrics)
 
         # STEP ENVIRONMENT FOR ROLLOUT LENGTH
-        learner_state, traj_batch = jax.lax.scan(
+        learner_state, (traj_batch, episode_metrics) = jax.lax.scan(
             _env_step, learner_state, None, config.system.rollout_length
         )
 
         # CALCULATE ADVANTAGE
-        params, opt_states, key, env_state, last_timestep = learner_state
+        params, opt_states, key, env_state, last_timestep, dones = learner_state
         last_val = critic_apply_fn(params.critic_params, last_timestep.observation)
 
         def _calculate_gae(
@@ -303,9 +308,8 @@ def get_learner_fn(
         )
 
         params, opt_states, traj_batch, advantages, targets, key = update_state
-        learner_state = LearnerState(params, opt_states, key, env_state, last_timestep)
-        metric = traj_batch.info
-        return learner_state, (metric, loss_info, traj_batch)
+        learner_state = LearnerState(params, opt_states, key, env_state, last_timestep, dones)
+        return learner_state, (episode_metrics, loss_info, traj_batch)
 
     def learner_fn(
         learner_state: LearnerState,
@@ -379,11 +383,9 @@ def learner_setup(
     # Initialise observation with obs of all agents.
     obs = env.observation_spec.generate_value()
     init_x = tree.map(lambda x: x[jnp.newaxis, ...], obs)
-
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(key_p, init_x)
     actor_opt_state = actor_optim.init(actor_params)
-
     # Initialise critic params and optimiser state.
     critic_params = critic_network.init(key_p, init_x)
     critic_opt_state = critic_optim.init(critic_params)
@@ -409,42 +411,40 @@ def learner_setup(
     learn = get_learner_fn(env, apply_fns, update_fns, config)
     learn = jax.pmap(learn, axis_name="device")
 
-    # Broadcast params and optimiser state to cores and batch.
-    broadcast = lambda x: jnp.broadcast_to(
-        x, (n_devices, config.system.update_batch_size, *x.shape)
-    )
-
-    actor_params = tree.map(broadcast, actor_params)
-    actor_opt_state = tree.map(broadcast, actor_opt_state)
-    critic_params = tree.map(broadcast, critic_params)
-    critic_opt_state = tree.map(broadcast, critic_opt_state)
-
     # Initialise environment states and timesteps.
     key, *env_keys = jax.random.split(
         key, n_devices * config.system.update_batch_size * config.arch.num_envs + 1
     )
-    env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(
-        jnp.stack(env_keys),
-    )
-
-    # Split keys for each core.
-    key, *step_keys = jax.random.split(key, n_devices * config.system.update_batch_size + 1)
-
-    # Add dimension to pmap over.
-    reshape_step_keys = lambda x: x.reshape(
-        (n_devices, config.system.update_batch_size) + x.shape[1:]
-    )
-    step_keys = reshape_step_keys(jnp.stack(step_keys))
+    env_states, timesteps = jax.vmap(env.reset, in_axes=0)(jnp.stack(env_keys))
     reshape_states = lambda x: x.reshape(
         (n_devices, config.system.update_batch_size, config.arch.num_envs) + x.shape[1:]
     )
     env_states = tree.map(reshape_states, env_states)
     timesteps = tree.map(reshape_states, timesteps)
 
+    # Initialize dones with shape (num_envs, num_agents)
+    dones = jnp.zeros((config.arch.num_envs, config.system.num_agents), dtype=bool)
+
+    # Split keys for each core.
+    key, step_keys = jax.random.split(key)
+
+    # Pack parameters and optimizer states
     params = Params(actor_params, critic_params)
     opt_states = OptStates(actor_opt_state, critic_opt_state)
 
-    init_learner_state = LearnerState(params, opt_states, step_keys, env_states, timesteps)
+    replicate_learner = (params, opt_states, step_keys, dones)
+
+    # Duplicate learner for update_batch_size.
+    broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
+    replicate_learner = tree.map(broadcast, replicate_learner)
+
+    # Duplicate learner across devices.
+    replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())
+
+    # Initialise learner state.
+    params, opt_states, step_keys, dones = replicate_learner
+    init_learner_state = LearnerState(params, opt_states, step_keys, env_states, timesteps, dones)
+
     return learn, actor_network, init_learner_state
 
 
@@ -468,8 +468,8 @@ def run_experiment(_config: DictConfig) -> None:
 
     # Setup evaluator.
     eval_keys = jax.random.split(key_e, n_devices)
-    eval_act_fn = make_ff_eval_act_fn(actor_network, config)
-    evaluator = get_eval_fn(eval_env, eval_act_fn, config, config.arch.num_eval_episodes)
+    eval_act_fn = make_ff_eval_act_fn(actor_network.apply, config)
+    evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
 
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
     steps_per_rollout = (
@@ -500,22 +500,19 @@ def run_experiment(_config: DictConfig) -> None:
             **config.logger.checkpointing.save_args,  # Checkpoint args
         )
 
+    # Set up dummy transition based on observation shape
+    obs_shape = env.observation_spec.agents_view.shape[1:]  # Get shape after agent dimension
+
     dummy_flashbax_transition = {
         "done": jnp.zeros((config.system.num_agents,), dtype=bool),
         "action": jnp.zeros((config.system.num_agents,), dtype=jnp.int32),
         "reward": jnp.zeros((config.system.num_agents,), dtype=jnp.float32),
         "observation": jnp.zeros(
-            (
-                config.system.num_agents,
-                env.observation_spec.agents_view.shape[1],
-            ),
+            (config.system.num_agents, *obs_shape),
             dtype=jnp.float32,
         ),
         "legal_action_mask": jnp.zeros(
-            (
-                config.system.num_agents,
-                config.system.num_actions,
-            ),
+            (config.system.num_agents, config.system.num_actions),
             dtype=bool,
         ),
     }
@@ -669,7 +666,9 @@ def run_experiment(_config: DictConfig) -> None:
     logger.stop()
 
 
-@hydra.main(config_path="../configs/default", config_name="ff_ippo.yaml", version_base="1.2")
+@hydra.main(
+    config_path="../../mava/configs/default", config_name="ff_ippo.yaml", version_base="1.2"
+)
 def hydra_entry_point(cfg: DictConfig) -> None:
     """Experiment entry point."""
     # Allow dynamic attributes.

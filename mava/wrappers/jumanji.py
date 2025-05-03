@@ -15,7 +15,7 @@
 
 from abc import ABC, abstractmethod
 from functools import cached_property
-from typing import Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 import chex
 import jax
@@ -150,7 +150,10 @@ class RwareWrapper(JumanjiMarlWrapper):
         )
         reward = jnp.repeat(timestep.reward, self.num_agents)
         discount = jnp.repeat(timestep.discount, self.num_agents)
-        return timestep.replace(observation=observation, reward=reward, discount=discount)
+        metrics: Dict[str, Any] = {"env_metrics": {}}
+        return timestep.replace(
+            observation=observation, reward=reward, discount=discount, extras=metrics
+        )
 
     @cached_property
     def observation_spec(
@@ -201,7 +204,8 @@ class LbfWrapper(JumanjiMarlWrapper):
         if self._aggregate_rewards:
             reward = aggregate_rewards(reward, self.num_agents)
 
-        return timestep.replace(observation=modified_observation, reward=reward)
+        metrics: Dict[str, Any] = {"env_metrics": {}}
+        return timestep.replace(observation=modified_observation, reward=reward, extras=metrics)
 
     @cached_property
     def observation_spec(
@@ -282,13 +286,18 @@ class ConnectorWrapper(JumanjiMarlWrapper):
         }
 
         # The episode is won if all agents have connected.
-        extras = timestep.extras | {"won_episode": timestep.extras["ratio_connections"] == 1.0}
+        metrics: Dict[str, Any] = {
+            "env_metrics": {
+                "won_episode": timestep.extras["ratio_connections"] == 1.0,
+                **timestep.extras,
+            }
+        }
 
         # Whether or not aggregate the list of individual rewards.
         reward = timestep.reward
         if self._aggregate_rewards:
             reward = aggregate_rewards(reward, self.num_agents)
-        return timestep.replace(observation=Observation(**obs_data), reward=reward, extras=extras)
+        return timestep.replace(observation=Observation(**obs_data), reward=reward, extras=metrics)
 
     def get_global_state(self, obs: Observation) -> chex.Array:
         """Constructs the global state from the global information
@@ -434,12 +443,17 @@ class VectorConnectorWrapper(JumanjiMarlWrapper):
         }
 
         # The episode is won if all agents have connected.
-        extras = timestep.extras | {"won_episode": timestep.extras["ratio_connections"] == 1.0}
+        metrics: Dict[str, Any] = {
+            "env_metrics": {
+                "won_episode": timestep.extras["ratio_connections"] == 1.0,
+                **timestep.extras,
+            }
+        }
 
         reward = timestep.reward
         if self._aggregate_rewards:
             reward = aggregate_rewards(reward, self.num_agents)
-        return timestep.replace(observation=Observation(**obs_data), reward=reward, extras=extras)
+        return timestep.replace(observation=Observation(**obs_data), reward=reward, extras=metrics)
 
     @cached_property
     def observation_spec(
@@ -539,10 +553,14 @@ class CleanerWrapper(JumanjiMarlWrapper):
         discount = jnp.repeat(timestep.discount, self.num_agents)
 
         # The episode is won if every tile is cleaned.
-        extras = {"won_episode": timestep.extras["num_dirty_tiles"] == 0}
-
+        metrics: Dict[str, Any] = {
+            "env_metrics": {
+                "won_episode": timestep.extras["num_dirty_tiles"] == 0,
+                **timestep.extras,
+            }
+        }
         return timestep.replace(
-            observation=Observation(**obs_data), reward=reward, discount=discount, extras=extras
+            observation=Observation(**obs_data), reward=reward, discount=discount, extras=metrics
         )
 
     def get_global_state(self, obs: Observation) -> chex.Array:

@@ -29,7 +29,6 @@ from flax.core.scope import FrozenVariableDict
 from jax import Array, tree
 from jumanji.env import State
 from omegaconf import DictConfig, OmegaConf
-from rich.pretty import pprint
 
 from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
@@ -426,14 +425,14 @@ def make_update_fns(
         next_obs = timestep.observation
         rewards = timestep.reward
         terms = ~timestep.discount.astype(bool)
-        infos = timestep.extras
+        metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
 
-        real_next_obs = infos["real_next_obs"]
+        real_next_obs = timestep.extras["real_next_obs"]
 
         transition = Transition(obs, action, rewards, terms, real_next_obs)
         buffer_state = rb.add(buffer_state, transition)
 
-        return next_obs, env_state, buffer_state, infos["episode_metrics"]
+        return next_obs, env_state, buffer_state, metrics
 
     def act(
         carry: Tuple[FrozenVariableDict, Array, State, BufferState, chex.PRNGKey], _: Any
@@ -524,10 +523,9 @@ def run_experiment(cfg: DictConfig) -> float:
     # Number of steps to do in the scanned update method (how many anakin steps).
     cfg.system.scan_steps = int(steps_per_rollout / anakin_act_steps)
 
-    pprint(OmegaConf.to_container(cfg, resolve=True))
-
     # Initialize system and make learning functions.
     (env, eval_env), networks, optims, rb, learner_state, target_entropy, logger, key = init(cfg)
+    logger.log_config(OmegaConf.to_container(cfg, resolve=True))
     explore, update = make_update_fns(cfg, env, networks, optims, rb, target_entropy)
 
     actor, _ = networks

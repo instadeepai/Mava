@@ -65,7 +65,7 @@ class EvalActFn(Protocol):
 
 def get_num_eval_envs(config: DictConfig, absolute_metric: bool) -> int:
     """Returns the number of vmapped envs/batch size during evaluation."""
-    n_devices = jax.device_count()
+    n_devices = jax.device_count() if config.arch.architecture_name == "anakin" else 1
     n_parallel_envs = config.arch.num_envs * n_devices
 
     if absolute_metric:
@@ -140,15 +140,12 @@ def get_eval_fn(
             step_state = env_state, ts, key, init_act_state
             _, timesteps = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit + 1))
 
-            metrics = timesteps.extras["episode_metrics"]
-            if config.env.log_win_rate:
-                metrics["won_episode"] = timesteps.extras["won_episode"]
+            metrics = timesteps.extras["episode_metrics"] | timesteps.extras["env_metrics"]
 
             # find the first instance of done to get the metrics at that timestep, we don't
             # care about subsequent steps because we only the results from the first episode
             done_idx = jnp.argmax(timesteps.last(), axis=0)
             metrics = tree.map(lambda m: m[done_idx, jnp.arange(n_vmapped_envs)], metrics)
-            del metrics["is_terminal_step"]  # uneeded for logging
 
             return key, metrics
 
@@ -290,8 +287,7 @@ def get_sebulba_eval_fn(
             if config.env.log_win_rate:
                 metrics["won_episode"] = timesteps.extras["won_episode"]
 
-            # find the first instance of done to get the metrics at that timestep, we don't
-            # care about subsequent steps because we only the results from the first episode
+            # Find the first instance of done to get the metrics at that timestep.
             done_idx = np.argmax(timesteps.last(), axis=0)
             metrics = tree.map(lambda m: m[done_idx, np.arange(n_parallel_envs)], metrics)
             del metrics["is_terminal_step"]  # uneeded for logging

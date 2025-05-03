@@ -16,9 +16,7 @@ cd mava
 
 3. Create and activate a virtual environment and install requirements
 ```bash
-uv venv -p=3.12
-source .venv/bin/activate
-uv pip install -e .
+uv sync -p=3.12
 ```
 
 4. Install jax on your accelerator. The example below is for an NVIDIA GPU, please the [official install guide](https://github.com/google/jax#installation) for other accelerators.
@@ -29,6 +27,11 @@ uv pip install "jax[cuda12]==0.4.30"
 
 5. Run a system!
 ```bash
+uv run mava/systems/ppo/anakin/ff_ippo.py env=rware
+```
+or
+```
+source .venv/bin/activate
 python mava/systems/ppo/anakin/ff_ippo.py env=rware
 ```
 

@@ -16,6 +16,7 @@ from functools import cached_property
 from typing import Any, Callable, Dict, Generic, Optional, Protocol, Tuple, TypeVar, Union
 
 import chex
+import jax
 import jumanji.specs as specs
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
@@ -28,7 +29,7 @@ Done: TypeAlias = chex.Array
 HiddenState: TypeAlias = chex.Array
 # Can't know the exact type of State.
 State: TypeAlias = Any
-Metrics: TypeAlias = Dict[str, chex.Array]
+Metrics: TypeAlias = Dict[str, jax.typing.ArrayLike]
 
 
 class MarlEnv(Protocol):

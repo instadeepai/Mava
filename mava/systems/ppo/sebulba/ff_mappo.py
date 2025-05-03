@@ -35,6 +35,7 @@ from jax.experimental.shard_map import shard_map
 from jax.sharding import Mesh, NamedSharding, PartitionSpec, Sharding
 from numpy.typing import NDArray
 from omegaconf import DictConfig, OmegaConf
+from rich.pretty import pprint
 
 from mava.evaluator import get_sebulba_eval_fn as get_eval_fn
 from mava.evaluator import make_ff_eval_act_fn
@@ -46,6 +47,7 @@ from mava.types import (
     CriticApply,
     Metrics,
     Observation,
+    ObservationGlobalState,
     SebulbaLearnerFn,
 )
 from mava.utils import make_env as environments
@@ -103,6 +105,8 @@ def rollout(
         actor_policy = actor_apply_fn(params.actor_params, observation)
         action = actor_policy.sample(seed=key)
         log_prob = actor_policy.log_prob(action)
+        # It may be faster to calculate the values in the learner as
+        # then we won't need to pass critic params to actors.
         value = critic_apply_fn(params.critic_params, observation).squeeze()
         return action, log_prob, value
 
@@ -120,7 +124,7 @@ def rollout(
                 with RecordTimeTo(actor_timings["get_params_time"]):
                     params = params_source.get()  # Get the latest parameters from the learner
 
-                obs_tpu = tree.map(move_to_device, timestep.observation)
+                obs_tpu = move_to_device(timestep.observation)
 
                 # Get action and value
                 with RecordTimeTo(actor_timings["compute_action_time"]):
@@ -133,19 +137,8 @@ def rollout(
                     timestep = env.step(cpu_action)
 
                 # Append data to storage
-                traj.append(
-                    PPOTransition(
-                        dones,
-                        action,
-                        value,
-                        timestep.reward,
-                        log_prob,
-                        obs_tpu,
-                    )
-                )
-
-                metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
-                episode_metrics.append(metrics)
+                traj.append(PPOTransition(dones, action, value, timestep.reward, log_prob, obs_tpu))
+                episode_metrics.append(timestep.extras["episode_metrics"])
 
                 dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
 
@@ -427,7 +420,7 @@ def learner_setup(
     """Initialise learner_fn, network and learner state."""
 
     # Create temporory envoirnments.
-    env = environments.make_gym_env(config, config.arch.num_envs)
+    env = environments.make_gym_env(config, config.arch.num_envs, add_global_state=True)
     # Get number of agents and actions.
     action_space = env.single_action_space
     config.system.num_agents = len(action_space)
@@ -450,7 +443,7 @@ def learner_setup(
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 
     actor_network = Actor(torso=actor_torso, action_head=actor_action_head)
-    critic_network = Critic(torso=critic_torso)
+    critic_network = Critic(torso=critic_torso, centralised_critic=True)
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
     critic_lr = make_learning_rate(config.system.critic_lr, config)
@@ -465,9 +458,11 @@ def learner_setup(
     )
 
     # Initialise observation.
-    single_obs = jnp.array([env.single_observation_space.sample()["agents_view"]])
+    single_obs = env.single_observation_space.sample()
+    local_obs = jnp.array([single_obs["agents_view"]])
+    global_obs = jnp.array([single_obs["global_state"]])
     init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
-    init_x = Observation(single_obs, init_action_mask)
+    init_x = ObservationGlobalState(local_obs, init_action_mask, global_obs)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(actor_key, init_x)
@@ -518,15 +513,15 @@ def learner_setup(
     )
 
     # Initialise learner state.
-    init_learner_state = SebulbaLearnerState(params, opt_states, step_keys, None, None)
+    init_learner_state = SebulbaLearnerState(params, opt_states, step_keys, None, None)  # type: ignore
     env.close()
 
-    return learn, apply_fns, init_learner_state, learner_sharding
+    return learn, apply_fns, init_learner_state, learner_sharding  # type: ignore
 
 
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
-    _config.logger.system_name = "ff_ippo_sebulba"
+    _config.logger.system_name = "ff_mappo_sebulba"
     config = copy.deepcopy(_config)
 
     local_devices = jax.local_devices()
@@ -560,7 +555,9 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Logger setup
     logger = MavaLogger(config)
-    logger.log_config(OmegaConf.to_container(config, resolve=True))
+    print_cfg: Dict = OmegaConf.to_container(config, resolve=True)
+    print_cfg["arch"]["devices"] = jax.devices()
+    pprint(print_cfg)
 
     # Set up checkpointer
     save_checkpoint = config.logger.checkpointing.save_model
@@ -574,7 +571,7 @@ def run_experiment(_config: DictConfig) -> float:
     # Executor setup and launch.
     inital_params = jax.device_put(learner_state.params, actor_devices[0])  # unreplicate
 
-    # the rollout queue/ the pipe between actor and learner
+    # The rollout queue/ the pipe between actor and learner
     pipe = Pipeline(config.arch.rollout_queue_size, learner_sharding)
     pipe.start()
 
@@ -600,7 +597,7 @@ def run_experiment(_config: DictConfig) -> float:
                 args=(
                     act_key,
                     # We have to do this here, creating envs inside actor threads causes deadlocks
-                    environments.make_gym_env(config, config.arch.num_envs),
+                    environments.make_gym_env(config, config.arch.num_envs, add_global_state=True),
                     config,
                     pipe,
                     params_source,
@@ -685,6 +682,8 @@ def run_experiment(_config: DictConfig) -> float:
         t = int(steps_per_rollout * (eval_step + 1))
         logger.log(eval_metrics, t, eval_step, LogEvent.ABSOLUTE)
         abs_metric_evaluator_envs.close()
+
+    # Stop all the threads.
     logger.stop()
 
     return eval_performance
@@ -692,7 +691,7 @@ def run_experiment(_config: DictConfig) -> float:
 
 @hydra.main(
     config_path="../../../configs/default/",
-    config_name="ff_ippo_sebulba.yaml",
+    config_name="ff_mappo_sebulba.yaml",
     version_base="1.2",
 )
 def hydra_entry_point(cfg: DictConfig) -> float:
