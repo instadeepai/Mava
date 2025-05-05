@@ -462,3 +462,154 @@ def async_multiagent_worker(  # CCR001
         pipe.send((None, False))
     finally:
         env.close()
+
+
+# pip install flatland-rl
+# pip install "ray[rllib]"
+# pip install pettingzoo
+
+
+# from flatland.ml.pettingzoo.examples.flatland_pettingzoo_stable_baselines import train_flatland_pettingzoo_supersuit, eval_flatland_pettingzoo
+import gymnasium
+from flatland.env_generation.env_generator import env_generator
+
+# from flatland.envs.predictions import ShortestPathPredictorForRailEnv
+from flatland.ml.observations.flatten_tree_observation_for_rail_env import (
+    FlattenedNormalizedTreeObsForRailEnv,
+)
+from flatland.ml.pettingzoo.wrappers import PettingzooFlatland
+from gymnasium import spaces
+from gymnasium.vector.utils import iterate
+
+
+class FlatlandWrapper(gymnasium.Wrapper):
+    def __init__(self, env):
+        """
+        parameters:
+            - env: the pettingzoo Parallel environment that will be converted to a gymnasium vector environment
+            - black_death: whether to give zero valued observations and 0 rewards when an agent is done, allowing for environments with multiple numbers of agents.
+                            Is equivalent to adding the black death wrapper, but somewhat more efficient.
+
+        The resulting object will be a valid vector environment that has a num_envs
+        parameter equal to the max number of agents, will return an array of observations,
+        rewards, dones, etc, and will reset environment automatically when it finishes
+        """
+        self.env = env
+        self.metadata = env.metadata
+        single_obs = env.observation_space(env.possible_agents[0])
+
+        self.num_agents = len(env.possible_agents)
+        shape = (self.num_agents, *single_obs.shape)
+        low = np.tile(single_obs.low, (self.num_agents, 1))
+        high = np.tile(single_obs.high, (self.num_agents, 1))
+        observation_space = spaces.Box(low=low, high=high, shape=shape, dtype=single_obs.dtype)
+        self.observation_space = spaces.Dict({"agents_view": observation_space})
+        self.action_space = spaces.MultiDiscrete([env.action_space(0).n] * self.num_agents)
+
+        self.step_count = 0
+
+    def concat_obs(self, obs_dict):
+        obs_list = []
+        for i, agent in enumerate(self.env.possible_agents):
+            if agent not in obs_dict:
+                raise AssertionError(
+                    "environment has agent death. Not allowed for pettingzoo_env_to_vec_env_v1 unless black_death is True"
+                )
+            obs_list.append(obs_dict[agent])
+
+        obs = np.stack(obs_list, axis=0)
+
+        return obs
+
+    def reset(self, seed=None, options=None):
+        # TODO: should this be changed to infos?
+        _observations, infos = self.env.reset(seed=seed, options=options)
+        observations = {"agents_view": self.concat_obs(_observations)}
+        # infs = [infos.get(agent, {}) for agent in self.env.possible_agents]
+        self.step_count = 0
+        infs = {
+            "action_mask": np.ones((self.num_agents, 5)),
+            "step_count": self.step_count,
+        }
+
+        return observations, infs
+
+    def step(self, actions):
+        actions = list(iterate(self.action_space, actions))
+        agent_set = set(self.env.agents)
+        act_dict = {
+            agent: actions[i]
+            for i, agent in enumerate(self.env.possible_agents)
+            if agent in agent_set
+        }
+        observations, rewards, terms, truncs, infos = self.env.step(act_dict)
+
+        # adds last observation to info where user can get it
+        terminations = np.fromiter(terms.values(), dtype=bool).all()
+        truncations = np.fromiter(truncs.values(), dtype=bool).all()
+        rews = (
+            np.fromiter(rewards.values(), dtype=bool)
+            .sum()[np.newaxis]
+            .repeat(self.num_agents, axis=0)
+        )
+
+        # rews = np.array(
+        #     [rewards.get(agent, 0) for agent in self.env.possible_agents],
+        #     dtype=np.float32,
+        # ).sum()
+        # tms = np.array(
+        #     [terms.get(agent, False) for agent in self.env.possible_agents],
+        #     dtype=np.uint8,
+        # )
+        # tcs = np.array(
+        #     [truncs.get(agent, False) for agent in self.env.possible_agents],
+        #     dtype=np.uint8,
+        # )
+        # infs = [infos.get(agent, {}) for agent in self.env.possible_agents]
+
+        observations = {"agents_view": self.concat_obs(observations)}
+        # empty infos for reset infs
+        # reset_infs = [{} for _ in range(len(self.env.possible_agents))]
+        # combine standard infos and reset infos
+        # infs = [{**inf, **reset_inf} for inf, reset_inf in zip(infs, reset_infs)]
+        self.step_count += 1
+        infs = {
+            "action_mask": np.ones((self.num_agents, 5)),
+            "step_count": self.step_count,
+        }
+
+        return observations, rews, terminations, truncations, infs
+
+    def render(self):
+        return self.env.render()
+
+    def close(self):
+        return self.env.close()
+
+
+def flatland_builder():
+    env, obs, info = env_generator(
+        n_agents=7,
+        x_dim=30,
+        y_dim=30,
+        n_cities=2,
+        max_rail_pairs_in_city=4,
+        grid_mode=False,
+        max_rails_between_cities=2,
+        malfunction_duration_min=20,
+        malfunction_duration_max=50,
+        malfunction_interval=540,
+        speed_ratios=None,
+        seed=42,
+        obs_builder_object=FlattenedNormalizedTreeObsForRailEnv(max_depth=2),
+        #   acceleration_delta=1.0,
+        #   braking_delta=-1.0,
+        #   rewards: Rewards = None,
+        #   effects_generator: Optional[EffectsGenerator[RailEnv]] = None,
+    )
+
+    env = PettingzooFlatland(env)
+
+    env = env.parallel_env()
+
+    return FlatlandWrapper(env)

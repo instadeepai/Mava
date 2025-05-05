@@ -144,7 +144,7 @@ def rollout(
                     )
                 )
 
-                metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
+                metrics = timestep.extras["episode_metrics"]  # | timestep.extras["env_metrics"]
                 episode_metrics.append(metrics)
 
                 dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
@@ -427,7 +427,8 @@ def learner_setup(
     """Initialise learner_fn, network and learner state."""
 
     # Create temporory envoirnments.
-    env = environments.make_gym_env(config, config.arch.num_envs)
+    env = environments.make_flatland_env(config, config.arch.num_envs)
+    # env = environments.make_gym_env(config, config.arch.num_envs)
     # Get number of agents and actions.
     action_space = env.single_action_space
     config.system.num_agents = len(action_space)
@@ -547,7 +548,7 @@ def run_experiment(_config: DictConfig) -> float:
     # One key per device for evaluation.
     eval_act_fn = make_ff_eval_act_fn(apply_fns[0], config)
     evaluator, evaluator_envs = get_eval_fn(
-        environments.make_gym_env, eval_act_fn, config, np_rng, absolute_metric=False
+        environments.make_flatland_env, eval_act_fn, config, np_rng, absolute_metric=False
     )
 
     # Calculate total timesteps.
@@ -600,7 +601,7 @@ def run_experiment(_config: DictConfig) -> float:
                 args=(
                     act_key,
                     # We have to do this here, creating envs inside actor threads causes deadlocks
-                    environments.make_gym_env(config, config.arch.num_envs),
+                    environments.make_flatland_env(config, config.arch.num_envs),
                     config,
                     pipe,
                     params_source,
@@ -677,7 +678,7 @@ def run_experiment(_config: DictConfig) -> float:
     if config.arch.absolute_metric:
         print(f"{Fore.BLUE}{Style.BRIGHT}Measuring absolute metric...{Style.RESET_ALL}")
         abs_metric_evaluator, abs_metric_evaluator_envs = get_eval_fn(
-            environments.make_gym_env, eval_act_fn, config, np_rng, absolute_metric=True
+            environments.make_flatland_env, eval_act_fn, config, np_rng, absolute_metric=True
         )
         key, eval_key = jax.random.split(key, 2)
         eval_metrics = abs_metric_evaluator(best_params_cpu, eval_key, {})

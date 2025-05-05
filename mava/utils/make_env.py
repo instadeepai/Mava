@@ -59,6 +59,7 @@ from mava.wrappers import (
     VectorConnectorWrapper,
     async_multiagent_worker,
 )
+from mava.wrappers.gym import flatland_builder
 
 # Registry mapping environment names to their generator and wrapper classes.
 _jumanji_registry = {
@@ -252,6 +253,28 @@ def make_gym_env(
         if config.system.add_agent_id:
             wrapped_env = GymAgentIDWrapper(wrapped_env)
         wrapped_env = GymRecordEpisodeMetrics(wrapped_env)
+        return wrapped_env
+
+    envs = gymnasium.vector.AsyncVectorEnv(
+        [lambda: create_gym_env(config, add_global_state) for _ in range(num_env)],
+        worker=async_multiagent_worker,
+    )
+
+    envs = GymToJumanji(envs)
+
+    return envs
+
+
+def make_flatland_env(
+    config: DictConfig,
+    num_env: int,
+    add_global_state: bool = False,
+):
+    def create_gym_env(config: DictConfig, add_global_state: bool = False) -> gymnasium.Env:
+        env = flatland_builder()
+        # if config.system.add_agent_id:
+        #     wrapped_env = GymAgentIDWrapper(wrapped_env)
+        wrapped_env = GymRecordEpisodeMetrics(env)
         return wrapped_env
 
     envs = gymnasium.vector.AsyncVectorEnv(
