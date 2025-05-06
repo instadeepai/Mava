@@ -587,11 +587,11 @@ class FlatlandWrapper(gymnasium.Wrapper):
 
 def flatland_builder():
     env, obs, info = env_generator(
-        # n_agents=5,
-        # x_dim=30,
-        # y_dim=30,
-        # n_cities=2,
-        # max_rail_pairs_in_city=4,
+        n_agents=50,
+        x_dim=50,
+        y_dim=50,
+        n_cities=10,
+        # max_rail_pairs_in_city=10,
         # grid_mode=False,
         # max_rails_between_cities=2,
         malfunction_duration_min=0,
