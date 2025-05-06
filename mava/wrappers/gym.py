@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Un
 import gymnasium
 import gymnasium.vector.async_vector_env
 import numpy as np
+from flatland.envs.predictions import ShortestPathPredictorForRailEnv
 from gymnasium import spaces
 from gymnasium.spaces.utils import is_space_dtype_shape_equiv
 from gymnasium.vector.utils import write_to_shared_memory
@@ -511,10 +512,10 @@ class FlatlandWrapper(gymnasium.Wrapper):
     def concat_obs(self, obs_dict):
         obs_list = []
         for i, agent in enumerate(self.env.possible_agents):
-            if agent not in obs_dict:
-                raise AssertionError(
-                    "environment has agent death. Not allowed for pettingzoo_env_to_vec_env_v1 unless black_death is True"
-                )
+            # if agent not in obs_dict:
+            #     raise AssertionError(
+            #         "environment has agent death. Not allowed for pettingzoo_env_to_vec_env_v1 unless black_death is True"
+            #     )
             obs_list.append(obs_dict[agent])
 
         obs = np.stack(obs_list, axis=0)
@@ -547,34 +548,31 @@ class FlatlandWrapper(gymnasium.Wrapper):
         # adds last observation to info where user can get it
         terminations = np.fromiter(terms.values(), dtype=bool).all()
         truncations = np.fromiter(truncs.values(), dtype=bool).all()
-        rews = (
-            np.fromiter(rewards.values(), dtype=bool)
-            .sum()[np.newaxis]
-            .repeat(self.num_agents, axis=0)
-        )
+        # rews = (
+        #     np.fromiter(rewards.values(), dtype=float)
+        #     .sum()[np.newaxis]
+        #     .repeat(self.num_agents, axis=0)
+        # )
 
-        # rews = np.array(
-        #     [rewards.get(agent, 0) for agent in self.env.possible_agents],
-        #     dtype=np.float32,
-        # ).sum()
-        # tms = np.array(
-        #     [terms.get(agent, False) for agent in self.env.possible_agents],
-        #     dtype=np.uint8,
-        # )
-        # tcs = np.array(
-        #     [truncs.get(agent, False) for agent in self.env.possible_agents],
-        #     dtype=np.uint8,
-        # )
+        rews = [rewards[ag] for ag in self.env.possible_agents]
+
         # infs = [infos.get(agent, {}) for agent in self.env.possible_agents]
 
         observations = {"agents_view": self.concat_obs(observations)}
-        # empty infos for reset infs
-        # reset_infs = [{} for _ in range(len(self.env.possible_agents))]
-        # combine standard infos and reset infos
-        # infs = [{**inf, **reset_inf} for inf, reset_inf in zip(infs, reset_infs)]
+
         self.step_count += 1
+
+        action_mask = []
+        for agent in self.env.possible_agents:
+            action_mask.append(
+                np.ones(5, dtype=bool)
+                if infos[agent]["action_required"]
+                else np.zeros(5, dtype=bool)
+            )
+            action_mask[-1][0] = True  # noop action is always true
+
         infs = {
-            "action_mask": np.ones((self.num_agents, 5)),
+            "action_mask": np.stack(action_mask, axis=0),
             "step_count": self.step_count,
         }
 
@@ -589,19 +587,21 @@ class FlatlandWrapper(gymnasium.Wrapper):
 
 def flatland_builder():
     env, obs, info = env_generator(
-        n_agents=7,
-        x_dim=30,
-        y_dim=30,
-        n_cities=2,
-        max_rail_pairs_in_city=4,
-        grid_mode=False,
-        max_rails_between_cities=2,
-        malfunction_duration_min=20,
-        malfunction_duration_max=50,
-        malfunction_interval=540,
-        speed_ratios=None,
+        # n_agents=5,
+        # x_dim=30,
+        # y_dim=30,
+        # n_cities=2,
+        # max_rail_pairs_in_city=4,
+        # grid_mode=False,
+        # max_rails_between_cities=2,
+        malfunction_duration_min=0,
+        malfunction_duration_max=0,
+        malfunction_interval=100000,
+        # speed_ratios=None,
         seed=42,
-        obs_builder_object=FlattenedNormalizedTreeObsForRailEnv(max_depth=2),
+        obs_builder_object=FlattenedNormalizedTreeObsForRailEnv(
+            max_depth=3, predictor=ShortestPathPredictorForRailEnv(max_depth=50)
+        ),
         #   acceleration_delta=1.0,
         #   braking_delta=-1.0,
         #   rewards: Rewards = None,

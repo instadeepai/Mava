@@ -23,7 +23,6 @@ from typing import Any, Dict, List, Sequence, Tuple
 import chex
 import hydra
 import jax
-import jax.debug
 import jax.numpy as jnp
 import numpy as np
 import optax
@@ -467,8 +466,9 @@ def learner_setup(
 
     # Initialise observation.
     single_obs = jnp.array([env.single_observation_space.sample()["agents_view"]])
-    init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
-    init_x = Observation(single_obs, init_action_mask)
+    init_action_mask = jnp.ones((1, config.system.num_agents, config.system.num_actions))
+    step_count = jnp.zeros((1, config.system.num_agents), dtype=jnp.int32)
+    init_x = Observation(single_obs, init_action_mask, step_count)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(actor_key, init_x)
@@ -602,6 +602,7 @@ def run_experiment(_config: DictConfig) -> float:
                     act_key,
                     # We have to do this here, creating envs inside actor threads causes deadlocks
                     environments.make_flatland_env(config, config.arch.num_envs),
+                    # environments.make_gym_env(config, config.arch.num_envs),
                     config,
                     pipe,
                     params_source,
