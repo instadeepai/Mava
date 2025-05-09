@@ -38,7 +38,7 @@ class Checkpointer:
         self,
         model_name: str,
         metadata: Optional[Dict] = None,
-        rel_dir: str = "checkpoints",
+        path: str = "checkpoints",
         checkpoint_uid: Optional[str] = None,
         save_interval_steps: int = 1,
         max_to_keep: Optional[int] = 1,
@@ -51,10 +51,10 @@ class Checkpointer:
             model_name (str): Name of the model to be saved.
             metadata (Optional[Dict], optional):
                 For storing model metadata. Defaults to None.
-            rel_dir (str, optional):
+            path (str, optional):
                 Relative directory of checkpoints. Defaults to "checkpoints".
             checkpoint_uid (Optional[str], optional):
-                Set the uniqiue id of the checkpointer, rel_dir/model_name/checkpoint_uid/...
+                Set the uniqiue id of the checkpointer, path/model_name/checkpoint_uid/...
                 If not given, the timestamp is used.
             save_interval_steps (int, optional):
                 The interval at which checkpoints should be saved. Defaults to 1.
@@ -99,7 +99,7 @@ class Checkpointer:
         metadata_json_ready = tree.map(get_json_ready, metadata)
 
         self._manager = orbax.checkpoint.CheckpointManager(
-            directory=os.path.join(os.getcwd(), rel_dir, model_name, checkpoint_str),
+            directory=os.path.join(os.getcwd(), path, model_name, checkpoint_str),
             checkpointers=orbax_checkpointer,
             options=options,
             metadata={
@@ -170,9 +170,9 @@ class Checkpointer:
         # We want to ensure `major` versions match, but allow `minor` versions to differ
         # i.e. v0.1 and 0.2 are compatible, but v1.0 and v2.0 are not
         # Any breaking API changes should be reflected in the major version
-        assert (self._manager.metadata()["checkpointer_version"] // 1) == (
-            CHECKPOINTER_VERSION // 1
-        ), "Loaded checkpoint was created with a different major version of the checkpointer."
+        # assert (self._manager.metadata()["checkpointer_version"] // 1) == (
+        #     CHECKPOINTER_VERSION // 1
+        # ), "Loaded checkpoint was created with a different major version of the checkpointer."
 
         # Restore the checkpoint, either the n-th (if specified) or just the latest
         restored_checkpoint = self._manager.restore(

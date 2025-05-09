@@ -543,13 +543,13 @@ def run_experiment(_config: DictConfig) -> float:
     if config.system.recurrent_chunk_size is None:
         config.system.recurrent_chunk_size = config.system.rollout_length
     else:
-        assert (
-            config.system.rollout_length % config.system.recurrent_chunk_size == 0
-        ), "Rollout length must be divisible by recurrent chunk size."
+        assert config.system.rollout_length % config.system.recurrent_chunk_size == 0, (
+            "Rollout length must be divisible by recurrent chunk size."
+        )
 
-        assert (
-            config.arch.num_envs % config.system.num_minibatches == 0
-        ), "Number of envs must be divisibile by number of minibatches."
+        assert config.arch.num_envs % config.system.num_minibatches == 0, (
+            "Number of envs must be divisibile by number of minibatches."
+        )
 
     # Create the enviroments for train and eval.
     env, eval_env = environments.make(config)
@@ -572,9 +572,9 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
-    assert (
-        config.system.num_updates > config.arch.num_evaluation
-    ), "Number of updates per evaluation must be less than total number of updates."
+    assert config.system.num_updates > config.arch.num_evaluation, (
+        "Number of updates per evaluation must be less than total number of updates."
+    )
 
     # Calculate number of updates per evaluation.
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation

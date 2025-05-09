@@ -11,15 +11,15 @@ loggers:
     enabled: True
   neptune:
     _target_: mava.utils.logger.NeptuneLogger
-    enabled: False
+    enabled: True
 
     # If specified will resume the run with this run ID.
     # This is useful for resuming runs and logging from multiple processes.
     # NOTE: it will overwrite the run unless you set the timestep correctly.
     run_id: ~
     project: Instadeep/mava-benchmark
-    tag: [delete]
-    group_tag: [delete]
+    tag: [three-case-maze,time-lim-10]
+    group_tag: [offline-marl-mem-game]
     detailed_logging: False  # having mean/std/min/max can clutter neptune so we make it optional
     architecture_name: ${arch.architecture_name}  # this is required because async logging causes deadlocks in sebulba
     # Whether JSON file data should be uploaded to Neptune for downstream
@@ -43,13 +43,13 @@ loggers:
 
 # --- Checkpointing ---
 checkpointing:
-  save_model: False # Whether to save model checkpoints.
+  save_model: True # Whether to save model checkpoints.
   save_args:
     save_interval_steps: 1 # Number of steps between saving checkpoints.
     max_to_keep: 1 # Maximum number of checkpoints to keep.
     keep_period: ~ # Don't delete any checkpoint where step % keep_period == 0
     checkpoint_uid: ~ # Unique identifier for checkpoint to save. Defaults to timestamp
-    path: ~
+    path: "checkpoints"
   load_model: False # Whether to load model checkpoints.
   load_args:
     checkpoint_uid: "" # Unique identifier for checkpoint to load.

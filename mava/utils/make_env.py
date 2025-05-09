@@ -129,6 +129,7 @@ def make_jumanji_env(config: DictConfig, add_global_state: bool = False) -> Tupl
     eval_env = wrapper(eval_env, add_global_state=add_global_state)
 
     train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+
     return train_env, eval_env
 
 
@@ -226,6 +227,16 @@ def make_gigastep_env(
     return train_env, eval_env
 
 
+def make_tmaze_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
+    from jumanji.environments.routing.tmaze.env import TMaze
+
+    train_env = TMaze(length=5, width=2, time_limit=10)
+    eval_env = TMaze(length=5, width=2, time_limit=10)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+
+    return train_env, eval_env
+
+
 def make_gym_env(
     config: DictConfig,
     num_env: int,
@@ -288,5 +299,7 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, M
         return make_matrax_env(config, add_global_state)
     elif env_name in _gigastep_registry:
         return make_gigastep_env(config, add_global_state)
+    elif env_name == "tmaze":
+        return make_tmaze_env(config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")

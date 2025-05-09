@@ -41,7 +41,8 @@ dependencies = [
     "jax==0.4.30",
     "jaxlib==0.4.30",
     "jaxmarl @ git+https://github.com/RuanJohn/JaxMARL@unpin-jax", # This only unpins the version of Jax.
-    "jumanji>= 1.1.0",
+    "jumanji @ git+https://github.com/sash-a/jumanji@feat/multi-agent-memory-envs",
+    # "jumanji>= 1.1.0",
     "lbforaging",
     "matrax>= 0.0.5",
     "mujoco==3.1.3",

@@ -2,7 +2,7 @@
 
 total_timesteps: ~ # Set the total environment steps.
 # If unspecified, it's derived from num_updates; otherwise, num_updates adjusts based on this value.
-num_updates: 1220 # Number of updates
+num_updates: 400 # Number of updates
 seed: 42
 
 # --- Agent observations ---
@@ -10,7 +10,7 @@ add_agent_id: True
 
 # --- RL hyperparameters ---
 actor_lr: 0.0005 # Learning rate for actor network
-update_batch_size: 2 # Number of vectorised gradient updates per device.
+update_batch_size: 1 # Number of vectorised gradient updates per device.
 rollout_length: 128 # Number of environment steps per vectorised environment.
 ppo_epochs: 5 # Number of ppo epochs per training data batch.
 num_minibatches: 1 # Number of minibatches per ppo epoch.
