@@ -45,8 +45,8 @@ dependencies = [
   "gymnasium==1.0.0",
   "hydra-core==1.3.2",
   "id-marl-eval @ git+https://github.com/instadeepai/marl-eval",
-  "jax~=0.6.0",
-  "jaxlib~=0.6.0",
+  "jax>=0.5.0,<0.7.0",
+  "jaxlib>=0.5.0,<0.7.0",
   "jaxmarl @ git+https://github.com/RuanJohn/JaxMARL@jax-05",    # This only unpins the version of Jax.
   # "jumanji>= 1.1.0",
   "jumanji @ git+https://github.com/instadeepai/jumanji",      # TODO: once jumanji is released go back to pip package
@@ -69,8 +69,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-cuda12 = ["jax[cuda12]~=0.6.0"]
-tpu = ["jax[tpu]~=0.6.0"]
+cuda12 = ["jax[cuda12]>=0.5.0,<0.7.0"]
+tpu = ["jax[tpu]>=0.5.0,<0.7.0"]
 
 [dependency-groups]
 dev = ["mypy", "pre-commit", "pytest"]
