@@ -1,6 +1,6 @@
 # Detailed installation guide
 
-### Conda virtual environment
+### uv virtual environment
 We recommend using [uv](https://docs.astral.sh/uv/) for package management. These instructions should allow you to install and run mava.
 
 1. Install `uv`
@@ -14,18 +14,18 @@ git clone https://github.com/instadeepai/Mava.git
 cd mava
 ```
 
-3. Create and activate a virtual environment and install requirements
+3. Create a virtual environment and install requirements (this only installs a CPU version of JAX)
 ```bash
 uv sync -p=3.12
 ```
 
-4. Install jax on your accelerator. The example below is for an NVIDIA GPU, please the [official install guide](https://github.com/google/jax#installation) for other accelerators.
-Note that the Jax version we use will change over time, please check the [requirements.txt](../requirements/requirements.txt) for our latest tested Jax verion.
+3.1 If you want to install Mava so that it runs on your accelerator simply run the following. If this does not work please see the [official JAX install guide](https://github.com/google/jax#installation).
 ```bash
-uv pip install "jax[cuda12]==0.4.30"
+uv sync --extra cuda12  # GPU aware JAX
+uv sync --extra tpu  # TPU aware JAX
 ```
 
-5. Run a system!
+4. Run a system!
 ```bash
 uv run mava/systems/ppo/anakin/ff_ippo.py env=rware
 ```
@@ -33,6 +33,14 @@ or
 ```
 source .venv/bin/activate
 python mava/systems/ppo/anakin/ff_ippo.py env=rware
+```
+
+5. (Optional) Alternate package manager
+
+If you prefer installation can also be done using `pip`:
+```bash
+pip install -e ".[cuda12]"  # GPU aware JAX
+pip install -e ".[tpu]"  # TPU aware JAX
 ```
 
 ### Docker
