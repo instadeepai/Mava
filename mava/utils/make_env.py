@@ -230,8 +230,8 @@ def make_gigastep_env(
 def make_tmaze_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
     from jumanji.environments.routing.tmaze.env import TMaze
 
-    train_env = TMaze(length=5, width=2, time_limit=10)
-    eval_env = TMaze(length=5, width=2, time_limit=10)
+    train_env = TMaze(length=5, width=2, time_limit=20)
+    eval_env = TMaze(length=5, width=2, time_limit=20)
     train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
 
     return train_env, eval_env
