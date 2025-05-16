@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
+from typing import Tuple, Type
 
 import gymnasium
 import gymnasium as gym
@@ -65,7 +65,7 @@ from mava.wrappers.graph_wrapper import GraphWrapper
 from mava.wrappers.jaxmarl import MPEGraphWrapper
 
 # Registry mapping environment names to their generator and wrapper classes.
-_jumanji_registry = {
+_jumanji_registry: dict[str, dict[str, Type]] = {
     "RobotWarehouse": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
     "Connector": {"generator": ConnectorRandomGenerator, "wrapper": ConnectorWrapper},
@@ -77,14 +77,18 @@ _jumanji_registry = {
 }
 
 # Registry mapping environment names directly to the corresponding wrapper classes.
-_matrax_registry = {"Matrax": MatraxWrapper}
-_jaxmarl_registry = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper, "MPE": MPEWrapper}
-_gigastep_registry = {"Gigastep": GigastepWrapper}
+_matrax_registry: dict[str, dict[str, Type]] = {"Matrax": {"wrapper": MatraxWrapper}}
+_jaxmarl_registry: dict[str, dict[str, Type]] = {
+    "Smax": {"wrapper": SmaxWrapper},
+    "MaBrax": {"wrapper": MabraxWrapper},
+    "MPE": {"wrapper": MPEWrapper, "graph_wrapper": MPEGraphWrapper},
+}
+_gigastep_registry: dict[str, dict[str, Type]] = {"Gigastep": {"wrapper": GigastepWrapper}}
 
-_gym_registry = {
-    "RobotWarehouse": UoeWrapper,
-    "LevelBasedForaging": UoeWrapper,
-    "SMACLite": SmacWrapper,
+_gym_registry: dict[str, dict[str, Type]] = {
+    "RobotWarehouse": {"wrapper": UoeWrapper},
+    "LevelBasedForaging": {"wrapper": UoeWrapper},
+    "SMACLite": {"wrapper": SmacWrapper},
 }
 
 
@@ -103,16 +107,23 @@ def add_extra_wrappers(
     )
 
     if uses_gnn:
-        if config.env.env_name == "MPE":
-            assert isinstance(train_env, MPEWrapper) and isinstance(
-                eval_env, MPEWrapper
-            ), "Attempting to add mpe graph wrapper to non-MPE environment"
-
-            train_env = MPEGraphWrapper(train_env)
-            eval_env = MPEGraphWrapper(eval_env)
+        # Get the appropriate registry based on environment type
+        registry: dict[str, dict[str, Type]]
+        if config.env.env_name in _jumanji_registry:
+            registry = _jumanji_registry
+        elif config.env.env_name in _jaxmarl_registry:
+            registry = _jaxmarl_registry
+        elif config.env.env_name in _matrax_registry:
+            registry = _matrax_registry
+        elif config.env.env_name in _gigastep_registry:
+            registry = _gigastep_registry
         else:
-            train_env = GraphWrapper(train_env)
-            eval_env = GraphWrapper(eval_env)
+            registry = _gym_registry
+
+        # Get the graph wrapper from registry or use default GraphWrapper
+        graph_wrapper = registry[config.env.env_name].get("graph_wrapper", GraphWrapper)
+        train_env = graph_wrapper(train_env)
+        eval_env = graph_wrapper(eval_env)
 
     if config.system.add_agent_id:
         train_env = AgentIDWrapper(train_env)
@@ -178,11 +189,11 @@ def make_jaxmarl_env(config: DictConfig, add_global_state: bool = False) -> Tupl
         kwargs.update(config.env.scenario.task_config)
 
     # Create jaxmarl envs.
-    train_env: MarlEnv = _jaxmarl_registry[config.env.env_name](
+    train_env: MarlEnv = _jaxmarl_registry[config.env.env_name]["wrapper"](
         jaxmarl.make(config.env.scenario.name, **kwargs),
         add_global_state,
     )
-    eval_env: MarlEnv = _jaxmarl_registry[config.env.env_name](
+    eval_env: MarlEnv = _jaxmarl_registry[config.env.env_name]["wrapper"](
         jaxmarl.make(config.env.scenario.name, **kwargs),
         add_global_state,
     )
@@ -208,7 +219,7 @@ def make_matrax_env(config: DictConfig, add_global_state: bool = False) -> Tuple
 
     """
     # Select the Matrax wrapper.
-    wrapper = _matrax_registry[config.env.scenario.name]
+    wrapper = _matrax_registry[config.env.scenario.name]["wrapper"]
 
     # Create envs.
     task_name = config["env"]["scenario"]["task_name"]
@@ -238,7 +249,7 @@ def make_gigastep_env(
         A tuple of the environments.
 
     """
-    wrapper = _gigastep_registry[config.env.scenario.name]
+    wrapper = _gigastep_registry[config.env.scenario.name]["wrapper"]
 
     kwargs = config.env.kwargs
     scenario = ScenarioBuilder.from_config(config.env.scenario.task_config)
@@ -266,7 +277,7 @@ def make_gym_env(
     Returns:
         Async environments.
     """
-    wrapper = _gym_registry[config.env.env_name]
+    wrapper = _gym_registry[config.env.env_name]["wrapper"]
     config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
     def create_gym_env(config: DictConfig, add_global_state: bool = False) -> gymnasium.Env:
