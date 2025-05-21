@@ -18,7 +18,6 @@ import gymnasium
 import gymnasium as gym
 import gymnasium.vector
 import gymnasium.wrappers
-import hydra
 import jaxmarl
 import jumanji
 import matrax
@@ -38,8 +37,8 @@ from jumanji.environments.routing.robot_warehouse.generator import (
 )
 from omegaconf import DictConfig
 
-from mava.networks.gnn import GNN
 from mava.types import MarlEnv
+from mava.utils.network_utils import is_gnn_based
 from mava.wrappers import (
     AgentIDWrapper,
     AutoResetWrapper,
@@ -98,15 +97,7 @@ def add_extra_wrappers(
     # Disable the AgentID wrapper if the environment has implicit agent IDs.
     config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
-    uses_gnn = isinstance(
-        hydra.utils.get_class(config.network.actor_network.pre_torso),
-        GNN,
-    ) or isinstance(
-        hydra.utils.get_class(config.network.critic_network.pre_torso),
-        GNN,
-    )
-
-    if uses_gnn:
+    if is_gnn_based(config):
         # Get the appropriate registry based on environment type
         registry: dict[str, dict[str, Type]]
         if config.env.env_name in _jumanji_registry:

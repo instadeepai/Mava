@@ -27,7 +27,9 @@ from jumanji.env import State
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
-from mava.types import GraphsTuple, MarlEnv, Observation, ObservationGlobalState
+from mava.types import GraphObservation, GraphsTuple, MarlEnv, Observation, ObservationGlobalState
+
+GraphObservationSpecName = "GraphObservation"
 
 
 class GraphWrapper(Wrapper):
@@ -49,7 +51,7 @@ class GraphWrapper(Wrapper):
 
     def add_graph_to_observations(
         self, state: State, observation: Union[Observation, ObservationGlobalState]
-    ) -> Union[Observation, ObservationGlobalState]:
+    ) -> GraphObservation:
         """
         Default graph is a fully connected graph with no edge features. Every agent is a node and
         its observation is the node feature.
@@ -69,10 +71,7 @@ class GraphWrapper(Wrapper):
 
         graph = jax.vmap(_make_fully_connected_graph)(jnp.arange(self.num_agents))
 
-        observation = observation._replace(
-            graph=graph,
-        )
-        return observation
+        return GraphObservation(observation=observation, graph=graph)
 
     def reset(
         self, key: chex.PRNGKey
@@ -93,7 +92,7 @@ class GraphWrapper(Wrapper):
     @cached_property
     def observation_spec(
         self,
-    ) -> Union[specs.Spec[Observation], specs.Spec[ObservationGlobalState]]:
+    ) -> specs.Spec[GraphObservation]:
         """Define the observation spec for the Jraph graph representation."""
         obs_spec = self._env.observation_spec
 
@@ -126,4 +125,9 @@ class GraphWrapper(Wrapper):
             ),
         )
 
-        return obs_spec.replace(graph=graph_spec)
+        return specs.Spec(
+            GraphObservation,
+            GraphObservationSpecName,
+            observation=obs_spec,
+            graph=graph_spec,
+        )

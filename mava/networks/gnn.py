@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Sequence
+from typing import Sequence, TypeGuard
 
 import chex
 import jraph
@@ -23,7 +23,7 @@ from jax import numpy as jnp
 from jraph import GraphsTuple as JraphGraphsTuple
 
 from mava.networks.torsos import MLPTorso, _parse_activation_fn
-from mava.types import Observation
+from mava.types import GraphObservation
 from mava.utils.jraph_utils import batched_graph_to_single_graph
 
 
@@ -33,6 +33,11 @@ class GNN(nn.Module):
     """
 
     pass
+
+
+def is_graph_torso(torso: nn.Module) -> TypeGuard[GNN]:
+    """Type guard to check if torso is a graph-based network."""
+    return isinstance(torso, GNN)
 
 
 class InforMARLNbrhdAggregationTorso(GNN):
@@ -48,11 +53,10 @@ class InforMARLNbrhdAggregationTorso(GNN):
     num_attention_layers: int
 
     @nn.compact
-    def __call__(self, observation: Observation) -> chex.Array:
-        assert observation.graph is not None, "Graph is not provided in the observation"
-
+    def __call__(self, graph_observation: GraphObservation) -> chex.Array:
+        observation = graph_observation.observation
+        graph = graph_observation.graph
         obs = observation.agents_view
-        graph = observation.graph
         assert graph.nodes is not None, "There are no node features in the graph"
 
         num_timesteps, num_envs, num_agents, num_nodes_per_graph, *_ = graph.nodes.shape
@@ -94,11 +98,9 @@ class InforMARLGlobalAggregationTorso(GNN):
     num_attention_layers: int
 
     @nn.compact
-    def __call__(self, observation: Observation) -> chex.Array:
-        graph = observation.graph
-        assert graph is not None, "Graph is not provided in the observation"
+    def __call__(self, graph_observation: GraphObservation) -> chex.Array:
+        graph = graph_observation.graph
         assert graph.nodes is not None, "There are no node features in the graph"
-
         num_timesteps, num_envs, num_agents, num_nodes_per_graph, *_ = graph.nodes.shape
         # one for timesteps, one for envs, one for agents
         graph = batched_graph_to_single_graph(graph, num_batch_dims=3)

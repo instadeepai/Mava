@@ -31,7 +31,7 @@ import jumanji.specs as specs
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
 from tensorflow_probability.substrates.jax.distributions import Distribution
-from typing_extensions import NamedTuple, TypeAlias
+from typing_extensions import NamedTuple, TypeAlias, TypeIs
 
 Action: TypeAlias = chex.Array
 Value: TypeAlias = chex.Array
@@ -123,6 +123,40 @@ class MarlEnv(Protocol):
         ...
 
 
+class Observation(NamedTuple):
+    """The observation that the agent sees.
+
+    agents_view: the agent's view of the environment.
+    action_mask: boolean array specifying, for each agent, which action is legal.
+    step_count: the number of steps elapsed since the beginning of the episode.
+    """
+
+    agents_view: chex.Array  # (num_agents, num_obs_features)
+    action_mask: chex.Array  # (num_agents, num_actions)
+    step_count: Optional[chex.Array] = None  # (num_agents, )
+
+
+class ObservationGlobalState(NamedTuple):
+    """The observation seen by agents in centralised systems.
+
+    Extends `Observation` by adding a `global_state` attribute for centralised training.
+    global_state: The global state of the environment, often a concatenation of agents' views.
+    """
+
+    agents_view: chex.Array  # (num_agents, num_obs_features)
+    action_mask: chex.Array  # (num_agents, num_actions)
+    global_state: chex.Array  # (num_agents, num_agents * num_obs_features)
+    step_count: Optional[chex.Array] = None  # (num_agents, )
+
+
+RNNObservation: TypeAlias = Tuple[Union[Observation, "GraphObservation[Observation]"], Done]
+RNNGlobalObservation: TypeAlias = Tuple[
+    Union[ObservationGlobalState, "GraphObservation[ObservationGlobalState]"], Done
+]
+MavaObservation: TypeAlias = Union[Observation, ObservationGlobalState]
+MavaObservationType = TypeVar("MavaObservationType", bound=MavaObservation, covariant=True)
+
+
 class GraphsTuple(NamedTuple):
     """
     This is a copy of jraph.GraphsTuple with ego_node_index
@@ -138,37 +172,25 @@ class GraphsTuple(NamedTuple):
     ego_node_index: chex.Array
 
 
-class Observation(NamedTuple):
-    """The observation that the agent sees.
+class GraphObservation(NamedTuple, Generic[MavaObservationType]):
+    observation: MavaObservationType
+    graph: GraphsTuple
 
-    agents_view: the agent's view of the environment.
-    action_mask: boolean array specifying, for each agent, which action is legal.
-    step_count: the number of steps elapsed since the beginning of the episode.
-    """
+    def __getattr__(self, name: str) -> Any:
+        """Delegate attribute access to the underlying observation.
 
-    agents_view: chex.Array  # (num_agents, num_obs_features)
-    action_mask: chex.Array  # (num_agents, num_actions)
-    step_count: Optional[chex.Array] = None  # (num_agents, )
-    graph: Optional[GraphsTuple] = None
-
-
-class ObservationGlobalState(NamedTuple):
-    """The observation seen by agents in centralised systems.
-
-    Extends `Observation` by adding a `global_state` attribute for centralised training.
-    global_state: The global state of the environment, often a concatenation of agents' views.
-    """
-
-    agents_view: chex.Array  # (num_agents, num_obs_features)
-    action_mask: chex.Array  # (num_agents, num_actions)
-    global_state: chex.Array  # (num_agents, num_agents * num_obs_features)
-    step_count: Optional[chex.Array] = None  # (num_agents, )
-    graph: Optional[GraphsTuple] = None
+        This lets downstream wrappers and other code work with both GraphObservation and
+        regular Observation types without needing to handle them differently.
+        """
+        return getattr(self.observation, name)
 
 
-RNNObservation: TypeAlias = Tuple[Observation, Done]
-RNNGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
-MavaObservation: TypeAlias = Union[Observation, ObservationGlobalState]
+def is_graph_observation(
+    obs: Union[Observation, ObservationGlobalState, GraphObservation[MavaObservationType]],
+) -> TypeIs[GraphObservation[MavaObservationType]]:
+    """Type guard to check if observation is a GraphObservation."""
+    return isinstance(obs, GraphObservation)
+
 
 # `MavaState` is the main type passed around in our systems. It is often used as a scan carry.
 # Types like: `LearnerState` (mava/systems/<system_name>/types.py) are `MavaState`s.

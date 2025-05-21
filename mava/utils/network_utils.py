@@ -14,8 +14,12 @@
 
 from typing import Dict, Tuple, Union
 
+import hydra
 from gymnasium.spaces import Discrete, MultiDiscrete, Space
 from jumanji.specs import DiscreteArray, MultiDiscreteArray, Spec
+from omegaconf import DictConfig
+
+from mava.networks.gnn import GNN
 
 _DISCRETE = "discrete"
 _CONTINUOUS = "continuous"
@@ -27,3 +31,18 @@ def get_action_head(action_types: Union[Spec, Space]) -> Tuple[Dict[str, str], s
         return {"_target_": "mava.networks.heads.DiscreteActionHead"}, _DISCRETE
 
     return {"_target_": "mava.networks.heads.ContinuousActionHead"}, _CONTINUOUS
+
+
+def is_gnn_based(config: DictConfig) -> bool:
+    """Checks if either actor or critic network's pre-torso uses a GNN architecture.
+
+    Returns:
+        True if either the actor or critic network uses a GNN architecture, False otherwise.
+    """
+    return issubclass(
+        hydra.utils.get_class(config.network.actor_network.pre_torso._target_),
+        GNN,
+    ) or issubclass(
+        hydra.utils.get_class(config.network.critic_network.pre_torso._target_),
+        GNN,
+    )

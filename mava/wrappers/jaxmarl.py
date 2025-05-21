@@ -34,7 +34,7 @@ from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper
 
-from mava.types import GraphsTuple, Observation, ObservationGlobalState, State
+from mava.types import GraphObservation, GraphsTuple, Observation, ObservationGlobalState, State
 from mava.wrappers.graph_wrapper import GraphWrapper
 
 # Define a TypeVar for the state, bound to the base State type
@@ -540,17 +540,19 @@ class MPEGraphWrapper(GraphWrapper):
 
     def add_graph_to_observations(
         self, state: JaxMarlState[MPEState], observation: Union[Observation, ObservationGlobalState]
-    ) -> Union[Observation, ObservationGlobalState]:
+    ) -> GraphObservation:
         b_graph = jax.vmap(self.visibility_graph_for_ego, in_axes=(None, None, 0))(
             state.state, self.visibility_radius, jnp.arange(self.num_agents)
         )
-        observation = observation._replace(graph=b_graph)
-        return observation
+        return GraphObservation(observation=observation, graph=b_graph)
 
     @cached_property
     def observation_spec(
         self,
-    ) -> Union[specs.Spec[Observation], specs.Spec[ObservationGlobalState]]:
+    ) -> Union[
+        specs.Spec[GraphObservation[Observation]],
+        specs.Spec[GraphObservation[ObservationGlobalState]],
+    ]:
         """Define the observation spec for the Jraph graph representation."""
         obs_spec = self._env.observation_spec
 
@@ -585,4 +587,9 @@ class MPEGraphWrapper(GraphWrapper):
             ),
         )
 
-        return obs_spec.replace(graph=graph_spec)
+        return specs.Spec(
+            GraphObservation,
+            "GraphObservation",
+            observation=obs_spec,
+            graph=graph_spec,
+        )
