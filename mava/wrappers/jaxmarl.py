@@ -456,10 +456,34 @@ class MPEWrapper(JaxMarlWrapper):
 
 
 class MPEGraphWrapper(GraphWrapper):
-    """Wrapper for the MPE environment that adds a graph to the observation."""
+    """Wrapper for the MPE environment that adds a graph to the observation.
 
-    # This init isn't really needed as jumanji.Wrapper will forward the attributes,
-    # but mypy doesn't realize this.
+    This wrapper creates a graph topology for each agent where:
+    - Each agent and landmark is represented as a node in the graph
+    - Node features are relative positions and velocities with respect to the ego agent
+      (4D features: [relative_x, relative_y, relative_vx, relative_vy])
+    - Edges are created based on a visibility radius - nodes are connected only if they
+      are within this radius of each other
+    - Edge features are the Euclidean distances between connected nodes
+    - Self-loops can be optionally added to each node
+
+    For example, in a 3-agent environment with 2 landmarks:
+    - Each agent gets its own graph with 5 nodes (3 agents + 2 landmarks)
+    - For Agent 0's graph:
+      * Node features are positions/velocities relative to Agent 0
+      * Edges connect nodes that are within visibility_radius of each other
+      * Edge features are the distances between connected nodes
+      * ego_node_index=0 identifies Agent 0 as the reference point
+    - For Agent 1's graph:
+      * Node features are positions/velocities relative to Agent 1
+      * Different edge connections based on Agent 1's visibility
+      * Edge features are the distances between connected nodes
+      * ego_node_index=1 identifies Agent 1 as the reference point
+
+    This relative representation allows each agent to have its own perspective of the
+    environment, with node features and graph topology specific to its viewpoint.
+    """
+
     def __init__(
         self,
         env: MPEWrapper,

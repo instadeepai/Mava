@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Shape conventions:
+# T: number of timesteps
+# E: number of environments
+# N: number of agents
+# V: number of nodes per graph
+# F: feature dimension
+
 from typing import Sequence, TypeGuard
 
 import chex
@@ -43,6 +50,20 @@ def is_graph_torso(torso: nn.Module) -> TypeGuard[GNN]:
 class InforMARLNbrhdAggregationTorso(GNN):
     """InforMARL Actor Network.
     For more details see: https://arxiv.org/abs/2211.02127
+
+    Each agent has its own graph, where the agent is called the ego-agent. This torso uses
+    multi-layer multi-head GAT layers to perform local neighborhood aggregation, where each
+    node only aggregates information from its direct neighbors using edge information.
+
+    For example, in a graph with nodes:
+    A - B
+    C - D
+    where A is the ego-agent:
+    - A's and B's node features will be a function of only A's and B's node features
+    - C's and D's node features will be a function of only C's and D's node features
+
+    Since A is the ego-agent, only A's node feature will be taken from this computation
+    and concatenated with A's observation.
     """
 
     attention_query_layer_sizes: Sequence[int]
@@ -57,9 +78,7 @@ class InforMARLNbrhdAggregationTorso(GNN):
         observation = graph_observation.observation
         graph = graph_observation.graph
         obs = observation.agents_view
-        assert graph.nodes is not None, "There are no node features in the graph"
-
-        num_timesteps, num_envs, num_agents, num_nodes_per_graph, *_ = graph.nodes.shape
+        T, E, N, *_ = graph.nodes_strict.shape
         # one for timesteps, one for envs, one for agents
         graph = batched_graph_to_single_graph(graph, num_batch_dims=3)
 
@@ -77,9 +96,7 @@ class InforMARLNbrhdAggregationTorso(GNN):
                 avg_multi_head=should_avg_multi_head,
             )(jraph_graph)
 
-        ego_node_features = get_ego_node_features(
-            jraph_graph, ego_node_index, num_timesteps, num_envs, num_agents
-        )
+        ego_node_features = get_ego_node_features(jraph_graph, ego_node_index, T, E, N)
         graph_embedding = jnp.concatenate([obs, ego_node_features], axis=-1)
 
         return graph_embedding
@@ -88,6 +105,21 @@ class InforMARLNbrhdAggregationTorso(GNN):
 class InforMARLGlobalAggregationTorso(GNN):
     """InforMARL Actor Network.
     For more details see: https://arxiv.org/abs/2211.02127
+
+    Each agent has its own graph, where the agent is called the ego-agent. This torso uses
+    multi-layer multi-head GAT layers to aggregate node features, where edge information
+    is used in the aggregation.
+
+    For example, in a graph with nodes:
+    A - B
+    C - D
+    where A is the ego-agent:
+    - A's and B's node features will be a function of only A's and B's node features
+    - C's and D's node features will be a function of only C's and D's node features
+
+    Unlike the neighborhood aggregation torso, the ego-agent information is not picked after
+    the aggregation. All nodes are averaged together and concatenated with A's observation.
+    The GAT layers can be disabled by setting num_attention_layers to 0.
     """
 
     attention_query_layer_sizes: Sequence[int]
@@ -100,8 +132,7 @@ class InforMARLGlobalAggregationTorso(GNN):
     @nn.compact
     def __call__(self, graph_observation: GraphObservation) -> chex.Array:
         graph = graph_observation.graph
-        assert graph.nodes is not None, "There are no node features in the graph"
-        num_timesteps, num_envs, num_agents, num_nodes_per_graph, *_ = graph.nodes.shape
+        T, E, N, V, *_ = graph.nodes_strict.shape
         # one for timesteps, one for envs, one for agents
         graph = batched_graph_to_single_graph(graph, num_batch_dims=3)
 
@@ -120,13 +151,12 @@ class InforMARLGlobalAggregationTorso(GNN):
             )(jraph_graph)
 
         node_embedding = jraph_graph.nodes
-        assert node_embedding is not None, "This is provided to make type checking happy"
 
         node_features = node_embedding.reshape(
-            num_timesteps,
-            num_envs,
-            num_agents,
-            num_nodes_per_graph,
+            T,
+            E,
+            N,
+            V,
             *node_embedding.shape[1:],
         )
         # There is a graph for a given timestep, env, and agent.
@@ -137,6 +167,14 @@ class InforMARLGlobalAggregationTorso(GNN):
 
 
 class GraphMultiHeadAttentionLayer(nn.Module):
+    """A multi-head attention layer for a graph.
+
+    This layer implements Graph Attention Network (GAT) with multi-head attention.
+    It uses the same MLP for both sender and receiver projections, and computes attention
+    scores between nodes and their neighbors in parallel across multiple heads.
+    The output can be either averaged or concatenated across heads based on avg_multi_head.
+    """
+
     attention_query_layer_sizes: Sequence[int]
     use_layer_norm: bool
     activation: str
@@ -232,5 +270,4 @@ def get_ego_node_features(
     graph: JraphGraphsTuple, ego_node_index: chex.Array, *num_nodes: Sequence[int]
 ) -> chex.Array:
     """Returns the ego node features from a graph."""
-    assert graph.nodes is not None, "There are no node features in the graph"
     return graph.nodes[ego_node_index].reshape(*num_nodes, *graph.nodes.shape[1:])

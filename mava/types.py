@@ -171,6 +171,11 @@ class GraphsTuple(NamedTuple):
     n_edge: chex.Array  # with integer dtype
     ego_node_index: chex.Array
 
+    @property
+    def nodes_strict(self) -> chex.ArrayTree:
+        assert self.nodes is not None, "nodes must not be None"
+        return self.nodes
+
 
 class GraphObservation(NamedTuple, Generic[MavaObservationType]):
     observation: MavaObservationType

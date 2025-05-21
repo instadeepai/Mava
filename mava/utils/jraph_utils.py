@@ -21,12 +21,82 @@ import jax.numpy as jnp
 from mava.types import GraphsTuple
 
 
+def validate_num_dims_in_graph_tuple(graph: GraphsTuple, num_batch_dims: int) -> None:
+    """Validate that the non feature attributes of a batched graph tuple are valid.
+
+    Ensures that all graph attributes (receivers, senders, ego_node_index, n_node, n_edge)
+    have the same number of batch dimensions as specified by num_batch_dims.
+    """
+
+    # Adds 1 dimension for number of edges
+    num_receivers_dims = num_batch_dims + 1
+    num_senders_dims = num_batch_dims + 1
+
+    # Adds 1 dimension since default jraph GraphsTuple have 1 dimension for
+    # these attributes when not batched.
+    num_ego_node_index_dims = num_batch_dims + 1
+    num_n_node_dims = num_batch_dims + 1
+    num_n_edge_dims = num_batch_dims + 1
+
+    assert graph.receivers is None or graph.receivers.ndim == num_receivers_dims, (
+        "The number of batch dimensions in the receivers must match the number of batch dimensions"
+        " in the receiver features"
+    )
+    assert graph.senders is None or graph.senders.ndim == num_senders_dims, (
+        "The number of batch dimensions in the senders must match the number of batch dimensions"
+        " in the sender features"
+    )
+    assert graph.ego_node_index.ndim == num_ego_node_index_dims, (
+        "The number of batch dimensions in the ego node index must match the number of"
+        " batch dimensions"
+    )
+    assert graph.n_node.ndim == num_n_node_dims, (
+        "The number of batch dimensions in the number of nodes must match the number of"
+        " batch dimensions"
+    )
+    assert graph.n_edge.ndim == num_n_edge_dims, (
+        "The number of batch dimensions in the number of edges must match the number of"
+        " batch dimensions"
+    )
+
+
 def batched_graph_to_single_graph(graph: GraphsTuple, num_batch_dims: int = 1) -> GraphsTuple:
+    """Convert a batched graph to a single graph.
+
+    Jraph's GraphsTuple convention doesn't include batch dimensions in its attributes.
+    However, during data collection, multiple graphs are often stacked together,
+    creating multiple batch dimensions. This function converts a batched GraphsTuple with
+    multiple batch dimensions into a GraphsTuple that strips the batch dimensions in a
+    way that's compatible with jraph functions.
+
+    The function handles two cases:
+    1. num_batch_dims=1: Simply removes the batch dimension from the leading axis
+       of all attributes while preserving other dimensions.
+    2. num_batch_dims>1: Removes the first num_batch_dims dimensions and adjusts
+       node indices to combine the graphs into a single graph.
+
+    Args:
+        graph: A batched GraphsTuple with multiple batch dimensions
+        num_batch_dims: Number of batch dimensions to remove (default: 1)
+
+    Returns:
+        A single GraphsTuple with batch dimensions removed and node indices adjusted
+    """
+    validate_num_dims_in_graph_tuple(graph, num_batch_dims)
+
+    # concatenate the batch dimensions while retaining the feature dimensions
     graph = jax.tree.map(lambda x: x.reshape(-1, *x.shape[num_batch_dims:]), graph)
+
+    # split the batch dimension into a list of graphs
     batched_graphs = jax.tree.map(
-        lambda x: jax.tree.map(lambda y: jnp.squeeze(y, axis=0), jnp.split(x, x.shape[0], axis=0)),
+        lambda x: jnp.split(x, x.shape[0], axis=0),
         graph,
     )
+
+    # remove the batch dimension from the feature dimensions
+    batched_graphs = jax.tree.map(lambda y: jnp.squeeze(y, axis=0), batched_graphs)
+
+    # convert graph of lists into a list of graphs
     list_of_graphs = jax.tree.transpose(
         outer_treedef=jax.tree.structure(graph),
         inner_treedef=None,  # Let JAX infer the inner (list) structure
@@ -38,8 +108,18 @@ def batched_graph_to_single_graph(graph: GraphsTuple, num_batch_dims: int = 1) -
 def batch(graphs: List[GraphsTuple]) -> GraphsTuple:
     """Returns batched graph given a list of graphs.
 
-    This is a adapted version of jraph.batch with support for ego_node_index in
-    the mava.types.GraphsTuple.
+    This is an adapted version of jraph.batch that adds support for ego_node_index
+    in mava.types.GraphsTuple. The function:
+    1. Calculates offsets for sender and receiver arrays based on node counts
+    2. Concatenates all graph attributes (nodes, edges, globals)
+    3. Adjusts sender, receiver, and ego_node indices by adding appropriate offsets
+       to maintain correct node references in the batched graph
+
+    Args:
+        graphs: List of individual GraphsTuple to be batched together
+
+    Returns:
+        A single GraphsTuple containing all graphs with adjusted indices
     """
     # Calculates offsets for sender and receiver arrays, caused by concatenating
     # the nodes arrays.

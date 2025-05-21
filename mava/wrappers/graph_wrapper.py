@@ -33,12 +33,31 @@ GraphObservationSpecName = "GraphObservation"
 
 
 class GraphWrapper(Wrapper):
-    """Wrapper to convert the observation structure from the environment into a Jraph GraphsTuple
-    representing the graph topology of the agents. The default is a fully-connected graph.
+    """Wrapper to convert environment observations into a graph observation using
+    Jraph GraphsTuple.
+
+    This wrapper creates a graph topology for each agent where:
+    - Each agent is represented as a node in the graph
+    - The agent's observation becomes the node features
+    - By default, creates a fully-connected graph (all agents can communicate with each other)
+    - Each graph has an ego_node_index that identifies which node represents the agent
+      that owns this graph (useful for neighborhood/global aggregation in GNNs)
+
+    For example, in a 3-agent environment, each agent gets its own graph:
+    Agent 0's graph: [0->1, 0->2, 1->0, 1->2, 2->0, 2->1] with ego_node_index=0
+    Agent 1's graph: [0->1, 0->2, 1->0, 1->2, 2->0, 2->1] with ego_node_index=1
+    Agent 2's graph: [0->1, 0->2, 1->0, 1->2, 2->0, 2->1] with ego_node_index=2
+
+    The ego_node_index is crucial for GNN operations as it allows:
+    - Neighborhood aggregation to focus on the ego agent's local view
+
+    Note that each agent needs its own graph because the graph topology can be different
+    for each agent. For example, in MPE environments, node features of non-ego agents
+    can be relative (like relative distances) with respect to the ego agent. This allows
+    different agents in the same environment to work with different graph topologies,
+    making the representation more flexible and agent-specific.
     """
 
-    # This init isn't really needed as jumanji.Wrapper will forward the attributes,
-    # but mypy doesn't realize this.
     def __init__(self, env: MarlEnv, add_self_loops: bool = True):
         super().__init__(env)
         self._env: MarlEnv
