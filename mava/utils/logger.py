@@ -281,7 +281,7 @@ class NeptuneLogger(BaseLogger):
 
         # Create a zip file containing the specified JSON file
         with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-            zipf.write(self.json_file_path)
+            zipf.write(self.json_file_path, arcname=self.json_file_path.name)
 
         self.logger[f"metrics/metrics_{self.unique_token}"].upload(zip_file_path)
 
@@ -336,7 +336,7 @@ class JsonLogger(BaseLogger):
             seed: Random seed used in the experiment.
         """
         json_exp_path = get_logger_path(system_name, "json")
-        json_logs_path = Path(base_exp_path, json_exp_path, unique_token, "metrics.json")
+        json_logs_path = Path(base_exp_path, json_exp_path, unique_token)
         # if a custom path is specified, use that instead
         if path is not None:
             json_logs_path = Path(base_exp_path, "json", path)
