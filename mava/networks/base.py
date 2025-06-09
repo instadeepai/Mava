@@ -23,7 +23,6 @@ from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
 from mava.networks.distributions import MaskedEpsGreedyDistribution
-from mava.networks.gnn import is_graph_torso
 from mava.networks.torsos import MLPTorso
 from mava.types import (
     GraphObservation,
@@ -32,8 +31,8 @@ from mava.types import (
     ObservationGlobalState,
     RNNGlobalObservation,
     RNNObservation,
-    is_graph_observation,
 )
+from mava.utils.graph.gnn_utils import is_graph_observation, validate_graph_components
 
 
 class FeedForwardActor(nn.Module):
@@ -47,9 +46,9 @@ class FeedForwardActor(nn.Module):
         self, observation: Union[Observation, GraphObservation[Observation]]
     ) -> tfd.Distribution:
         """Forward pass."""
-        validate_graph_components(self.torso, observation)
 
         if is_graph_observation(observation):
+            validate_graph_components(self.torso, observation)
             obs_embedding = self.torso(observation)
             action_mask = observation.observation.action_mask
         else:
@@ -71,8 +70,8 @@ class FeedForwardValueNet(nn.Module):
     ) -> chex.Array:
         """Forward pass."""
 
-        validate_graph_components(self.torso, observation)
         if is_graph_observation(observation):
+            validate_graph_components(self.torso, observation)
             critic_output = self.torso(observation)
         else:
             if self.centralised_critic:
@@ -167,9 +166,8 @@ class RecurrentActor(nn.Module):
         """Forward pass."""
         observation, done = observation_done
 
-        validate_graph_components(self.pre_torso, observation)
-
         if is_graph_observation(observation):
+            validate_graph_components(self.pre_torso, observation)
             policy_embedding = self.pre_torso(observation)
             action_mask = observation.observation.action_mask
         else:
@@ -203,9 +201,8 @@ class RecurrentValueNet(nn.Module):
         """Forward pass."""
         observation, done = observation_done
 
-        validate_graph_components(self.pre_torso, observation)
-
         if is_graph_observation(observation):
+            validate_graph_components(self.pre_torso, observation)
             value_embedding = self.pre_torso(observation)
         else:
             if self.centralised_critic:
@@ -344,14 +341,3 @@ class QMixingNetwork(nn.Module):
         q_tot = jnp.reshape(y, (B, T, 1))
 
         return q_tot
-
-
-def validate_graph_components(
-    torso: nn.Module, observation: Union[Observation, ObservationGlobalState, GraphObservation]
-) -> None:
-    """Validate that GNN and GraphObservation are used together."""
-    is_graph = is_graph_observation(observation)
-    is_gnn = is_graph_torso(torso)
-
-    if is_graph != is_gnn:
-        raise ValueError("GraphObservation and GNN must be used together. ")

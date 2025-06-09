@@ -12,13 +12,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
+from typing import List, TypeGuard, Union
 
 import chex
 import jax
 import jax.numpy as jnp
+from flax import linen as nn
+from typing_extensions import TypeIs
 
-from mava.types import GraphsTuple
+from mava.types import (
+    GraphObservation,
+    GraphsTuple,
+    MavaObservationType,
+    Observation,
+    ObservationGlobalState,
+)
+
+
+class GNN(nn.Module):
+    """A parent class for all GNN models.
+    This is used so that we can identify GNN models in base actor and critic networks.
+    """
+
+    pass
+
+
+def is_graph_torso(torso: nn.Module) -> TypeGuard[GNN]:
+    """Type guard to check if torso is a graph-based network."""
+    return isinstance(torso, GNN)
+
+
+def is_graph_observation(
+    obs: Union[Observation, ObservationGlobalState, GraphObservation[MavaObservationType]],
+) -> TypeIs[GraphObservation[MavaObservationType]]:
+    """Type guard to check if observation is a GraphObservation."""
+    return isinstance(obs, GraphObservation)
+
+
+def validate_graph_components(
+    torso: nn.Module, observation: Union[Observation, ObservationGlobalState, GraphObservation]
+) -> None:
+    """Validate that GNN and GraphObservation are used together."""
+    is_graph = is_graph_observation(observation)
+    is_gnn = is_graph_torso(torso)
+
+    if is_graph != is_gnn:
+        raise ValueError("GraphObservation and GNN must be used together. ")
 
 
 def validate_num_dims_in_graph_tuple(graph: GraphsTuple, num_batch_dims: int) -> None:

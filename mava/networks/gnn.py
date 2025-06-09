@@ -19,7 +19,7 @@
 # V: number of nodes per graph
 # F: feature dimension
 
-from typing import Sequence, TypeGuard
+from typing import Sequence
 
 import chex
 import jraph
@@ -31,20 +31,7 @@ from jraph import GraphsTuple as JraphGraphsTuple
 
 from mava.networks.torsos import MLPTorso, _parse_activation_fn
 from mava.types import GraphObservation
-from mava.utils.jraph_utils import batched_graph_to_single_graph
-
-
-class GNN(nn.Module):
-    """A parent class for all GNN models.
-    This is used so that we can identify GNN models in base actor and critic networks.
-    """
-
-    pass
-
-
-def is_graph_torso(torso: nn.Module) -> TypeGuard[GNN]:
-    """Type guard to check if torso is a graph-based network."""
-    return isinstance(torso, GNN)
+from mava.utils.graph.gnn_utils import GNN, batched_graph_to_single_graph
 
 
 class InforMARLNbrhdAggregationTorso(GNN):

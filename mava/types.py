@@ -31,7 +31,7 @@ import jumanji.specs as specs
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
 from tensorflow_probability.substrates.jax.distributions import Distribution
-from typing_extensions import NamedTuple, TypeAlias, TypeIs
+from typing_extensions import NamedTuple, TypeAlias
 
 Action: TypeAlias = chex.Array
 Value: TypeAlias = chex.Array
@@ -188,13 +188,6 @@ class GraphObservation(NamedTuple, Generic[MavaObservationType]):
         regular Observation types without needing to handle them differently.
         """
         return getattr(self.observation, name)
-
-
-def is_graph_observation(
-    obs: Union[Observation, ObservationGlobalState, GraphObservation[MavaObservationType]],
-) -> TypeIs[GraphObservation[MavaObservationType]]:
-    """Type guard to check if observation is a GraphObservation."""
-    return isinstance(obs, GraphObservation)
 
 
 # `MavaState` is the main type passed around in our systems. It is often used as a scan carry.
