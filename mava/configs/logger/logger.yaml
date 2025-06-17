@@ -49,7 +49,9 @@ checkpointing:
     max_to_keep: 1 # Maximum number of checkpoints to keep.
     keep_period: ~ # Don't delete any checkpoint where step % keep_period == 0
     checkpoint_uid: ~ # Unique identifier for checkpoint to save. Defaults to timestamp
-    path: ~
+    rel_dir: checkpoints # Relative directory to save checkpoints.
+
   load_model: False # Whether to load model checkpoints.
   load_args:
     checkpoint_uid: "" # Unique identifier for checkpoint to load.
+    rel_dir: checkpoints # Relative directory to load checkpoints.
