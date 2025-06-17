@@ -19,11 +19,12 @@ cd mava
 uv sync -p=3.12
 ```
 
-3.1 If you want to install Mava so that it runs on your accelerator simply run the following. If this does not work please see the [official JAX install guide](https://github.com/google/jax#installation).
+3.1 If you want to install Mava so that it runs on your accelerator simply run the following:
 ```bash
 uv sync --extra cuda12  # GPU aware JAX
 uv sync --extra tpu  # TPU aware JAX
-```
+...
+**Note:** If this does not work, please see the [official JAX install guide](https://github.com/google/jax#installation).
 
 4. Run a system!
 ```bash
