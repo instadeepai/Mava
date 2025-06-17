@@ -18,7 +18,7 @@ from typing import Sequence, Tuple, Union
 import chex
 import jax
 import jax.numpy as jnp
-import tensorflow_probability.substrates.jax.distributions as tfd
+import distrax
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
@@ -34,7 +34,7 @@ class FeedForwardActor(nn.Module):
     action_head: nn.Module
 
     @nn.compact
-    def __call__(self, observation: Observation) -> tfd.Distribution:
+    def __call__(self, observation: Observation) -> distrax.Distribution:
         """Forward pass."""
         obs_embedding = self.torso(observation.agents_view)
 
@@ -139,7 +139,7 @@ class RecurrentActor(nn.Module):
         self,
         policy_hidden_state: chex.Array,
         observation_done: RNNObservation,
-    ) -> Tuple[chex.Array, tfd.Distribution]:
+    ) -> Tuple[chex.Array, distrax.Distribution]:
         """Forward pass."""
         observation, done = observation_done
 

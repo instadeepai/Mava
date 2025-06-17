@@ -17,7 +17,7 @@ from typing import Tuple, Union
 import chex
 import jax
 import jax.numpy as jnp
-import tensorflow_probability.substrates.jax.distributions as tfd
+import distrax
 from flax import linen as nn
 
 from mava.networks.distributions import IdentityTransformation, TanhTransformedDistribution
@@ -51,7 +51,7 @@ def discrete_parallel_act(
         jnp.finfo(jnp.float32).min,
     )
 
-    distribution = IdentityTransformation(distribution=tfd.Categorical(logits=masked_logits))
+    distribution = IdentityTransformation(distribution=distrax.Categorical(logits=masked_logits))
     action_log_prob = distribution.log_prob(action)
     entropy = distribution.entropy(seed=key)
 
@@ -76,8 +76,8 @@ def continuous_parallel_act(
     act_mean = decoder(shifted_action, obs_rep)  # (B, N, A)
     action_std = jax.nn.softplus(decoder.log_std)
 
-    distribution = tfd.Normal(loc=act_mean, scale=action_std)
-    distribution = tfd.Independent(
+    distribution = distrax.Normal(loc=act_mean, scale=action_std)
+    distribution = distrax.Independent(
         TanhTransformedDistribution(distribution),
         reinterpreted_batch_ndims=1,
     )
@@ -109,7 +109,7 @@ def discrete_autoregressive_act(
         )
         key, sample_key = jax.random.split(key)
 
-        distribution = IdentityTransformation(distribution=tfd.Categorical(logits=masked_logits))
+        distribution = IdentityTransformation(distribution=distrax.Categorical(logits=masked_logits))
         action = distribution.sample(seed=sample_key)  # (B, )
         action_log = distribution.log_prob(action)  # (B, )
 
@@ -144,8 +144,8 @@ def continuous_autoregressive_act(
 
         key, sample_key = jax.random.split(key)
 
-        distribution = tfd.Normal(loc=act_mean, scale=action_std)
-        distribution = tfd.Independent(
+        distribution = distrax.Normal(loc=act_mean, scale=action_std)
+        distribution = distrax.Independent(
             TanhTransformedDistribution(distribution),
             reinterpreted_batch_ndims=1,
         )

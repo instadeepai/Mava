@@ -56,7 +56,7 @@ dependencies = [
     "setuptools",
     "smaclite @ git+https://github.com/uoe-agents/smaclite.git",
     "tensorboard_logger",
-    "tensorflow_probability",
+
     "type_enforced", # needed because gigastep is missing this dependency
 ]
 

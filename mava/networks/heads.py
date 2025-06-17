@@ -16,7 +16,7 @@
 import chex
 import jax
 import jax.numpy as jnp
-import tensorflow_probability.substrates.jax.distributions as tfd
+import distrax
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
 
@@ -33,7 +33,7 @@ class DiscreteActionHead(nn.Module):
         self,
         obs_embedding: chex.Array,
         action_mask: chex.Array,
-    ) -> tfd.TransformedDistribution:
+    ) -> distrax.Transformed:
         """Action selection for distrete action space environments.
 
         Args:
@@ -43,7 +43,7 @@ class DiscreteActionHead(nn.Module):
 
         Returns:
         -------
-            A transformed tfd.categorical distribution on the action space for action sampling.
+            A transformed distrax.categorical distribution on the action space for action sampling.
 
         NOTE: We pass both the observation embedding and the observation object to the action head
         since the observation object contains the action mask and other potentially useful
@@ -60,7 +60,7 @@ class DiscreteActionHead(nn.Module):
 
         #  We transform this distribution with the `Identity()` transformation to
         # keep the API identical to the ContinuousActionHead.
-        return IdentityTransformation(distribution=tfd.Categorical(logits=masked_logits))
+        return IdentityTransformation(distribution=distrax.Categorical(logits=masked_logits))
 
 
 class ContinuousActionHead(nn.Module):
@@ -82,7 +82,7 @@ class ContinuousActionHead(nn.Module):
             self.log_std = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))
 
     @nn.compact
-    def __call__(self, obs_embedding: chex.Array, action_mask: chex.Array) -> tfd.Independent:
+    def __call__(self, obs_embedding: chex.Array, action_mask: chex.Array) -> distrax.Independent:
         """Action selection for continuous action space environments.
 
         Args:
@@ -94,7 +94,7 @@ class ContinuousActionHead(nn.Module):
 
         Returns:
         -------
-            tfd.Independent: Independent transformed distribution.
+            distrax.Independent: Independent transformed distribution.
 
         """
         del action_mask
@@ -103,9 +103,9 @@ class ContinuousActionHead(nn.Module):
         scale = self.log_std if self.independent_std else self.log_std(obs_embedding)
         scale = jax.nn.softplus(scale) + self.min_scale
 
-        distribution = tfd.Normal(loc=loc, scale=scale)
+        distribution = distrax.Normal(loc=loc, scale=scale)
 
-        return tfd.Independent(
+        return distrax.Independent(
             TanhTransformedDistribution(distribution),
             reinterpreted_batch_ndims=1,
         )

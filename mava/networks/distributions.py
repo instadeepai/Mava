@@ -17,11 +17,10 @@ from typing import Any, Optional
 import chex
 import jax
 import jax.numpy as jnp
-import tensorflow_probability.substrates.jax.bijectors as tfb
-import tensorflow_probability.substrates.jax.distributions as tfd
+import distrax
 
 
-class TanhTransformedDistribution(tfd.TransformedDistribution):
+class TanhTransformedDistribution(distrax.Transformed):
     """A distribution transformed using the `tanh` function.
 
     This transformation was adapted to acme's implementation.
@@ -30,7 +29,7 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
 
     def __init__(
         self,
-        distribution: tfd.Distribution,
+        distribution: distrax.Distribution,
         threshold: float = 0.999,
         validate_args: bool = False,
     ) -> None:
@@ -45,7 +44,7 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
 
         """
         super().__init__(
-            distribution=distribution, bijector=tfb.Tanh(), validate_args=validate_args
+            distribution=distribution, bijector=distrax.Tanh(), validate_args=validate_args
         )
         # Computes the log of the average probability distribution outside the
         # clipping range, i.e. on the interval [-inf, -atanh(threshold)] for
@@ -91,7 +90,7 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
         return td_properties
 
 
-class MaskedEpsGreedyDistribution(tfd.Categorical):
+class MaskedEpsGreedyDistribution(distrax.Categorical):
     """Computes an epsilon-greedy distribution for each action choice. There are two
     components in the distribution:
 
@@ -143,16 +142,16 @@ class MaskedEpsGreedyDistribution(tfd.Categorical):
         return td_properties
 
 
-class IdentityTransformation(tfd.TransformedDistribution):
+class IdentityTransformation(distrax.Transformed):
     """A distribution transformed using the `Identity()` bijector.
 
     We transform this distribution with the `Identity()` bijector to enable us to call
     `pi.entropy(seed)` and keep the API identical to the TanhTransformedDistribution.
     """
 
-    def __init__(self, distribution: tfd.Distribution) -> None:
+    def __init__(self, distribution: distrax.Distribution) -> None:
         """Initialises the IdentityTransformation."""
-        super().__init__(distribution=distribution, bijector=tfb.Identity())
+        super().__init__(distribution=distribution, bijector=distrax.Identity())
 
     def entropy(self, seed: chex.PRNGKey = None) -> chex.Array:
         """Computes the entropy of the distribution."""

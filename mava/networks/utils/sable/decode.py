@@ -18,7 +18,7 @@ import chex
 import distrax
 import jax
 import jax.numpy as jnp
-import tensorflow_probability.substrates.jax.distributions as tfd
+
 from flax import linen as nn
 
 from mava.networks.distributions import TanhTransformedDistribution
@@ -195,8 +195,8 @@ def continuous_train_decoder_fn(
 
     action_std = jax.nn.softplus(decoder.log_std) + _MIN_SCALE
 
-    base_distribution = tfd.Normal(loc=act_mean, scale=action_std)
-    distribution = tfd.Independent(
+    base_distribution = distrax.Normal(loc=act_mean, scale=action_std)
+    distribution = distrax.Independent(
         TanhTransformedDistribution(base_distribution),
         reinterpreted_batch_ndims=1,
     )
@@ -250,8 +250,8 @@ def continuous_autoregressive_act(
 
         key, sample_key = jax.random.split(key)
 
-        base_distribution = tfd.Normal(loc=act_mean, scale=action_std)
-        distribution = tfd.Independent(
+        base_distribution = distrax.Normal(loc=act_mean, scale=action_std)
+        distribution = distrax.Independent(
             TanhTransformedDistribution(base_distribution),
             reinterpreted_batch_ndims=1,
         )

@@ -20,7 +20,7 @@ import jax
 import jumanji.specs as specs
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
-from tensorflow_probability.substrates.jax.distributions import Distribution
+from distrax import Distribution
 from typing_extensions import NamedTuple, TypeAlias
 
 Action: TypeAlias = chex.Array
