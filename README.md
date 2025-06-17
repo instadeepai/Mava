@@ -62,7 +62,7 @@ uv sync --extra tpu  # TPU aware JAX
 Alternatively with pip, create a virtual environment and then:
 
 ```bash
-pip install -e ".[cuda12]"  # GPU aware JAX
+pip install -e ".[cuda12]"  # GPU aware JAX (leave out the [cuda12] if you don't have a GPU or are on Mac)
 ```
 
 We have tested `Mava` on Python 3.11 and 3.12, but earlier versions may also work. Specifically, we use Python 3.10 for the Quickstart notebook on Google Colab since Colab uses Python 3.10 by default.  For more in-depth installation guides including Docker builds and virtual environments, please see our [detailed installation guide](docs/DETAILED_INSTALL.md).
