@@ -48,8 +48,7 @@ dependencies = [
   "jax>=0.5.0,<0.7.0",
   "jaxlib>=0.5.0,<0.7.0",
   "jaxmarl @ git+https://github.com/RuanJohn/JaxMARL@jax-05",    # This only unpins the version of Jax.
-  # "jumanji>= 1.1.0",
-  "jumanji @ git+https://github.com/instadeepai/jumanji",      # TODO: once jumanji is released go back to pip package
+  "jumanji>= 1.1.1",
   "lbforaging",
   "matrax>= 0.0.5",
   "mujoco==3.1.3",
