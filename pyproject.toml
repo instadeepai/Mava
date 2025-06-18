@@ -1,98 +1,106 @@
 [build-system]
-requires=["setuptools>=62.6"]
-build-backend="setuptools.build_meta"
+requires = ["setuptools>=62.6"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include=['mava*']
+include = ['mava*']
 
 [project]
-name="id-mava"
-authors=[{name="InstaDeep Ltd"}]
-dynamic=["version"]
-license={file="LICENSE"}
-description="Distributed Multi-Agent Reinforcement Learning in JAX."
-readme ="README.md"
-requires-python=">=3.10,<3.13"
-keywords=["multi-agent", "reinforcement learning", "python", "jax", "anakin", "sebulba"]
-classifiers=[
-    "Environment :: Console",
-    "Intended Audience :: Science/Research",
-    "Intended Audience :: Developers",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "License :: OSI Approved :: Apache Software License",
+name = "id-mava"
+authors = [{ name = "InstaDeep Ltd" }]
+dynamic = ["version"]
+license = { file = "LICENSE" }
+description = "Distributed Multi-Agent Reinforcement Learning in JAX."
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+keywords = [
+  "multi-agent",
+  "reinforcement learning",
+  "python",
+  "jax",
+  "anakin",
+  "sebulba",
+]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
-    "brax==0.10.3",
-    "colorama",
-    "distrax",
-    "flashbax~=0.1.0",
-    "flax>=0.8.1,<0.10.4",
-    "gigastep @ git+https://github.com/mlech26l/gigastep",
-    "gymnasium==1.0.0",
-    "hydra-core==1.3.2",
-    "id-marl-eval @ git+https://github.com/instadeepai/marl-eval",
-    "jax==0.4.30",
-    "jaxlib==0.4.30",
-    "jaxmarl @ git+https://github.com/RuanJohn/JaxMARL@unpin-jax", # This only unpins the version of Jax.
-    "jumanji>= 1.1.0",
-    "lbforaging",
-    "matrax>= 0.0.5",
-    "mujoco==3.1.3",
-    "mujoco-mjx==3.1.3",
-    "neptune",
-    "numpy==1.26.4",
-    "omegaconf",
-    "optax",
-    "protobuf~=3.20",
-    "rware",
-    "scipy==1.12.0",
-    "setuptools",
-    "smaclite @ git+https://github.com/uoe-agents/smaclite.git",
-    "tensorboard_logger",
-    "tensorflow_probability",
-    "type_enforced", # needed because gigastep is missing this dependency
+  "brax==0.10.3",
+  "colorama",
+  "distrax",
+  "flashbax~=0.1.0",
+  "flax>=0.8.1,<0.10.4",
+  "gigastep @ git+https://github.com/mlech26l/gigastep",
+  "gymnasium==1.0.0",
+  "hydra-core==1.3.2",
+  "id-marl-eval @ git+https://github.com/instadeepai/marl-eval",
+  "jax>=0.5.0,<0.7.0",
+  "jaxlib>=0.5.0,<0.7.0",
+  "jaxmarl @ git+https://github.com/RuanJohn/JaxMARL@jax-05",    # This only unpins the version of Jax.
+  # "jumanji>= 1.1.0",
+  "jumanji @ git+https://github.com/instadeepai/jumanji",      # TODO: once jumanji is released go back to pip package
+  "lbforaging",
+  "matrax>= 0.0.5",
+  "mujoco==3.1.3",
+  "mujoco-mjx==3.1.3",
+  "neptune",
+  "numpy==1.26.4",
+  "omegaconf",
+  "optax",
+  "protobuf~=3.20",
+  "rware",
+  "scipy==1.12.0",
+  "setuptools",
+  "smaclite @ git+https://github.com/uoe-agents/smaclite.git",
+  "tensorboard_logger",
+  "tensorflow_probability",
+  "type_enforced",                                             # needed because gigastep is missing this dependency
 ]
+
+[project.optional-dependencies]
+cuda12 = ["jax[cuda12]>=0.5.0,<0.7.0"]
+tpu = ["jax[tpu]>=0.5.0,<0.7.0"]
 
 [dependency-groups]
-dev = [
-    "mypy",
-    "pre-commit",
-    "pytest",
-]
+dev = ["mypy", "pre-commit", "pytest"]
 
 [tool.setuptools.dynamic]
-version={attr="mava.__version__"}
+version = { attr = "mava.__version__" }
 
 [project.urls]
-"Homepage"="https://github.com/instadeep/Mava"
-"Bug Tracker"="https://github.com/instadeep/Mava/issues"
+"Homepage" = "https://github.com/instadeep/Mava"
+"Bug Tracker" = "https://github.com/instadeep/Mava/issues"
 
 [tool.mypy]
-python_version="3.10"
-warn_redundant_casts=true
-disallow_untyped_defs=true
-strict_equality=true
-follow_imports="skip"
-ignore_missing_imports=true
+python_version = "3.10"
+warn_redundant_casts = true
+disallow_untyped_defs = true
+strict_equality = true
+follow_imports = "skip"
+ignore_missing_imports = true
 
 [tool.ruff]
-line-length=100
+line-length = 100
 
 [tool.ruff.lint]
-select=["A", "B", "E", "F",  "I", "N", "W", "RUF", "ANN"]
-ignore=[
-    "E731",  # Allow lambdas to be assigned to variables.
-    "ANN101",  # no need to type self
-    "ANN102",  # no need to type cls
-    "ANN204",  # no need for return type for special methods
-    "ANN401",  # can use Any type
+select = ["A", "B", "E", "F", "I", "N", "W", "RUF", "ANN"]
+ignore = [
+  "E731",   # Allow lambdas to be assigned to variables.
+  "ANN101", # no need to type self
+  "ANN102", # no need to type cls
+  "ANN204", # no need for return type for special methods
+  "ANN401", # can use Any type
 ]
 
 [tool.ruff.lint.pep8-naming]
