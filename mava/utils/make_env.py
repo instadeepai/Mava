@@ -38,6 +38,7 @@ from jumanji.environments.routing.robot_warehouse.generator import (
 from omegaconf import DictConfig
 
 from mava.types import MarlEnv
+from mava.utils.t_maze import TMaze
 from mava.wrappers import (
     AgentIDWrapper,
     AutoResetWrapper,
@@ -76,6 +77,7 @@ _jumanji_registry = {
 _matrax_registry = {"Matrax": MatraxWrapper}
 _jaxmarl_registry = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper, "MPE": MPEWrapper}
 _gigastep_registry = {"Gigastep": GigastepWrapper}
+_tmaze_registry = {"TMAZE": TMaze}
 
 _gym_registry = {
     "RobotWarehouse": UoeWrapper,
@@ -226,6 +228,14 @@ def make_gigastep_env(
     return train_env, eval_env
 
 
+def make_tmaze(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
+    train_env = TMaze(length=5, width=2, time_limit=20)
+    eval_env = TMaze(length=5, width=2, time_limit=20)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)  # type: ignore
+
+    return train_env, eval_env
+
+
 def make_gym_env(
     config: DictConfig,
     num_env: int,
@@ -288,5 +298,7 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, M
         return make_matrax_env(config, add_global_state)
     elif env_name in _gigastep_registry:
         return make_gigastep_env(config, add_global_state)
+    elif env_name in _tmaze_registry:
+        return make_tmaze(config, add_global_state)
     else:
         raise ValueError(f"{env_name} is not a supported environment.")
