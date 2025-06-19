@@ -427,13 +427,18 @@ class SableNetwork(nn.Module):
             encoder=self.encoder, obs=obs, hstate=hstates[0], dones=dones, step_count=step_count
         )
 
+        decoder_hstates = hstates[1:]
+        decoder_hstates = tree.map(lambda x: jnp.zeros_like(x), decoder_hstates)
+        # always True for the decoder dones.
+        decoder_dones = tree.map(lambda x: jnp.ones_like(x, dtype=x.dtype), dones)
+
         action_log, entropy = self.train_decoder_fn(
             decoder=self.decoder,
             obs_rep=obs_rep,
             action=action,
             legal_actions=legal_actions,
-            hstates=hstates[1:],
-            dones=dones,
+            hstates=decoder_hstates,
+            dones=decoder_dones,
             step_count=step_count,
             rng_key=rng_key,
         )
@@ -464,19 +469,23 @@ class SableNetwork(nn.Module):
             step_count=step_count,
         )
 
+        # always zero out the decoder hidden states.
+        decoder_hstates = decayed_hstates[1:]
+        decoder_hstates = tree.map(lambda x: jnp.zeros_like(x), decoder_hstates)
+
         output_actions, output_actions_log, updated_dec_hs = self.autoregressive_act(
             decoder=self.decoder,
             obs_rep=obs_rep,
             legal_actions=legal_actions,
-            hstates=decayed_hstates[1:],
+            hstates=decoder_hstates,
             step_count=step_count,
             key=key,
         )
 
         updated_hs = HiddenStates(
             encoder=updated_enc_hs,
-            decoder_self_retn=updated_dec_hs[0],
-            decoder_cross_retn=updated_dec_hs[1],
+            decoder_self_retn=decoder_hstates[0],
+            decoder_cross_retn=decoder_hstates[1],
         )
 
         value = jnp.squeeze(value, axis=-1)

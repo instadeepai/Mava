@@ -893,7 +893,7 @@ requires-dist = [
     { name = "jax", extras = ["tpu"], marker = "extra == 'tpu'", specifier = ">=0.5.0,<0.7.0" },
     { name = "jaxlib", specifier = ">=0.5.0,<0.7.0" },
     { name = "jaxmarl", git = "https://github.com/RuanJohn/JaxMARL?rev=jax-05" },
-    { name = "jumanji", git = "https://github.com/instadeepai/jumanji" },
+    { name = "jumanji", specifier = ">=1.1.1" },
     { name = "lbforaging" },
     { name = "matrax", specifier = ">=0.0.5" },
     { name = "mujoco", specifier = "==3.1.3" },
@@ -1215,8 +1215,8 @@ wheels = [
 
 [[package]]
 name = "jumanji"
-version = "1.1.0"
-source = { git = "https://github.com/instadeepai/jumanji#9ced6b8123b75d937ddb60cf676cfe4efe207809" }
+version = "1.1.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "chex" },
     { name = "dm-env" },
@@ -1228,6 +1228,10 @@ dependencies = [
     { name = "numpy" },
     { name = "pillow" },
     { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/dd/58/68c7a2d276f514967a0791e3ec7483c5b5de39ab4562014ccc7a8bcf2457/jumanji-1.1.1.tar.gz", hash = "sha256:6b54b150df3a48f2fcef7b1dc4f955ae63de276a3adbbb1f10ea8e7737a0978d", size = 1164578 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d2/20/ff43a5de0bdda4170bd2b2c97a2708b61fc1add2d7b78bed931fb575676a/jumanji-1.1.1-py3-none-any.whl", hash = "sha256:5d8e8bcfb00f43223a991b481e2f2a95676756133b220015bc24331cb2fa1aeb", size = 1372629 },
 ]
 
 [[package]]
