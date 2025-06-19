@@ -473,7 +473,7 @@ class SableNetwork(nn.Module):
         decoder_hstates = decayed_hstates[1:]
         decoder_hstates = tree.map(lambda x: jnp.zeros_like(x), decoder_hstates)
 
-        output_actions, output_actions_log, updated_dec_hs = self.autoregressive_act(
+        output_actions, output_actions_log, _ = self.autoregressive_act(
             decoder=self.decoder,
             obs_rep=obs_rep,
             legal_actions=legal_actions,
@@ -482,6 +482,7 @@ class SableNetwork(nn.Module):
             key=key,
         )
 
+        # just returning zero decoder hstates.
         updated_hs = HiddenStates(
             encoder=updated_enc_hs,
             decoder_self_retn=decoder_hstates[0],
