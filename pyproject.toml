@@ -48,6 +48,7 @@ dependencies = [
   "jax>=0.5.0,<0.7.0",
   "jaxlib>=0.5.0,<0.7.0",
   "jaxmarl @ git+https://github.com/RuanJohn/JaxMARL@jax-05",    # This only unpins the version of Jax.
+  "jraph",
   "jumanji>= 1.1.1",
   "lbforaging",
   "matrax>= 0.0.5",

@@ -13,7 +13,17 @@
 # limitations under the License.
 
 from functools import cached_property
-from typing import Any, Callable, Dict, Generic, Optional, Protocol, Tuple, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Optional,
+    Protocol,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 import chex
 import jax
@@ -139,9 +149,46 @@ class ObservationGlobalState(NamedTuple):
     step_count: Optional[chex.Array] = None  # (num_agents, )
 
 
-RNNObservation: TypeAlias = Tuple[Observation, Done]
-RNNGlobalObservation: TypeAlias = Tuple[ObservationGlobalState, Done]
+RNNObservation: TypeAlias = Tuple[Union[Observation, "GraphObservation[Observation]"], Done]
+RNNGlobalObservation: TypeAlias = Tuple[
+    Union[ObservationGlobalState, "GraphObservation[ObservationGlobalState]"], Done
+]
 MavaObservation: TypeAlias = Union[Observation, ObservationGlobalState]
+MavaObservationType = TypeVar("MavaObservationType", bound=MavaObservation, covariant=True)
+
+
+class GraphsTuple(NamedTuple):
+    """
+    This is a copy of jraph.GraphsTuple with ego_node_index
+    """
+
+    nodes: Optional[chex.ArrayTree]
+    edges: Optional[chex.ArrayTree]
+    receivers: Optional[chex.Array]  # with integer dtype
+    senders: Optional[chex.Array]  # with integer dtype
+    globals: Optional[chex.ArrayTree]
+    n_node: chex.Array  # with integer dtype
+    n_edge: chex.Array  # with integer dtype
+    ego_node_index: chex.Array
+
+    @property
+    def nodes_strict(self) -> chex.ArrayTree:
+        assert self.nodes is not None, "nodes must not be None"
+        return self.nodes
+
+
+class GraphObservation(NamedTuple, Generic[MavaObservationType]):
+    observation: MavaObservationType
+    graph: GraphsTuple
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate attribute access to the underlying observation.
+
+        This lets downstream wrappers and other code work with both GraphObservation and
+        regular Observation types without needing to handle them differently.
+        """
+        return getattr(self.observation, name)
+
 
 # `MavaState` is the main type passed around in our systems. It is often used as a scan carry.
 # Types like: `LearnerState` (mava/systems/<system_name>/types.py) are `MavaState`s.

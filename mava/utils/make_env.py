@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
+from typing import Tuple, Type, TypeAlias
 
 import gymnasium
 import gymnasium as gym
@@ -38,6 +38,7 @@ from jumanji.environments.routing.robot_warehouse.generator import (
 from omegaconf import DictConfig
 
 from mava.types import MarlEnv
+from mava.utils.network_utils import is_gnn_based
 from mava.wrappers import (
     AgentIDWrapper,
     AutoResetWrapper,
@@ -59,9 +60,13 @@ from mava.wrappers import (
     VectorConnectorWrapper,
     async_multiagent_worker,
 )
+from mava.wrappers.graph_wrapper import GraphWrapper
+from mava.wrappers.jaxmarl import MPEGraphWrapper
+
+registry_type: TypeAlias = dict[str, dict[str, Type]]
 
 # Registry mapping environment names to their generator and wrapper classes.
-_jumanji_registry = {
+_jumanji_registry: registry_type = {
     "RobotWarehouse": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
     "LevelBasedForaging": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
     "Connector": {"generator": ConnectorRandomGenerator, "wrapper": ConnectorWrapper},
@@ -73,26 +78,40 @@ _jumanji_registry = {
 }
 
 # Registry mapping environment names directly to the corresponding wrapper classes.
-_matrax_registry = {"Matrax": MatraxWrapper}
-_jaxmarl_registry = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper, "MPE": MPEWrapper}
-_gigastep_registry = {"Gigastep": GigastepWrapper}
+_matrax_registry: registry_type = {"Matrax": {"wrapper": MatraxWrapper}}
+_jaxmarl_registry: registry_type = {
+    "Smax": {"wrapper": SmaxWrapper},
+    "MaBrax": {"wrapper": MabraxWrapper},
+    "MPE": {"wrapper": MPEWrapper, "graph_wrapper": MPEGraphWrapper},
+}
+_gigastep_registry: registry_type = {"Gigastep": {"wrapper": GigastepWrapper}}
 
-_gym_registry = {
-    "RobotWarehouse": UoeWrapper,
-    "LevelBasedForaging": UoeWrapper,
-    "SMACLite": SmacWrapper,
+_gym_registry: registry_type = {
+    "RobotWarehouse": {"wrapper": UoeWrapper},
+    "LevelBasedForaging": {"wrapper": UoeWrapper},
+    "SMACLite": {"wrapper": SmacWrapper},
 }
 
 
 def add_extra_wrappers(
-    train_env: MarlEnv, eval_env: MarlEnv, config: DictConfig
+    train_env: MarlEnv, eval_env: MarlEnv, config: DictConfig, registry: registry_type
 ) -> Tuple[MarlEnv, MarlEnv]:
+    """Wrappers that access and modify observations (like AgentIDWrapper) must come before
+    GraphWrapper to avoid special casing observation handling for both regular and graph
+    observations. For example, AgentIDWrapper adds agent IDs to observations, which should happen
+    before converting observation to GraphObservation."""
     # Disable the AgentID wrapper if the environment has implicit agent IDs.
     config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
     if config.system.add_agent_id:
         train_env = AgentIDWrapper(train_env)
         eval_env = AgentIDWrapper(eval_env)
+
+    if is_gnn_based(config):
+        # Get the graph wrapper from registry or use default GraphWrapper
+        graph_wrapper = registry[config.env.env_name].get("graph_wrapper", GraphWrapper)
+        train_env = graph_wrapper(train_env)
+        eval_env = graph_wrapper(eval_env)
 
     train_env = AutoResetWrapper(train_env)
     train_env = RecordEpisodeMetrics(train_env)
@@ -128,7 +147,7 @@ def make_jumanji_env(config: DictConfig, add_global_state: bool = False) -> Tupl
     train_env = wrapper(train_env, add_global_state=add_global_state)
     eval_env = wrapper(eval_env, add_global_state=add_global_state)
 
-    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config, _jumanji_registry)
     return train_env, eval_env
 
 
@@ -154,16 +173,16 @@ def make_jaxmarl_env(config: DictConfig, add_global_state: bool = False) -> Tupl
         kwargs.update(config.env.scenario.task_config)
 
     # Create jaxmarl envs.
-    train_env: MarlEnv = _jaxmarl_registry[config.env.env_name](
+    train_env: MarlEnv = _jaxmarl_registry[config.env.env_name]["wrapper"](
         jaxmarl.make(config.env.scenario.name, **kwargs),
         add_global_state,
     )
-    eval_env: MarlEnv = _jaxmarl_registry[config.env.env_name](
+    eval_env: MarlEnv = _jaxmarl_registry[config.env.env_name]["wrapper"](
         jaxmarl.make(config.env.scenario.name, **kwargs),
         add_global_state,
     )
 
-    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config, _jaxmarl_registry)
 
     return train_env, eval_env
 
@@ -184,7 +203,7 @@ def make_matrax_env(config: DictConfig, add_global_state: bool = False) -> Tuple
 
     """
     # Select the Matrax wrapper.
-    wrapper = _matrax_registry[config.env.scenario.name]
+    wrapper = _matrax_registry[config.env.scenario.name]["wrapper"]
 
     # Create envs.
     task_name = config["env"]["scenario"]["task_name"]
@@ -193,7 +212,7 @@ def make_matrax_env(config: DictConfig, add_global_state: bool = False) -> Tuple
     train_env = wrapper(train_env, add_global_state)
     eval_env = wrapper(eval_env, add_global_state)
 
-    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config, _matrax_registry)
     return train_env, eval_env
 
 
@@ -214,7 +233,7 @@ def make_gigastep_env(
         A tuple of the environments.
 
     """
-    wrapper = _gigastep_registry[config.env.scenario.name]
+    wrapper = _gigastep_registry[config.env.scenario.name]["wrapper"]
 
     kwargs = config.env.kwargs
     scenario = ScenarioBuilder.from_config(config.env.scenario.task_config)
@@ -222,7 +241,7 @@ def make_gigastep_env(
     train_env: MarlEnv = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
     eval_env: MarlEnv = wrapper(scenario.make(**kwargs), has_global_state=add_global_state)
 
-    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config, _gigastep_registry)
     return train_env, eval_env
 
 
@@ -242,7 +261,7 @@ def make_gym_env(
     Returns:
         Async environments.
     """
-    wrapper = _gym_registry[config.env.env_name]
+    wrapper = _gym_registry[config.env.env_name]["wrapper"]
     config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
     def create_gym_env(config: DictConfig, add_global_state: bool = False) -> gymnasium.Env:

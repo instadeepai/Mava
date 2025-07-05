@@ -24,7 +24,15 @@ from flax.linen.initializers import orthogonal
 
 from mava.networks.distributions import MaskedEpsGreedyDistribution
 from mava.networks.torsos import MLPTorso
-from mava.types import Observation, ObservationGlobalState, RNNGlobalObservation, RNNObservation
+from mava.types import (
+    GraphObservation,
+    MavaObservation,
+    Observation,
+    ObservationGlobalState,
+    RNNGlobalObservation,
+    RNNObservation,
+)
+from mava.utils.graph.gnn_utils import is_graph_observation, validate_graph_components
 
 
 class FeedForwardActor(nn.Module):
@@ -34,11 +42,19 @@ class FeedForwardActor(nn.Module):
     action_head: nn.Module
 
     @nn.compact
-    def __call__(self, observation: Observation) -> tfd.Distribution:
+    def __call__(
+        self, observation: Union[Observation, GraphObservation[Observation]]
+    ) -> tfd.Distribution:
         """Forward pass."""
-        obs_embedding = self.torso(observation.agents_view)
 
-        return self.action_head(obs_embedding, observation.action_mask)
+        if is_graph_observation(observation):
+            validate_graph_components(self.torso, observation)
+            obs_embedding = self.torso(observation)
+            action_mask = observation.observation.action_mask
+        else:
+            obs_embedding = self.torso(observation.agents_view)
+            action_mask = observation.action_mask
+        return self.action_head(obs_embedding, action_mask)
 
 
 class FeedForwardValueNet(nn.Module):
@@ -48,18 +64,25 @@ class FeedForwardValueNet(nn.Module):
     centralised_critic: bool = False
 
     @nn.compact
-    def __call__(self, observation: Union[Observation, ObservationGlobalState]) -> chex.Array:
+    def __call__(
+        self,
+        observation: Union[Observation, ObservationGlobalState, GraphObservation[MavaObservation]],
+    ) -> chex.Array:
         """Forward pass."""
-        if self.centralised_critic:
-            if not isinstance(observation, ObservationGlobalState):
-                raise ValueError("Global state must be provided to the centralised critic.")
-            # Get global state in the case of a centralised critic.
-            observation = observation.global_state
-        else:
-            # Get single agent view in the case of a decentralised critic.
-            observation = observation.agents_view
 
-        critic_output = self.torso(observation)
+        if is_graph_observation(observation):
+            validate_graph_components(self.torso, observation)
+            critic_output = self.torso(observation)
+        else:
+            if self.centralised_critic:
+                if not isinstance(observation, ObservationGlobalState):
+                    raise ValueError("Global state must be provided to the centralised critic.")
+                # Get global state in the case of a centralised critic.
+                observation = observation.global_state
+            else:
+                # Get single agent view in the case of a decentralised critic.
+                observation = observation.agents_view
+            critic_output = self.torso(observation)
         critic_output = nn.Dense(1, kernel_init=orthogonal(1.0))(critic_output)
 
         return jnp.squeeze(critic_output, axis=-1)
@@ -143,13 +166,20 @@ class RecurrentActor(nn.Module):
         """Forward pass."""
         observation, done = observation_done
 
-        policy_embedding = self.pre_torso(observation.agents_view)
+        if is_graph_observation(observation):
+            validate_graph_components(self.pre_torso, observation)
+            policy_embedding = self.pre_torso(observation)
+            action_mask = observation.observation.action_mask
+        else:
+            policy_embedding = self.pre_torso(observation.agents_view)
+            action_mask = observation.action_mask
+
         policy_rnn_input = (policy_embedding, done)
         policy_hidden_state, policy_embedding = ScannedRNN(self.hidden_state_dim)(
             policy_hidden_state, policy_rnn_input
         )
         policy_embedding = self.post_torso(policy_embedding)
-        pi = self.action_head(policy_embedding, observation.action_mask)
+        pi = self.action_head(policy_embedding, action_mask)
 
         return policy_hidden_state, pi
 
@@ -171,16 +201,21 @@ class RecurrentValueNet(nn.Module):
         """Forward pass."""
         observation, done = observation_done
 
-        if self.centralised_critic:
-            if not isinstance(observation, ObservationGlobalState):
-                raise ValueError("Global state must be provided to the centralised critic.")
-            # Get global state in the case of a centralised critic.
-            observation = observation.global_state
+        if is_graph_observation(observation):
+            validate_graph_components(self.pre_torso, observation)
+            value_embedding = self.pre_torso(observation)
         else:
-            # Get single agent view in the case of a decentralised critic.
-            observation = observation.agents_view
+            if self.centralised_critic:
+                if not isinstance(observation, ObservationGlobalState):
+                    raise ValueError("Global state must be provided to the centralised critic.")
+                # Get global state in the case of a centralised critic.
+                observation = observation.global_state
+            else:
+                # Get single agent view in the case of a decentralised critic.
+                observation = observation.agents_view
 
-        value_embedding = self.pre_torso(observation)
+            value_embedding = self.pre_torso(observation)
+
         value_rnn_input = (value_embedding, done)
         value_net_hidden_state, value_embedding = ScannedRNN(self.hidden_state_dim)(
             value_net_hidden_state, value_rnn_input
@@ -208,6 +243,8 @@ class RecQNetwork(nn.Module):
         """Forward pass to obtain q values."""
         obs, resets = observations_resets
 
+        assert not is_graph_observation(obs), "GraphObservation is not supported for RecQNetwork"
+
         embedding = self.pre_torso(obs.agents_view)
 
         rnn_input = (embedding, resets)
@@ -229,6 +266,7 @@ class RecQNetwork(nn.Module):
         When epsilon is not specified, we assume a greedy approach.
         """
         obs, _ = observations_resets
+        assert not is_graph_observation(obs), "GraphObservation is not supported for RecQNetwork"
         hidden_state, q_values = self.get_q_values(hidden_state, observations_resets)
         eps_greedy_dist = MaskedEpsGreedyDistribution(q_values, eps, obs.action_mask)
 
