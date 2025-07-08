@@ -240,12 +240,28 @@ class NeptuneLogger(BaseLogger):
                 Note this will overwrite the run if you restart the step from 0.
         """
         # async logging leads to deadlocks in sebulba
-        mode = "async" if architecture_name == "anakin" else "sync"
+        mode = "async"
 
         if run_id is not None:
-            self.logger = neptune.init_run(with_id=run_id, project=project, mode=mode)
+            self.logger = neptune.init_run(
+                with_id=run_id,
+                project=project,
+                mode=mode,
+                capture_stdout=False,
+                capture_stderr=False,
+                capture_hardware_metrics=False,
+                capture_traceback=False,
+            )
         else:
-            self.logger = neptune.init_run(project=project, tags=list(tag), mode=mode)
+            self.logger = neptune.init_run(
+                project=project,
+                tags=list(tag),
+                mode=mode,
+                capture_stdout=False,
+                capture_stderr=False,
+                capture_hardware_metrics=False,
+                capture_traceback=False,
+            )
             self.logger["sys/group_tags"].add(list(group_tag))
 
         self.detailed_logging = detailed_logging
