@@ -347,6 +347,8 @@ class GymToJumanji:
             info["real_next_global_obs"],
         )
 
+        # We need to add `env_metrics` to the extras since the sebulba systems expect it.
+        extras["env_metrics"] = {}
         if "won_episode" in info:
             extras["env_metrics"] = {"won_episode": info["won_episode"]}
 
