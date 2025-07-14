@@ -22,7 +22,16 @@ To develop features for Mava, clone the repository and install the core and deve
 ```bash
 git clone https://github.com/instadeepai/mava.git
 cd mava
-pip install -e .[dev]
+# Create a virtual environment and install all dependencies
+uv sync
+# Activate the virtual environment
+source .venv/bin/activate
+```
+
+Alternatively with pip, create a virtual environment and then run:
+
+```bash
+pip install --group dev -e .
 ```
 
 ## Installing Pre-Commit Hooks
