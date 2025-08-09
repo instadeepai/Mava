@@ -221,7 +221,8 @@ class NeptuneLogger(BaseLogger):
         detailed_logging: bool,
         architecture_name: str,
         upload_json_data: bool,
-        run_id: str | None = None,
+        resume_run_id: str | None = None,
+        custom_run_id: str | None = None,
     ) -> None:
         """
         Initialize neptune.ai logger for experiment tracking.
@@ -236,16 +237,19 @@ class NeptuneLogger(BaseLogger):
             detailed_logging: Whether to log detailed metrics (incl. std/min/max).
             architecture_name: Name of the architecture [anakin | sebulba].
             upload_json_data: Whether to upload JSON data to neptune.ai.
-            run_id: ID of the run you wish to resume - None if you don't want to resume the run.
-                Note this will overwrite the run if you restart the step from 0.
+            resume_run_id: ID of the run you wish to *resume* - None if you don't want to resume the
+                run. Note: this will overwrite the run if you restart from step 0.
+            custom_run_id: custom ID of a *new* run.
         """
         # async logging leads to deadlocks in sebulba
         mode = "async" if architecture_name == "anakin" else "sync"
 
-        if run_id is not None:
-            self.logger = neptune.init_run(with_id=run_id, project=project, mode=mode)
+        if resume_run_id is not None:
+            self.logger = neptune.init_run(with_id=resume_run_id, project=project, mode=mode)
         else:
-            self.logger = neptune.init_run(project=project, tags=list(tag), mode=mode)
+            self.logger = neptune.init_run(
+                project=project, custom_run_id=custom_run_id, tags=list(tag), mode=mode
+            )
             self.logger["sys/group_tags"].add(list(group_tag))
 
         self.detailed_logging = detailed_logging

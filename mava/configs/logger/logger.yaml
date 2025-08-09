@@ -16,7 +16,9 @@ loggers:
     # If specified will resume the run with this run ID.
     # This is useful for resuming runs and logging from multiple processes.
     # NOTE: it will overwrite the run unless you set the timestep correctly.
-    run_id: ~
+    resume_run_id: ~
+    # If specified this will start a new neptune run with the custom ID.
+    custom_run_id: ~
     project: Instadeep/mava-benchmark
     tag: [delete]
     group_tag: [delete]
