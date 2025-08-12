@@ -199,7 +199,7 @@ class GymRecordEpisodeMetrics(gymnasium.Wrapper):
     def reset(
         self, seed: Optional[int] = None, options: Optional[dict] = None
     ) -> Tuple[NDArray, Dict]:
-        agents_view, info = self._env.reset(seed, options)
+        agents_view, info = self._env.reset(seed=seed, options=options)
 
         # Reset the metrics
         self.running_count_episode_return = 0.0
