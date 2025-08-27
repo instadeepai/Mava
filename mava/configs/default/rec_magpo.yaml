@@ -1,0 +1,11 @@
+defaults:
+  - logger: logger
+  - arch: anakin
+  - system: gpo/rec_magpo
+  - network: rec_retention
+  - env: rware # [cleaner, connector, vector-connector, gigastep, lbf, matrax, rware, smax, mpe]
+  - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs
