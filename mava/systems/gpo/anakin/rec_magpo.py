@@ -33,6 +33,7 @@ from mava.networks import RecurrentActor as Actor
 from mava.evaluator import  get_eval_fn, get_num_eval_envs, make_rec_eval_act_fn
 from mava.networks import SableNetwork, ScannedRNN
 from mava.networks.utils.sable import get_init_hidden_state
+from mava.networks.distributions import IdentityTransformation
 from mava.systems.gpo.types import GPOTransition as Transition
 from mava.systems.gpo.types import (
     ActorApply,
@@ -238,7 +239,10 @@ def get_learner_fn(
                     # Reshape output
                     actor_policy = backward_reshape(actor_policy)   
                     # Calculate kl loss
-                    kl_loss = tfd.kl_divergence(policy, lax.stop_gradient(actor_policy.distribution))
+                    if isinstance(actor_policy, IdentityTransformation):
+                        kl_loss = tfd.kl_divergence(policy, lax.stop_gradient(actor_policy.distribution))
+                    else:
+                        kl_loss = tfd.kl_divergence(policy, lax.stop_gradient(actor_policy))
                     log_prob_actor = actor_policy.log_prob(traj_batch.action)
         
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
@@ -318,7 +322,10 @@ def get_learner_fn(
                     log_prob_actor = actor_policy.log_prob(traj_batch.action)
 
                     # Calculate kl loss
-                    kl_loss = tfd.kl_divergence(lax.stop_gradient(policy), actor_policy.distribution).mean()
+                    if isinstance(actor_policy, IdentityTransformation):
+                        kl_loss = tfd.kl_divergence(lax.stop_gradient(policy), actor_policy.distribution).mean()
+                    else:
+                        kl_loss = tfd.kl_divergence(lax.stop_gradient(policy), actor_policy).mean()
 
                     # Calculate actor loss
                     ratio = jnp.exp(log_prob_actor - traj_batch.log_prob)
