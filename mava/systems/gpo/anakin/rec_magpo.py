@@ -138,16 +138,16 @@ def get_learner_fn(
 
             # Reset hidden state if done.
             done = timestep.last()
-            last_done = done.repeat(env.num_agents).reshape(config.arch.num_envs, -1)
             done = jnp.expand_dims(done, (1, 2, 3, 4))
             sable_hstates = tree.map(lambda hs: jnp.where(done, jnp.zeros_like(hs), hs), sable_hstates)
 
+            curr_done = done.repeat(env.num_agents).reshape(config.arch.num_envs, -1)
             prev_done = last_timestep.last().repeat(env.num_agents).reshape(num_envs, -1)
             transition = Transition(
                 prev_done, action, value, timestep.reward, log_prob, last_timestep.observation, last_hstates
             )
             hstates = HiddenStates_all(sable_hstates, last_hstates.policy_hidden_state)
-            learner_state = LearnerState(params, opt_states, key, env_state, timestep, last_done, hstates)
+            learner_state = LearnerState(params, opt_states, key, env_state, timestep, curr_done, hstates)
             metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
             return learner_state, (transition, metrics)
 
