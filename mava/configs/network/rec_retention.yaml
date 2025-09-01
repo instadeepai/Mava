@@ -15,7 +15,7 @@ memory_config:
   # For example a chunksize of 2 results in a sequence length of 2 * num_agents because there num_agents observations within a timestep
   # If unspecified, the rollout length is used as the chunk size which means that the entire rollout is computed in parallel during training.
 
-# ---Recurrent Structure Networks---
+# ---Recurrent Structure Networks for MAGPO---
 hidden_state_dim: 128 # The size of the RNN hiddenstate for each agent.
 
 actor_network:
