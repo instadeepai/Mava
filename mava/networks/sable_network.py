@@ -352,7 +352,6 @@ class SableNetwork(nn.Module):
     net_config: SableNetworkConfig
     memory_config: DictConfig
     action_space_type: str = _DISCRETE
-    return_dist: bool = False
 
     def setup(self) -> None:
         if self.action_space_type not in [_DISCRETE, _CONTINUOUS]:
@@ -398,7 +397,6 @@ class SableNetwork(nn.Module):
                 n_agents=self.n_agents,
                 chunk_size=self.memory_config.chunk_size,
                 action_dim=self.action_dim,
-                return_dist=self.return_dist,
             )
             self.autoregressive_act = partial(
                 continuous_autoregressive_act, action_dim=self.action_dim
@@ -408,7 +406,6 @@ class SableNetwork(nn.Module):
                 discrete_train_decoder_fn,
                 n_agents=self.n_agents,
                 chunk_size=self.memory_config.chunk_size,
-                return_dist=self.return_dist,
             )
             self.autoregressive_act = discrete_autoregressive_act  # type: ignore
 
@@ -429,33 +426,19 @@ class SableNetwork(nn.Module):
         value, obs_rep, _ = self.train_encoder_fn(
             encoder=self.encoder, obs=obs, hstate=hstates[0], dones=dones, step_count=step_count
         )
-        if self.return_dist:
-            action_log, entropy, dist = self.train_decoder_fn(
-            decoder=self.decoder,
-            obs_rep=obs_rep,
-            action=action,
-            legal_actions=legal_actions,
-            hstates=hstates[1:],
-            dones=dones,
-            step_count=step_count,
-            rng_key=rng_key,
-            )
-            value = jnp.squeeze(value, axis=-1)
-            return value, action_log, entropy, dist
-        else:
-            action_log, entropy = self.train_decoder_fn(
-                decoder=self.decoder,
-                obs_rep=obs_rep,
-                action=action,
-                legal_actions=legal_actions,
-                hstates=hstates[1:],
-                dones=dones,
-                step_count=step_count,
-                rng_key=rng_key,
-            )
 
-            value = jnp.squeeze(value, axis=-1)
-            return value, action_log, entropy
+        action_log, entropy, dist = self.train_decoder_fn(
+        decoder=self.decoder,
+        obs_rep=obs_rep,
+        action=action,
+        legal_actions=legal_actions,
+        hstates=hstates[1:],
+        dones=dones,
+        step_count=step_count,
+        rng_key=rng_key,
+        )
+        value = jnp.squeeze(value, axis=-1)
+        return value, action_log, entropy, dist
 
     def get_actions(
         self,
