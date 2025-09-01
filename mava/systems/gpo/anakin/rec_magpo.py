@@ -112,7 +112,6 @@ def get_learner_fn(
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
                 - hstates (HiddenStates): The hidden state of the network.
             _ (Any): The current metrics info.
-
         """ 
 
 
