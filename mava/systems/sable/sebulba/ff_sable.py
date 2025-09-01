@@ -216,7 +216,7 @@ def get_learner_step_fn(
                     """Calculate Sable loss."""
                     # Rerun network
                     minibatch_size = traj_batch.action.shape[0]
-                    value, log_prob, entropy = sable_apply_fn(  # type: ignore
+                    value, log_prob, entropy, _ = sable_apply_fn(  # type: ignore
                         params,
                         observation=traj_batch.obs,
                         action=traj_batch.action,
