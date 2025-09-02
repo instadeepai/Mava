@@ -1,4 +1,4 @@
-# Copyright 2025 Yueheng Li
+# Copyright 2022 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,73 +14,83 @@
 import copy
 import time
 from functools import partial
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Tuple
 
-import chex 
+import chex
 import flax
 import hydra
 import jax
 import jax.lax as lax
 import jax.numpy as jnp
 import optax
+import tensorflow_probability.substrates.jax.distributions as tfd
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict as Param
 from jax import tree
-from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
-import tensorflow_probability.substrates.jax.distributions as tfd
+
+from mava.evaluator import get_eval_fn, get_num_eval_envs, make_rec_eval_act_fn
 from mava.networks import RecurrentActor as Actor
-from mava.evaluator import  get_eval_fn, get_num_eval_envs, make_rec_eval_act_fn
 from mava.networks import SableNetwork, ScannedRNN
-from mava.networks.utils.sable import get_init_hidden_state
 from mava.networks.distributions import IdentityTransformation
-from mava.systems.gpo.types import GPOTransition as Transition
+from mava.networks.utils.sable import get_init_hidden_state
 from mava.systems.gpo.types import (
     ActorApply,
-    HiddenStates_all,
     HiddenStates,
     LearnerApply,
-    Params,
     OptStates,
+    Params,
+    SableApply,
+    SableHiddenStates,
 )
 from mava.systems.gpo.types import GPOLearnerState as LearnerState
-from mava.types import Action, ExperimentOutput, LearnerFn, MarlEnv, Metrics
+from mava.systems.gpo.types import GPOTransition as Transition
+from mava.types import ExperimentOutput, LearnerFn, MarlEnv, Metrics
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
 from mava.utils.jax_utils import concat_time_and_agents, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
 
-def forward_reshape(batch_tree, num_agents):
-    def reshape(x):
+
+def forward_reshape(
+    batch_tree: Any,  # PyTree of arrays
+    num_agents: int,
+) -> Any:
+    def reshape(x: chex.Array) -> chex.Array:
         """
         Convert (N, T*A, ...) → (T, N, A, ...)
         """
-        N, TA, *rest = x.shape
-        assert TA % num_agents == 0, "Second dim must be divisible by num_agents"
-        T = TA // num_agents
-        x = x.reshape(N, T, num_agents, *rest)        # (N, T, A, ...)
+        n, ta, *rest = x.shape
+        assert ta % num_agents == 0, "Second dim must be divisible by num_agents"
+        t = ta // num_agents
+        x = x.reshape(n, t, num_agents, *rest)  # (N, T, A, ...)
         x = jnp.transpose(x, (1, 0, 2, *range(3, x.ndim)))  # (T, N, A, ...)
         return x
+
     return tree.map(reshape, batch_tree)
 
-def backward_reshape(batch_tree):
-    def reshape(x):
+
+def backward_reshape(batch_tree: Any) -> Any:
+    def reshape(x: chex.Array) -> chex.Array:
         """
         Convert (T, N, A, ...) → (N, T*A, ...)
         """
-        T, N, A, *rest = x.shape
+        t, n, a, *rest = x.shape
         x = jnp.transpose(x, (1, 0, 2, *range(3, x.ndim)))  # (N, T, A, ...)
-        x = x.reshape(N, T * A, *rest)                     # (N, T*A, ...)
+        x = x.reshape(n, t * a, *rest)  # (N, T*A, ...)
         return x
+
     return tree.map(reshape, batch_tree)
+
 
 def get_learner_fn(
     env: MarlEnv,
-    apply_fns: Tuple[ActorApply, LearnerApply],
+    apply_fns: Tuple[ActorApply, SableApply, LearnerApply],
     update_fn: Tuple[optax.TransformUpdateFn, optax.TransformUpdateFn],
     config: DictConfig,
 ) -> LearnerFn[LearnerState]:
@@ -92,7 +102,6 @@ def get_learner_fn(
     num_envs = config.arch.num_envs
     alpha = config.system.alpha
     n_agents = env.num_agents
-    
 
     def _update_step(learner_state: LearnerState, _: Any) -> Tuple[LearnerState, Tuple]:
         """A single update of the network.
@@ -112,14 +121,15 @@ def get_learner_fn(
                 - last_timestep (TimeStep): The last timestep in the current trajectory.
                 - hstates (HiddenStates): The hidden state of the network.
             _ (Any): The current metrics info.
-        """ 
-
+        """
 
         def _env_step(
             learner_state: LearnerState, _: Any
         ) -> Tuple[LearnerState, Tuple[Transition, Metrics]]:
             """Step the environment."""
-            params, opt_states, key, env_state, last_timestep, last_done, last_hstates = learner_state
+            params, opt_states, key, env_state, last_timestep, last_done, last_hstates = (
+                learner_state
+            )
 
             # Select action
             key, policy_key = jax.random.split(key)
@@ -139,64 +149,52 @@ def get_learner_fn(
             # Reset hidden state if done.
             done = timestep.last()
             done = jnp.expand_dims(done, (1, 2, 3, 4))
-            sable_hstates = tree.map(lambda hs: jnp.where(done, jnp.zeros_like(hs), hs), sable_hstates)
+            sable_hstates = tree.map(
+                lambda hs: jnp.where(done, jnp.zeros_like(hs), hs), sable_hstates
+            )
 
             curr_done = done.repeat(env.num_agents).reshape(config.arch.num_envs, -1)
             prev_done = last_timestep.last().repeat(env.num_agents).reshape(num_envs, -1)
             transition = Transition(
-                prev_done, action, value, timestep.reward, log_prob, last_timestep.observation, last_hstates
+                prev_done,
+                action,
+                value,
+                timestep.reward,
+                log_prob,
+                last_timestep.observation,
+                last_hstates,
             )
-            hstates = HiddenStates_all(sable_hstates, last_hstates.policy_hidden_state)
-            learner_state = LearnerState(params, opt_states, key, env_state, timestep, curr_done, hstates)
+            hstates = HiddenStates(sable_hstates, last_hstates.policy_hidden_state)
+            learner_state = LearnerState(
+                params, opt_states, key, env_state, timestep, curr_done, hstates
+            )
             metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
             return learner_state, (transition, metrics)
 
         # Copy old hidden states: to be used in the training loop
-        prev_sable_hstates = tree.map(lambda x: jnp.copy(x), learner_state.hstates.sable_hidden_state)
+        prev_sable_hstates = tree.map(
+            lambda x: jnp.copy(x), learner_state.hstates.sable_hidden_state
+        )
 
         # Step environment for rollout length
         learner_state, (traj_batch, episode_metrics) = jax.lax.scan(
             _env_step, learner_state, length=config.system.rollout_length
         )
         # Calculate advantage
-        params, opt_states, key, env_state, last_timestep, last_done, updated_hstates = learner_state
+        params, opt_states, key, env_state, last_timestep, last_done, updated_hstates = (
+            learner_state
+        )
         key, last_val_key = jax.random.split(key)
         _, _, last_val, _ = sable_action_select_fn(  # type: ignore
-            params.guider_params, last_timestep.observation, updated_hstates.sable_hidden_state, last_val_key
+            params.guider_params,
+            last_timestep.observation,
+            updated_hstates.sable_hidden_state,
+            last_val_key,
         )
 
-        def _calculate_gae(
-            traj_batch: Transition,
-            current_val: chex.Array,
-            current_done: chex.Array,
-        ) -> Tuple[chex.Array, chex.Array]:
-            """Calculate the GAE."""
-
-            def _get_advantages(
-                carry: Tuple[chex.Array, chex.Array, chex.Array], transition: Transition
-            ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
-                """Calculate the GAE for a single transition."""
-                gae, next_value, next_done = carry
-                done, value, reward = (
-                    transition.done,
-                    transition.value,
-                    transition.reward,
-                )
-                gamma = config.system.gamma
-                delta = reward + gamma * next_value * (1 - next_done) - value
-                gae = delta + gamma * config.system.gae_lambda * (1 - next_done) * gae
-                return (gae, value, done), gae
-
-            _, advantages = jax.lax.scan(
-                _get_advantages,
-                (jnp.zeros_like(current_val), current_val, current_done),
-                traj_batch,
-                reverse=True,
-                unroll=16,
-            )
-            return advantages, advantages + traj_batch.value
-
-        advantages, targets = _calculate_gae(traj_batch, last_val, last_done)
+        advantages, targets = calculate_gae(
+            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+        )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
@@ -212,7 +210,7 @@ def get_learner_fn(
                     traj_batch: Transition,
                     gae: chex.Array,
                     value_targets: chex.Array,
-                    prev_hstates: HiddenStates,
+                    prev_hstates: SableHiddenStates,
                     rng_key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate Sable loss."""
@@ -227,37 +225,43 @@ def get_learner_fn(
                     )
 
                     # Reshape inputs
-                    obs, done, hidden = forward_reshape((traj_batch.obs, 
-                                                         traj_batch.done, 
-                                                         traj_batch.hstates.policy_hidden_state),
-                                                         n_agents)
-                    obs_and_done = (obs, done)
-                    _, actor_policy = actor_apply_fn(
-                        actor_params, hidden[0], obs_and_done
+                    obs, done, hidden = forward_reshape(
+                        (traj_batch.obs, traj_batch.done, traj_batch.hstates.policy_hidden_state),
+                        n_agents,
                     )
+                    obs_and_done = (obs, done)
+                    _, actor_policy = actor_apply_fn(actor_params, hidden[0], obs_and_done)
                     # Reshape output
-                    actor_policy = backward_reshape(actor_policy)   
+                    actor_policy = backward_reshape(actor_policy)
                     # Calculate kl loss
                     if isinstance(actor_policy, IdentityTransformation):
-                        kl_loss = tfd.kl_divergence(policy, lax.stop_gradient(actor_policy.distribution))
+                        kl_loss = tfd.kl_divergence(
+                            policy, lax.stop_gradient(actor_policy.distribution)
+                        )
                     else:
                         kl_loss = tfd.kl_divergence(policy, lax.stop_gradient(actor_policy))
                     log_prob_actor = actor_policy.log_prob(traj_batch.action)
-        
+
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
                     # Double clip function
                     clipped_ratio = jnp.exp(
                         jnp.clip(
-                            log_prob - log_prob_actor, 
-                            jnp.log(1/config.system.clip_gpo),
+                            log_prob - log_prob_actor,
+                            jnp.log(1 / config.system.clip_gpo),
                             jnp.log(config.system.clip_gpo),
-                        ) + log_prob_actor - traj_batch.log_prob)
+                        )
+                        + log_prob_actor
+                        - traj_batch.log_prob
+                    )
                     # Mask kl loss
-                    coe = jnp.select([
-                            log_prob-log_prob_actor< jnp.log(1/config.system.clip_gpo), 
-                            log_prob-log_prob_actor> jnp.log(config.system.clip_gpo)
-                            ],
-                            [1,1],0) 
+                    coe = jnp.select(
+                        [
+                            log_prob - log_prob_actor < jnp.log(1 / config.system.clip_gpo),
+                            log_prob - log_prob_actor > jnp.log(config.system.clip_gpo),
+                        ],
+                        [1, 1],
+                        0,
+                    )
                     kl_loss = (kl_loss * coe).mean()
                     # Nomalise advantage at minibatch level
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
@@ -283,7 +287,8 @@ def get_learner_fn(
                     value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
                     total_loss = (
-                        guider_loss + kl_loss 
+                        guider_loss
+                        + kl_loss
                         - config.system.ent_coef * entropy
                         + config.system.vf_coef * value_loss
                     )
@@ -307,22 +312,22 @@ def get_learner_fn(
                         rng_key,
                     )
                     # Reshape inputs
-                    obs, done, hidden = forward_reshape((traj_batch.obs, 
-                                                         traj_batch.done, 
-                                                         traj_batch.hstates.policy_hidden_state),
-                                                         n_agents)
-                    obs_and_done = (obs, done)
-                    
-                    _, actor_policy = actor_apply_fn(
-                        actor_params, hidden[0], obs_and_done
+                    obs, done, hidden = forward_reshape(
+                        (traj_batch.obs, traj_batch.done, traj_batch.hstates.policy_hidden_state),
+                        n_agents,
                     )
+                    obs_and_done = (obs, done)
+
+                    _, actor_policy = actor_apply_fn(actor_params, hidden[0], obs_and_done)
                     # Reshape output
-                    actor_policy = backward_reshape(actor_policy) 
+                    actor_policy = backward_reshape(actor_policy)
                     log_prob_actor = actor_policy.log_prob(traj_batch.action)
 
                     # Calculate kl loss
                     if isinstance(actor_policy, IdentityTransformation):
-                        kl_loss = tfd.kl_divergence(lax.stop_gradient(policy), actor_policy.distribution).mean()
+                        kl_loss = tfd.kl_divergence(
+                            lax.stop_gradient(policy), actor_policy.distribution
+                        ).mean()
                     else:
                         kl_loss = tfd.kl_divergence(lax.stop_gradient(policy), actor_policy).mean()
 
@@ -342,11 +347,9 @@ def get_learner_fn(
                     actor_loss = -jnp.minimum(actor_loss1, actor_loss2)
                     actor_loss = actor_loss.mean()
 
-                    total_loss = (
-                        actor_loss * alpha + kl_loss
-                    )
+                    total_loss = actor_loss * alpha + kl_loss
                     return total_loss, (actor_loss, kl_loss)
-         
+
                 # Calculate loss
                 key, entropy_key = jax.random.split(key)
                 guider_grad_fn = jax.value_and_grad(_guider_loss_fn, has_aux=True)
@@ -370,9 +373,13 @@ def get_learner_fn(
 
                 # Compute the parallel mean (pmean) over the batch.
                 # This pmean could be a regular mean as the batch axis is on the same device.
-                guider_grads, guider_loss_info = jax.lax.pmean((guider_grads, guider_loss_info), axis_name="batch")
+                guider_grads, guider_loss_info = jax.lax.pmean(
+                    (guider_grads, guider_loss_info), axis_name="batch"
+                )
                 # pmean over devices.
-                guider_grads, guider_loss_info = jax.lax.pmean((guider_grads, guider_loss_info), axis_name="device")
+                guider_grads, guider_loss_info = jax.lax.pmean(
+                    (guider_grads, guider_loss_info), axis_name="device"
+                )
 
                 actor_grads, actor_loss_info = jax.lax.pmean(
                     (actor_grads, actor_loss_info), axis_name="batch"
@@ -383,7 +390,9 @@ def get_learner_fn(
                 )
 
                 # Update params and optimiser state
-                guider_updates, guider_new_opt_state = sable_update_fn(guider_grads, opt_states.guider_opt_state)
+                guider_updates, guider_new_opt_state = sable_update_fn(
+                    guider_grads, opt_states.guider_opt_state
+                )
                 guider_new_params = optax.apply_updates(params.guider_params, guider_updates)
                 # Update params and optimiser state
                 actor_updates, actor_new_opt_state = actor_update_fn(
@@ -405,6 +414,7 @@ def get_learner_fn(
                     "entropy": entropy,
                 }
                 return (new_params, new_opt_state, key), loss_info
+
             (params, opt_states, traj_batch, advantages, targets, key, prev_hstates) = update_state
             # Shuffle minibatches
             key, batch_shuffle_key, agent_shuffle_key, entropy_key = jax.random.split(key, 4)
@@ -431,7 +441,7 @@ def get_learner_fn(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 prev_hstates,
             )
-            
+
             # UPDATE MINIBATCHES
             (params, opt_states, entropy_key), loss_info = jax.lax.scan(
                 _update_minibatch,
@@ -439,11 +449,18 @@ def get_learner_fn(
                 (*minibatches, prev_hs_minibatch),
             )
 
-
             update_state = (params, opt_states, traj_batch, advantages, targets, key, prev_hstates)
             return update_state, loss_info
 
-        update_state = (params, opt_states, traj_batch, advantages, targets, key, prev_sable_hstates)
+        update_state = (
+            params,
+            opt_states,
+            traj_batch,
+            advantages,
+            targets,
+            key,
+            prev_sable_hstates,
+        )
 
         # Update epochs
         update_state, loss_info = jax.lax.scan(
@@ -484,7 +501,7 @@ def get_learner_fn(
         learner_state, (episode_info, loss_info) = jax.lax.scan(
             batched_update_step, learner_state, None, config.system.num_updates_per_eval
         )
- 
+
         return ExperimentOutput(
             learner_state=learner_state,
             episode_metrics=episode_info,
@@ -496,7 +513,7 @@ def get_learner_fn(
 
 def learner_setup(
     env: MarlEnv, keys: chex.Array, config: DictConfig
-) -> Tuple[LearnerFn[LearnerState], Callable, LearnerState]:
+) -> Tuple[LearnerFn[LearnerState], Actor, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
     n_devices = len(jax.devices())
@@ -511,7 +528,7 @@ def learner_setup(
     action_dim = env.action_dim
     n_agents = env.num_agents
     config.system.num_agents = n_agents
- 
+
     # Setting the chunksize - smaller chunks save memory at the cost of speed
     if config.network.memory_config.timestep_chunk_size:
         config.network.memory_config.chunk_size = (
@@ -528,7 +545,7 @@ def learner_setup(
         action_dim=action_dim,
         net_config=config.network.net_config,
         memory_config=config.network.memory_config,
-        action_space_type=action_space_type
+        action_space_type=action_space_type,
     )
     # Define network
     actor_pre_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
@@ -557,7 +574,7 @@ def learner_setup(
     init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs0)  # Add batch dim
     init_hs = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
     init_hs = tree.map(lambda x: x[0, jnp.newaxis], init_hs)
-    
+
     # Initialise params and optimiser state.
     guider_params = sable_network.init(
         net_key,
@@ -567,7 +584,7 @@ def learner_setup(
         method="get_actions",
     )
     guider_opt_state = guider_optim.init(guider_params)
-    
+
     # Initialise observation with obs of all agents.
     init_obs = tree.map(
         lambda x: jnp.repeat(x[jnp.newaxis, ...], config.arch.num_envs, axis=0),
@@ -635,7 +652,7 @@ def learner_setup(
     init_hstates = flax.jax_utils.replicate(init_hstates, devices=jax.devices())
     # Initialise learner state.
     params, opt_states, step_keys, init_policy_hstate, dones = replicate_learner
-    hstates = HiddenStates_all(init_hstates, init_policy_hstate)
+    hstates = HiddenStates(init_hstates, init_policy_hstate)
     init_learner_state = LearnerState(
         params=params,
         opt_states=opt_states,
@@ -665,9 +682,7 @@ def run_experiment(_config: DictConfig) -> float:
     )
 
     # Setup learner.
-    learn, actor_network, learner_state = learner_setup(
-        env, (key, actor_net_key, net_key), config
-    )
+    learn, actor_network, learner_state = learner_setup(env, (key, actor_net_key, net_key), config)
 
     # Setup evaluator.
     # One key per device for evaluation.
@@ -798,6 +813,4 @@ def hydra_entry_point(cfg: DictConfig) -> float:
 
 
 if __name__ == "__main__":
-    
     hydra_entry_point()
-

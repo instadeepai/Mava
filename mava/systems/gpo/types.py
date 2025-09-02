@@ -18,12 +18,16 @@ from chex import Array, PRNGKey
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
 from optax._src.base import OptState
+from tensorflow_probability.substrates.jax.distributions import Distribution
 from typing_extensions import NamedTuple
+
 
 class Params(NamedTuple):
     """Parameters of an actor critic network."""
+
     guider_params: FrozenDict
     actor_params: FrozenDict
+
 
 class OptStates(NamedTuple):
     """OptStates of actor critic learner."""
@@ -40,17 +44,18 @@ class SableNetworkConfig(NamedTuple):
     embed_dim: int
 
 
-class HiddenStates(NamedTuple):
+class SableHiddenStates(NamedTuple):
     """Hidden states for the encoder and decoder."""
 
     encoder: Array
     decoder_self_retn: Array
     decoder_cross_retn: Array
 
-class HiddenStates_all(NamedTuple):
+
+class HiddenStates(NamedTuple):
     """Hidden states for the encoder and decoder."""
 
-    sable_hidden_state: HiddenStates
+    sable_hidden_state: SableHiddenStates
     policy_hidden_state: Array
 
 
@@ -63,7 +68,8 @@ class GPOLearnerState(NamedTuple):
     env_state: Array
     timestep: TimeStep
     dones: Array
-    hstates: HiddenStates_all
+    hstates: HiddenStates
+
 
 class GPOTransition(NamedTuple):
     """Transition tuple for PPO."""
@@ -74,14 +80,15 @@ class GPOTransition(NamedTuple):
     reward: Array
     log_prob: Array
     obs: Array
-    hstates: HiddenStates_all
-    
+    hstates: HiddenStates
 
 
 ActorApply = Callable[
     [FrozenDict, Array, Array, HiddenStates, PRNGKey],
     Tuple[Array, Array, Array, Array, HiddenStates],
 ]
-LearnerApply = Callable[
-    [FrozenDict, Array, Array, Array, HiddenStates, Array, PRNGKey], Tuple[Array, Array, Array]
+SableApply = Callable[
+    [FrozenDict, Array, Array, Array, HiddenStates, Array, PRNGKey],
+    Tuple[Array, Array, Array, Distribution],
 ]
+LearnerApply = Callable[[FrozenDict, Array, Array], Tuple[Array, Distribution]]

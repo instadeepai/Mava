@@ -416,7 +416,7 @@ class SableNetwork(nn.Module):
         hstates: HiddenStates,
         dones: chex.Array,
         rng_key: Optional[chex.PRNGKey] = None,
-    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
+    ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array]:
         """Training phase."""
         obs, legal_actions, step_count = (
             observation.agents_view,
@@ -428,14 +428,14 @@ class SableNetwork(nn.Module):
         )
 
         action_log, entropy, dist = self.train_decoder_fn(
-        decoder=self.decoder,
-        obs_rep=obs_rep,
-        action=action,
-        legal_actions=legal_actions,
-        hstates=hstates[1:],
-        dones=dones,
-        step_count=step_count,
-        rng_key=rng_key,
+            decoder=self.decoder,
+            obs_rep=obs_rep,
+            action=action,
+            legal_actions=legal_actions,
+            hstates=hstates[1:],
+            dones=dones,
+            step_count=step_count,
+            rng_key=rng_key,
         )
         value = jnp.squeeze(value, axis=-1)
         return value, action_log, entropy, dist

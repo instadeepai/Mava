@@ -18,6 +18,7 @@ from chex import Array, PRNGKey
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
 from optax._src.base import OptState
+from tensorflow_probability.substrates.jax.distributions import Distribution
 from typing_extensions import NamedTuple
 
 
@@ -63,5 +64,6 @@ ActorApply = Callable[
     Tuple[Array, Array, Array, Array, HiddenStates],
 ]
 LearnerApply = Callable[
-    [FrozenDict, Array, Array, Array, HiddenStates, Array, PRNGKey], Tuple[Array, Array, Array]
+    [FrozenDict, Array, Array, Array, HiddenStates, Array, PRNGKey],
+    Tuple[Array, Array, Array, Distribution],
 ]

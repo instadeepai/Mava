@@ -44,7 +44,7 @@ def discrete_train_decoder_fn(
     n_agents: int,
     chunk_size: int,
     rng_key: Optional[chex.PRNGKey] = None,
-) -> Tuple[chex.Array, chex.Array]:
+) -> Tuple[chex.Array, chex.Array, chex.Array]:
     """Parallel action sampling for discrete action spaces."""
     # Delete `rng_key` since it is not used in discrete action space
     del rng_key
@@ -81,7 +81,6 @@ def discrete_train_decoder_fn(
     action_log_prob = distribution.log_prob(action)
 
     return action_log_prob, distribution.entropy(), distribution
-
 
 
 def get_shifted_discrete_actions(
@@ -166,7 +165,7 @@ def continuous_train_decoder_fn(
     chunk_size: int,
     action_dim: int,
     rng_key: Optional[chex.PRNGKey] = None,
-) -> Tuple[chex.Array, chex.Array]:
+) -> Tuple[chex.Array, chex.Array, chex.Array]:
     """Parallel action sampling for discrete action spaces."""
     # Delete `legal_actions` since it is not used in continuous action space
     del legal_actions
