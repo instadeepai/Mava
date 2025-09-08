@@ -21,6 +21,5 @@ ent_coef: 0.01 # Entropy regularisation term for loss function.
 vf_coef: 0.5 # Critic weight in
 max_grad_norm: 0.5 # Maximum norm of the gradients for a weight update.
 decay_learning_rates: False # Whether learning rates should be linearly decayed during training.
-target_kl: 0.01
-clip_gpo: 1.5
-alpha: 1
+clip_gpo: 1.5 # Clipping value for the constraint between guider and learner.
+alpha: 1 # Weight of the learner RL auxiliary loss.

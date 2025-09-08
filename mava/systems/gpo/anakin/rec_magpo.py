@@ -215,7 +215,7 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate Sable loss."""
                     # Rerun network
-                    value, log_prob, entropy, policy = sable_apply_fn(  # type: ignore
+                    value, guider_log_prob, guider_entropy, guider_policy = sable_apply_fn(  # type: ignore
                         guider_params,
                         traj_batch.obs,
                         traj_batch.action,
@@ -231,38 +231,39 @@ def get_learner_fn(
                     )
                     obs_and_done = (obs, done)
                     _, actor_policy = actor_apply_fn(actor_params, hidden[0], obs_and_done)
-                    # Reshape output
+                    # Reshape the policy distribution (not just the logits)
                     actor_policy = backward_reshape(actor_policy)
                     # Calculate kl loss
+                    # Use .distribution since tfd.kl_divergence can't handle IdentityTransformation
                     if isinstance(actor_policy, IdentityTransformation):
                         kl_loss = tfd.kl_divergence(
-                            policy, lax.stop_gradient(actor_policy.distribution)
+                            guider_policy, lax.stop_gradient(actor_policy.distribution)
                         )
                     else:
-                        kl_loss = tfd.kl_divergence(policy, lax.stop_gradient(actor_policy))
-                    log_prob_actor = actor_policy.log_prob(traj_batch.action)
+                        kl_loss = tfd.kl_divergence(guider_policy, lax.stop_gradient(actor_policy))
+                    actor_log_prob = actor_policy.log_prob(traj_batch.action)
 
-                    ratio = jnp.exp(log_prob - traj_batch.log_prob)
+                    ratio = jnp.exp(guider_log_prob - traj_batch.log_prob)
                     # Double clip function
                     clipped_ratio = jnp.exp(
                         jnp.clip(
-                            log_prob - log_prob_actor,
+                            guider_log_prob - actor_log_prob,
                             jnp.log(1 / config.system.clip_gpo),
                             jnp.log(config.system.clip_gpo),
                         )
-                        + log_prob_actor
+                        + actor_log_prob
                         - traj_batch.log_prob
                     )
-                    # Mask kl loss
-                    coe = jnp.select(
+                    # Mask the kl loss 
+                    mask = jnp.select(
                         [
-                            log_prob - log_prob_actor < jnp.log(1 / config.system.clip_gpo),
-                            log_prob - log_prob_actor > jnp.log(config.system.clip_gpo),
+                            guider_log_prob - actor_log_prob < jnp.log(1 / config.system.clip_gpo),
+                            guider_log_prob - actor_log_prob > jnp.log(config.system.clip_gpo),
                         ],
                         [1, 1],
                         0,
                     )
-                    kl_loss = (kl_loss * coe).mean()
+                    kl_loss = (kl_loss * mask).mean()
                     # Nomalise advantage at minibatch level
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
                     guider_loss1 = ratio * gae
@@ -276,7 +277,7 @@ def get_learner_fn(
                     )
                     guider_loss = -jnp.minimum(guider_loss1, guider_loss2)
                     guider_loss = guider_loss.mean()
-                    entropy = entropy.mean()
+                    guider_entropy = guider_entropy.mean()
 
                     # Clipped MSE loss
                     value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
@@ -289,10 +290,10 @@ def get_learner_fn(
                     total_loss = (
                         guider_loss
                         + kl_loss
-                        - config.system.ent_coef * entropy
+                        - config.system.ent_coef * guider_entropy
                         + config.system.vf_coef * value_loss
                     )
-                    return total_loss, (guider_loss, entropy, value_loss, kl_loss)
+                    return total_loss, (guider_loss, guider_entropy, value_loss, kl_loss)
 
                 def _actor_loss_fn(
                     actor_params: Param,
@@ -303,7 +304,7 @@ def get_learner_fn(
                 ) -> Tuple:
                     """Calculate Sable loss."""
                     # Rerun network
-                    _, _, _, policy = sable_apply_fn(  # type: ignore
+                    _, _, _, guider_policy = sable_apply_fn(  # type: ignore
                         guider_params,
                         traj_batch.obs,
                         traj_batch.action,
@@ -319,20 +320,21 @@ def get_learner_fn(
                     obs_and_done = (obs, done)
 
                     _, actor_policy = actor_apply_fn(actor_params, hidden[0], obs_and_done)
-                    # Reshape output
+                    # Reshape the policy distribution (not just the logits)
                     actor_policy = backward_reshape(actor_policy)
-                    log_prob_actor = actor_policy.log_prob(traj_batch.action)
+                    actor_log_prob = actor_policy.log_prob(traj_batch.action)
 
                     # Calculate kl loss
+                    # Use .distribution since tfd.kl_divergence can't handle IdentityTransformation
                     if isinstance(actor_policy, IdentityTransformation):
                         kl_loss = tfd.kl_divergence(
-                            lax.stop_gradient(policy), actor_policy.distribution
+                            lax.stop_gradient(guider_policy), actor_policy.distribution
                         ).mean()
                     else:
-                        kl_loss = tfd.kl_divergence(lax.stop_gradient(policy), actor_policy).mean()
+                        kl_loss = tfd.kl_divergence(lax.stop_gradient(guider_policy), actor_policy).mean()
 
                     # Calculate actor loss
-                    ratio = jnp.exp(log_prob_actor - traj_batch.log_prob)
+                    ratio = jnp.exp(actor_log_prob - traj_batch.log_prob)
                     # Nomalise advantage at minibatch level
                     gae = (gae - gae.mean()) / (gae.std() + 1e-8)
                     actor_loss1 = ratio * gae

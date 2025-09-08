@@ -2,7 +2,7 @@ defaults:
   - logger: logger
   - arch: anakin
   - system: gpo/rec_magpo
-  - network: rec_retention
+  - network: magpo
   - env: rware # [cleaner, connector, vector-connector, gigastep, lbf, matrax, rware, smax, mpe]
   - _self_
 
