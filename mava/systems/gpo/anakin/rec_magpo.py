@@ -254,7 +254,7 @@ def get_learner_fn(
                         + actor_log_prob
                         - traj_batch.log_prob
                     )
-                    # Mask the kl loss 
+                    # Mask the kl loss
                     mask = jnp.select(
                         [
                             guider_log_prob - actor_log_prob < jnp.log(1 / config.system.clip_gpo),
@@ -331,7 +331,9 @@ def get_learner_fn(
                             lax.stop_gradient(guider_policy), actor_policy.distribution
                         ).mean()
                     else:
-                        kl_loss = tfd.kl_divergence(lax.stop_gradient(guider_policy), actor_policy).mean()
+                        kl_loss = tfd.kl_divergence(
+                            lax.stop_gradient(guider_policy), actor_policy
+                        ).mean()
 
                     # Calculate actor loss
                     ratio = jnp.exp(actor_log_prob - traj_batch.log_prob)
