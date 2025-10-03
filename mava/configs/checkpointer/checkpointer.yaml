@@ -1,0 +1,17 @@
+# --- Checkpointing options ---
+save:
+  use: false
+  path: "checkpoints/"  # Points to folder containing all checkpoints. Can be relative or absolute
+  uid: ~                # Folder name for this checkpoint. Auto-generated if left null
+
+  # Decides which checkpoints to keep
+  preservation_policy:
+    num_latest: 1
+    num_best: 1
+
+load:
+  use: false
+  path: "checkpoints/"   # Points to folder containing all checkpoints. Can be relative or absolute
+  uid: ~                 # Folder name for this checkpoint, must be set
+  # Which step to load
+  step: best  # latest | best | an int > 0

@@ -12,195 +12,149 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
+
 import warnings
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple, Type
+from typing import Any, Callable, Dict, Mapping, Tuple
 
-import absl.logging as absl_logging
-import orbax.checkpoint
-from chex import Numeric
-from jax import tree
-from omegaconf import DictConfig, OmegaConf
-
-from mava.types import MavaState
-
-# Keep track of the version of the checkpointer
-# Any breaking API changes should be reflected in the major version (e.g. v0.1 -> v1.0)
-# whereas minor versions (e.g. v0.1 -> v0.2) indicate backwards compatibility
-CHECKPOINTER_VERSION = 2.0
+import orbax.checkpoint as ocp
+from etils import epath
+from omegaconf.dictconfig import DictConfig
+from omegaconf.omegaconf import OmegaConf
+from orbax.checkpoint.checkpoint_managers import AnyPreservationPolicy, BestN, LatestN
 
 
-class Checkpointer:
-    """Model checkpointer for saving and restoring the `learner_state`."""
+def best_fn(metrics: Dict[str, float]) -> float:
+    """Default function to determine performance of checkpoint. Uses `metrics['episode_return']`."""
+    return metrics["episode_return"]
 
-    def __init__(
-        self,
-        model_name: str,
-        metadata: Optional[Dict] = None,
-        rel_dir: str = "checkpoints",
-        checkpoint_uid: Optional[str] = None,
-        save_interval_steps: int = 1,
-        max_to_keep: Optional[int] = 1,
-        keep_period: Optional[int] = None,
-    ):
-        """Initialise the checkpointer tool
 
-        Args:
-        ----
-            model_name (str): Name of the model to be saved.
-            metadata (Optional[Dict], optional):
-                For storing model metadata. Defaults to None.
-            rel_dir (str, optional):
-                Relative directory of checkpoints. Defaults to "checkpoints".
-            checkpoint_uid (Optional[str], optional):
-                Set the uniqiue id of the checkpointer, rel_dir/model_name/checkpoint_uid/...
-                If not given, the timestamp is used.
-            save_interval_steps (int, optional):
-                The interval at which checkpoints should be saved. Defaults to 1.
-            max_to_keep (Optional[int], optional):
-                Maximum number of checkpoints to keep. Defaults to 1.
-            keep_period (Optional[int], optional):
-                If set, will not delete any checkpoint where
-                checkpoint_step % keep_period == 0. Defaults to None.
+def make_checkpointer(
+    cfg: DictConfig, best_fn: Callable[[Dict[str, float]], float] = best_fn
+) -> ocp.CheckpointManager:
+    """Initializes and returns an Orbax CheckpointManager based on the config.
 
-        """
-        # When we load an existing checkpoint, the sharding info is read from the checkpoint file,
-        # rather than from 'RestoreArgs'. This is desired behaviour, so we suppress the warning.
-        warnings.filterwarnings(
-            action="ignore",
-            category=UserWarning,
-            message="Couldn't find sharding info under RestoreArgs",
+    This function configures a CheckpointManager for saving model checkpoints.
+    It constructs a save directory based on the provided configuration, sets up
+    a preservation policy to keep both the latest and the best checkpoints,
+    and embeds the experiment's configuration as metadata within the checkpoint
+    directory.
+
+    Args:
+        cfg (DictConfig): The Hydra configuration object. It should contain
+            settings for the checkpointer path (`cfg.checkpointer.save.path`),
+            the system name (`cfg.logger.system_name`), a unique ID
+            (`cfg.checkpointer.save.uid`), and preservation policy settings
+            (`cfg.checkpointer.save.preservation_policy`).
+        best_fn (Callable[[Dict[str, float]], float]): A function that takes a
+            metrics dictionary and returns a float value used to determine the
+            "best" checkpoint. Defaults to a function that uses
+            `metrics["episode_return"]`.
+
+    Returns:
+        ocp.CheckpointManager: An initialized Orbax CheckpointManager ready for saving.
+
+    Raises:
+        AssertionError: If `cfg.checkpointer.save.use` is False
+
+    Example Usage:
+        ```
+        from orbax.checkpoint.args import Composite, StandardSave
+
+        chkptr = make_checkpointer(cfg)
+        chkptr.save(
+            step,
+            args=Composite(
+                params=StandardSave(learner_state.params),
+                opt_states=StandardSave(learner_state.opt_states),
+            ),
         )
+        ```
+    """
+    assert cfg.checkpointer.save.use, f"Can't checkpoint if {cfg.checkpointer.save.use=}"
+    # If uid is None then make it date-time
+    uid = cfg.checkpointer.save.uid
+    if uid is None:
+        uid = datetime.now().strftime("%Y%m%d%H%M%S")
+        print(f"cfg.checkpointer.save.uid not found, creating {uid=}")
+    # if path is relative then make it absolute
+    path = epath.Path(cfg.checkpointer.save.path, cfg.logger.system_name, uid).resolve()
 
-        orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
-        checkpoint_str = (
-            checkpoint_uid if checkpoint_uid else datetime.now().strftime("%Y%m%d%H%M%S")
+    # TODO: check that this works with mngr.latest_step() and mngr.best_step()
+    # Determines which checkpoints to keep
+    best_to_keep = BestN(
+        get_metric_fn=best_fn,
+        n=cfg.checkpointer.save.preservation_policy.num_best,
+        keep_checkpoints_without_metrics=False,
+    )
+    latest_to_keep = LatestN(n=cfg.checkpointer.save.preservation_policy.num_latest)
+    preservation_policy = AnyPreservationPolicy([best_to_keep, latest_to_keep])
+
+    options = ocp.CheckpointManagerOptions(create=True, preservation_policy=preservation_policy)
+    mngr = ocp.CheckpointManager(
+        path,
+        options=options,
+        metadata=OmegaConf.to_container(cfg, resolve=True),  # type: ignore
+    )
+
+    return mngr
+
+
+def load_checkpoint(cfg: DictConfig) -> Tuple[Mapping[str, Any], Mapping[str, Any]]:
+    """Loads a checkpoint and its associated configuration from a path specified in config.
+
+    This function restores a saved training state. It locates the checkpoint
+    directory using the provided configuration, determines which specific step
+    to load ('latest', 'best', or a specific integer), and restores the
+    checkpoint data. It also returns the original configuration that was
+    saved with the checkpoint.
+
+    Args:
+        cfg (DictConfig): The Hydra configuration object for loading. It must
+            specify the load path (`cfg.checkpointer.load.path`), the system
+            name (`cfg.logger.system_name`), the unique ID of the run
+            (`cfg.checkpointer.load.uid`), and which step to load
+            (`cfg.checkpointer.load.step`).
+
+    Returns:
+        Tuple[Any, dict]: A tuple containing:
+            - The restored checkpoint data (e.g., model parameters, optimizer state).
+            - The configuration dictionary that was saved with the checkpoint.
+
+    Raises:
+        AssertionError: If `cfg.checkpointer.load.use` is False or if
+            `cfg.checkpointer.load.uid` is not provided.
+        ValueError: If `cfg.checkpointer.load.step` is not a positive integer,
+            'latest', or 'best'.
+    """
+    assert cfg.checkpointer.load.use, f"Can't checkpoint if {cfg.checkpointer.load.use=}"
+    assert cfg.checkpointer.load.uid is not None, f"Can't checkpoint: {cfg.checkpointer.load.uid=}"
+
+    path = epath.Path(cfg.checkpointer.load.path, cfg.logger.system_name, cfg.checkpointer.load.uid)
+    path = path.resolve()
+    _step = cfg.checkpointer.load.step
+
+    mngr = ocp.CheckpointManager(path)
+
+    # Warn if the config.logger.system_name doesn't match the loaded system's config
+    load_cfg = mngr.metadata().custom_metadata
+    load_system_name = load_cfg["logger"]["system_name"]  # type: ignore
+    if load_system_name != cfg.logger.system_name:
+        warn = (
+            f"Loading system ({load_system_name}) "
+            f"doesn't match current system ({cfg.logger.system_name})"
         )
+        warnings.warn(warn, stacklevel=1)
 
-        options = orbax.checkpoint.CheckpointManagerOptions(
-            create=True,
-            best_fn=lambda x: x["episode_return"],
-            best_mode="max",
-            save_interval_steps=save_interval_steps,
-            max_to_keep=max_to_keep,
-            keep_period=keep_period,
-        )
+    # Get step from config
+    if isinstance(_step, int) and _step > 0:
+        step = _step
+    elif _step == "latest":
+        step = mngr.latest_step()
+    elif _step == "best":
+        step = mngr.best_step()
+    else:
+        err = f"Unrecognised {cfg.checkpointer.load.step=}. Expected int > 0 or 'latest' or 'best'"
+        raise ValueError(err)
 
-        def get_json_ready(obj: Any) -> Any:
-            if not isinstance(obj, (bool, str, int, float, type(None))):
-                return str(obj)
-            else:
-                return obj
-
-        # Convert metadata to JSON-ready format
-        if metadata is not None and isinstance(metadata, DictConfig):
-            metadata = OmegaConf.to_container(metadata, resolve=True)
-        metadata_json_ready = tree.map(get_json_ready, metadata)
-
-        self._manager = orbax.checkpoint.CheckpointManager(
-            directory=os.path.join(os.getcwd(), rel_dir, model_name, checkpoint_str),
-            checkpointers=orbax_checkpointer,
-            options=options,
-            metadata={
-                "checkpointer_version": CHECKPOINTER_VERSION,
-                **(metadata_json_ready if metadata_json_ready is not None else {}),
-            },
-        )
-
-        # Don't log checkpointing messages (at INFO level)
-        absl_logging.set_verbosity(absl_logging.WARNING)
-
-    def save(
-        self,
-        timestep: int,
-        unreplicated_learner_state: MavaState,
-        episode_return: Numeric = 0.0,
-    ) -> bool:
-        """Save the learner state.
-
-        Args:
-        ----
-            timestep (int):
-                timestep at which the state is being saved.
-            unreplicated_learner_state (MavaState)
-                a Mava LearnerState (must be unreplicated)
-            episode_return (Numeric, optional):
-                Optional value to determine whether this is the 'best' model to save.
-                Defaults to 0.0.
-
-        Returns:
-        -------
-            bool: whether the saving was successful.
-
-        """
-        model_save_success: bool = self._manager.save(
-            step=timestep,
-            items={
-                "learner_state": unreplicated_learner_state,
-            },
-            # TODO: Log other metrics if needed.
-            metrics={"episode_return": float(episode_return)},
-        )
-        return model_save_success
-
-    def restore_params(
-        self,
-        input_params: Any,
-        timestep: Optional[int] = None,
-        restore_hstates: bool = False,
-        THiddenState: Optional[Type] = None,  # noqa: N803
-    ) -> Tuple[Any, Optional[Any]]:
-        """Restore the params and the hidden state (in case of RNNs)
-
-        Args:
-        ----
-            input_params (Any): A pytree of FrozenDict params of the learner.
-            timestep (Optional[int]):
-                Specific timestep for restoration (of course, only if that timestep exists).
-                Defaults to None, in which case the latest step will be used.
-            restore_hstates (bool, optional): Whether to restore the hidden states.
-            THiddenState (Type): The type of the hidden states to be restored.
-
-        Returns:
-        -------
-            Tuple[Params,Union[HiddenState, None]]: the restored params and hidden states.
-
-        """
-        # We want to ensure `major` versions match, but allow `minor` versions to differ
-        # i.e. v0.1 and 0.2 are compatible, but v1.0 and v2.0 are not
-        # Any breaking API changes should be reflected in the major version
-        assert (self._manager.metadata()["checkpointer_version"] // 1) == (
-            CHECKPOINTER_VERSION // 1
-        ), "Loaded checkpoint was created with a different major version of the checkpointer."
-
-        # Restore the checkpoint, either the n-th (if specified) or just the latest
-        restored_checkpoint = self._manager.restore(
-            timestep if timestep else self._manager.latest_step()
-        )
-
-        # Dictionary of the restored learner state
-        restored_learner_state_raw = restored_checkpoint["learner_state"]
-
-        # The type of params to restore is the same type as the `input_params`
-        TParams = type(input_params)  # noqa: N806
-
-        # We no longer check if params are in a FrozenDict since we require Flax >= 0.8.1
-        restored_params = TParams(**restored_learner_state_raw["params"])
-
-        # Restore hidden states if required
-        restored_hstates = None
-        if restore_hstates and THiddenState is not None:
-            restored_hstates = THiddenState(**restored_learner_state_raw["hstates"])
-
-        return restored_params, restored_hstates
-
-    def get_cfg(self) -> DictConfig:
-        """Return the metadata of the checkpoint.
-
-        Returns
-        -------
-            DictConfig: metadata of the checkpoint.
-
-        """
-        return DictConfig(self._manager.metadata())
+    return mngr.restore(step), load_cfg  # type: ignore
