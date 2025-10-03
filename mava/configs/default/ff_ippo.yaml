@@ -1,5 +1,6 @@
 defaults:
   - logger: logger
+  - checkpointer: checkpointer
   - arch: anakin
   - system: ppo/ff_ippo
   - network: mlp  # [mlp, cnn]

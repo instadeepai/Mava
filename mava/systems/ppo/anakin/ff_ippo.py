@@ -26,14 +26,16 @@ from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from jax import tree
 from omegaconf import DictConfig, OmegaConf
+from orbax.checkpoint.args import Composite, StandardSave
 
+from orbax.checkpoint.args import Composite, StandardRestore
 from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
 from mava.networks import FeedForwardActor as Actor
 from mava.networks import FeedForwardValueNet as Critic
 from mava.systems.ppo.types import LearnerState, OptStates, Params, PPOTransition
 from mava.types import ActorApply, CriticApply, ExperimentOutput, LearnerFn, MarlEnv, Metrics
 from mava.utils import make_env as environments
-from mava.utils.checkpointing import Checkpointer
+from mava.utils.checkpointing import load_checkpoint, make_checkpointer
 from mava.utils.config import check_total_timesteps
 from mava.utils.jax_utils import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
@@ -341,6 +343,7 @@ def learner_setup(
 
     # Pack params.
     params = Params(actor_params, critic_params)
+    opt_states = OptStates(actor_opt_state, critic_opt_state)
 
     # Pack apply and update functions.
     apply_fns = (actor_network.apply, critic_network.apply)
@@ -358,22 +361,17 @@ def learner_setup(
         jnp.stack(env_keys),
     )
     reshape_states = lambda x: x.reshape(
-        (n_devices, config.system.update_batch_size, config.arch.num_envs) + x.shape[1:]
+        (n_devices, config.system.update_batch_size, config.arch.num_envs, *x.shape[1:])
     )
     # (devices, update batch size, num_envs, ...)
     env_states = tree.map(reshape_states, env_states)
     timesteps = tree.map(reshape_states, timesteps)
 
-    # Load model from checkpoint if specified.
-    if config.logger.checkpointing.load_model:
-        loaded_checkpoint = Checkpointer(
-            model_name=config.logger.system_name,
-            **config.logger.checkpointing.load_args,  # Other checkpoint args
-        )
-        # Restore the learner state from the checkpoint
-        restored_params, _ = loaded_checkpoint.restore_params(input_params=params)
-        # Update the params
-        params = restored_params
+    if config.checkpointer.load.use:  # Load model from checkpoint if specified.
+        _type = Composite(params=StandardRestore(params), opt_states=StandardRestore(opt_states))
+        checkpoint, _ = load_checkpoint(config, _type)
+        params = checkpoint.params
+        opt_states = checkpoint.opt_states
 
     # Define params to be replicated across devices and batches.
     dones = jnp.zeros(
@@ -381,7 +379,6 @@ def learner_setup(
         dtype=bool,
     )
     key, step_keys = jax.random.split(key)
-    opt_states = OptStates(actor_opt_state, critic_opt_state)
     replicate_learner = (params, opt_states, step_keys, dones)
 
     # Duplicate learner for update_batch_size.
@@ -426,13 +423,13 @@ def run_experiment(_config: DictConfig) -> float:
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
-    assert (
-        config.system.num_updates > config.arch.num_evaluation
-    ), "Number of updates per evaluation must be less than total number of updates."
+    assert config.system.num_updates > config.arch.num_evaluation, (
+        "Number of updates per evaluation must be less than total number of updates."
+    )
 
-    assert (
-        config.arch.num_envs % config.system.num_minibatches == 0
-    ), "Number of envs must be divisibile by number of minibatches."
+    assert config.arch.num_envs % config.system.num_minibatches == 0, (
+        "Number of envs must be divisibile by number of minibatches."
+    )
 
     # Calculate number of updates per evaluation.
     config.system.num_updates_per_eval = config.system.num_updates // config.arch.num_evaluation
@@ -449,13 +446,8 @@ def run_experiment(_config: DictConfig) -> float:
     logger.log_config(OmegaConf.to_container(config, resolve=True))
 
     # Set up checkpointer
-    save_checkpoint = config.logger.checkpointing.save_model
-    if save_checkpoint:
-        checkpointer = Checkpointer(
-            metadata=config,  # Save all config as metadata in the checkpoint
-            model_name=config.logger.system_name,
-            **config.logger.checkpointing.save_args,  # Checkpoint args
-        )
+    if config.checkpointer.save.use:
+        chkptr = make_checkpointer(config)
 
     # Run experiment for a total number of evaluations.
     max_episode_return = -jnp.inf
@@ -489,12 +481,16 @@ def run_experiment(_config: DictConfig) -> float:
         logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
         episode_return = jnp.mean(eval_metrics["episode_return"])
 
-        if save_checkpoint:
-            # Save checkpoint of learner state
-            checkpointer.save(
-                timestep=steps_per_rollout * (eval_step + 1),
-                unreplicated_learner_state=unreplicate_n_dims(learner_output.learner_state),
-                episode_return=episode_return,
+        if config.checkpointer.save.use:
+            # Checkpoint params and opt states
+            save_state = jax.device_get(unreplicate_n_dims(learner_state))
+            chkptr.save(
+                steps_per_rollout * (eval_step + 1),
+                args=Composite(
+                    params=StandardSave(save_state.params),
+                    opt_states=StandardSave(save_state.opt_states),
+                ),
+                metrics=eval_metrics,
             )
 
         if config.arch.absolute_metric and max_episode_return <= episode_return:

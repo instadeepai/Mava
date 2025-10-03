@@ -17,6 +17,7 @@ import warnings
 from datetime import datetime
 from typing import Any, Callable, Dict, Mapping, Tuple
 
+import numpy as np
 import orbax.checkpoint as ocp
 from etils import epath
 from omegaconf.dictconfig import DictConfig
@@ -26,7 +27,7 @@ from orbax.checkpoint.checkpoint_managers import AnyPreservationPolicy, BestN, L
 
 def best_fn(metrics: Dict[str, float]) -> float:
     """Default function to determine performance of checkpoint. Uses `metrics['episode_return']`."""
-    return metrics["episode_return"]
+    return np.mean(metrics["episode_return"])
 
 
 def make_checkpointer(
@@ -100,7 +101,9 @@ def make_checkpointer(
     return mngr
 
 
-def load_checkpoint(cfg: DictConfig) -> Tuple[Mapping[str, Any], Mapping[str, Any]]:
+def load_checkpoint(
+    cfg: DictConfig, restore_args: ocp.args.Composite | ocp.args.StandardRestore | None = None
+) -> Tuple[Mapping[str, Any], Mapping[str, Any]]:
     """Loads a checkpoint and its associated configuration from a path specified in config.
 
     This function restores a saved training state. It locates the checkpoint
@@ -110,11 +113,12 @@ def load_checkpoint(cfg: DictConfig) -> Tuple[Mapping[str, Any], Mapping[str, An
     saved with the checkpoint.
 
     Args:
-        cfg (DictConfig): The Hydra configuration object for loading. It must
-            specify the load path (`cfg.checkpointer.load.path`), the system
-            name (`cfg.logger.system_name`), the unique ID of the run
-            (`cfg.checkpointer.load.uid`), and which step to load
+        cfg (DictConfig): The Hydra configuration object for loading. It must specify the load
+            path (`cfg.checkpointer.load.path`), the system name (`cfg.logger.system_name`),
+            the unique ID of the run (`cfg.checkpointer.load.uid`), and which step to load
             (`cfg.checkpointer.load.step`).
+        restore_args (ocp.args.Composite | ocp.args.StandardRestore | None): Used to restore a
+            checkpoint's type.
 
     Returns:
         Tuple[Any, dict]: A tuple containing:
@@ -157,4 +161,4 @@ def load_checkpoint(cfg: DictConfig) -> Tuple[Mapping[str, Any], Mapping[str, An
         err = f"Unrecognised {cfg.checkpointer.load.step=}. Expected int > 0 or 'latest' or 'best'"
         raise ValueError(err)
 
-    return mngr.restore(step), load_cfg  # type: ignore
+    return mngr.restore(step, args=restore_args), load_cfg  # type: ignore
