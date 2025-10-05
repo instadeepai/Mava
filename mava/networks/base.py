@@ -38,13 +38,12 @@ from mava.utils.graph.gnn_utils import is_graph_observation, validate_graph_comp
 class FeedForwardActor(nn.Module):
     """Feed Forward Actor Network."""
 
+    encoder: nn.Module
     torso: nn.Module
     action_head: nn.Module
 
     @nn.compact
-    def __call__(
-        self, observation: Union[Observation, GraphObservation[Observation]]
-    ) -> tfd.Distribution:
+    def __call__(self, observation: chex.ArrayTree) -> tfd.Distribution:
         """Forward pass."""
 
         if is_graph_observation(observation):
@@ -52,7 +51,8 @@ class FeedForwardActor(nn.Module):
             obs_embedding = self.torso(observation)
             action_mask = observation.observation.action_mask
         else:
-            obs_embedding = self.torso(observation.agents_view)
+            obs_embedding = self.encoder(observation)
+            obs_embedding = self.torso(obs_embedding)
             action_mask = observation.action_mask
         return self.action_head(obs_embedding, action_mask)
 
@@ -60,13 +60,14 @@ class FeedForwardActor(nn.Module):
 class FeedForwardValueNet(nn.Module):
     """Feedforward Value Network. Returns the value of an observation."""
 
+    encoder: nn.Module
     torso: nn.Module
     centralised_critic: bool = False
 
     @nn.compact
     def __call__(
         self,
-        observation: Union[Observation, ObservationGlobalState, GraphObservation[MavaObservation]],
+        observation: chex.ArrayTree,
     ) -> chex.Array:
         """Forward pass."""
 
@@ -75,14 +76,16 @@ class FeedForwardValueNet(nn.Module):
             critic_output = self.torso(observation)
         else:
             if self.centralised_critic:
+                # TODO: This needs to be updated to handle arbitrary observation objects.
+                # The current implementation assumes ObservationGlobalState.
                 if not isinstance(observation, ObservationGlobalState):
                     raise ValueError("Global state must be provided to the centralised critic.")
                 # Get global state in the case of a centralised critic.
                 observation = observation.global_state
-            else:
-                # Get single agent view in the case of a decentralised critic.
-                observation = observation.agents_view
-            critic_output = self.torso(observation)
+            # Encode the observation.
+            critic_output = self.encoder(observation)
+            critic_output = self.torso(critic_output)
+
         critic_output = nn.Dense(1, kernel_init=orthogonal(1.0))(critic_output)
 
         return jnp.squeeze(critic_output, axis=-1)

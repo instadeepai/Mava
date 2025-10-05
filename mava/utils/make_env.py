@@ -67,7 +67,8 @@ registry_type: TypeAlias = dict[str, dict[str, Type]]
 
 # Registry mapping environment names to their generator and wrapper classes.
 _jumanji_registry: registry_type = {
-    "RobotWarehouse": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper},
+    # TODO: always use the static make method once every wrapper has one
+    "RobotWarehouse": {"generator": RwareRandomGenerator, "wrapper": RwareWrapper.make},
     "LevelBasedForaging": {"generator": LbfRandomGenerator, "wrapper": LbfWrapper},
     "Connector": {"generator": ConnectorRandomGenerator, "wrapper": ConnectorWrapper},
     "VectorConnector": {

@@ -41,6 +41,24 @@ from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
+from flax import linen as nn
+from mava.networks.encoders.rware import RwareEncoder
+
+
+# TODO: remove once everything has an encoder
+class IdentityEncoder(nn.Module):
+    @nn.compact
+    def __call__(self, x):
+        return x.agents_view
+
+
+# TODO: move to networks folder
+def get_encoder(env_name: str) -> nn.Module:
+    """Get the encoder for a given environment."""
+    if "rware" in env_name:
+        return RwareEncoder()
+    else:
+        return IdentityEncoder()
 
 
 def get_learner_fn(
@@ -306,14 +324,17 @@ def learner_setup(
     # PRNG keys.
     key, actor_net_key, critic_net_key = keys
 
+    # Get encoder for the environment.
+    encoder = get_encoder(config.env.env_name)
+
     # Define network and optimiser.
     actor_torso = hydra.utils.instantiate(config.network.actor_network.pre_torso)
     action_head, _ = get_action_head(env.action_spec)
     actor_action_head = hydra.utils.instantiate(action_head, action_dim=env.action_dim)
     critic_torso = hydra.utils.instantiate(config.network.critic_network.pre_torso)
 
-    actor_network = Actor(torso=actor_torso, action_head=actor_action_head)
-    critic_network = Critic(torso=critic_torso)
+    actor_network = Actor(encoder=encoder, torso=actor_torso, action_head=actor_action_head)
+    critic_network = Critic(encoder=encoder, torso=critic_torso)
 
     actor_lr = make_learning_rate(config.system.actor_lr, config)
     critic_lr = make_learning_rate(config.system.critic_lr, config)

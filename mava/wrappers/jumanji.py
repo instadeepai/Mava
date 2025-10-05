@@ -37,7 +37,13 @@ from jumanji.environments.routing.robot_warehouse import RobotWarehouse
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
-from mava.types import Observation, ObservationGlobalState, State
+from mava.types import MarlEnv, Observation, ObservationGlobalState, State
+from mava.wrappers.common import (
+    EmptyMetricsWrapper,
+    RepeatDiscountWrapper,
+    RepeatRewardWrapper,
+    RepeatStepCountWrapper,
+)
 
 
 def aggregate_rewards(reward: chex.Array, num_agents: int) -> chex.Array:
@@ -134,38 +140,24 @@ class JumanjiMarlWrapper(Wrapper, ABC):
         return int(self._env.action_spec.num_values[0])
 
 
-class RwareWrapper(JumanjiMarlWrapper):
+class RwareWrapper(Wrapper, MarlEnv):
     """Multi-agent wrapper for the Robotic Warehouse environment."""
 
-    def __init__(self, env: RobotWarehouse, add_global_state: bool = False):
-        super().__init__(env, add_global_state)
-        self._env: RobotWarehouse
+    def __init__(self, env: RobotWarehouse, add_global_state: bool = False) -> None:
+        assert isinstance(env, RobotWarehouse)
+        super().__init__(env)
+        self.num_agents = env.num_agents
+        self.time_limit = env.time_limit
+        self.action_dim = int(env.action_spec.num_values[0])  # type: ignore
 
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
-        """Modify the timestep for the Robotic Warehouse environment."""
-        observation = Observation(
-            agents_view=timestep.observation.agents_view.astype(float),
-            action_mask=timestep.observation.action_mask,
-            step_count=jnp.repeat(timestep.observation.step_count, self.num_agents),
-        )
-        reward = jnp.repeat(timestep.reward, self.num_agents)
-        discount = jnp.repeat(timestep.discount, self.num_agents)
-        metrics: Dict[str, Any] = {"env_metrics": {}}
-        return timestep.replace(
-            observation=observation, reward=reward, discount=discount, extras=metrics
-        )
-
-    @cached_property
-    def observation_spec(
-        self,
-    ) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
-        # need to cast the agents view and global state to floats as we do in modify timestep
-        inner_spec = super().observation_spec
-        spec = inner_spec.replace(agents_view=inner_spec.agents_view.replace(dtype=float))
-        if self.add_global_state:
-            spec = spec.replace(global_state=inner_spec.global_state.replace(dtype=float))
-
-        return spec
+    @staticmethod
+    def make(env: RobotWarehouse, add_global_state: bool = False) -> MarlEnv:
+        wrapped = RwareWrapper(env, add_global_state)
+        wrapped = RepeatStepCountWrapper(wrapped)
+        wrapped = RepeatRewardWrapper(wrapped)
+        wrapped = RepeatDiscountWrapper(wrapped)
+        wrapped = EmptyMetricsWrapper(wrapped)
+        return wrapped
 
 
 class LbfWrapper(JumanjiMarlWrapper):
