@@ -11,14 +11,14 @@ loggers:
     enabled: True
   neptune:
     _target_: mava.utils.logger.NeptuneLogger
-    enabled: False
+    enabled: True
 
     # If specified will resume the run with this run ID.
     # This is useful for resuming runs and logging from multiple processes.
     # NOTE: it will overwrite the run unless you set the timestep correctly.
     run_id: ~
     project: Instadeep/mava-benchmark
-    tag: [delete]
+    tag: [connector-gen]
     group_tag: [delete]
     detailed_logging: False  # having mean/std/min/max can clutter neptune so we make it optional
     architecture_name: ${arch.architecture_name}  # this is required because async logging causes deadlocks in sebulba

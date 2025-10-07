@@ -105,6 +105,3 @@ ignore = [
 
 [tool.ruff.lint.pep8-naming]
 ignore-names = ["?"]
-
-[tool.uv.sources]
-jumanji = { git = "https://github.com/instadeepai/jumanji", rev = "fix/connector-test" }
