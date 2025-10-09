@@ -971,7 +971,7 @@ requires-dist = [
     { name = "jaxlib", specifier = "==0.5.3" },
     { name = "jaxmarl", git = "https://github.com/RuanJohn/JaxMARL?rev=jax-05" },
     { name = "jraph" },
-    { name = "jumanji", git = "https://github.com/instadeepai/jumanji?rev=fix%2Fconnector-test" },
+    { name = "jumanji", git = "https://github.com/instadeepai/jumanji?rev=fix%2Fconnector-test-part-1" },
     { name = "lbforaging" },
     { name = "matrax", specifier = ">=0.0.5" },
     { name = "mujoco", specifier = "==3.1.3" },
@@ -1309,7 +1309,7 @@ wheels = [
 [[package]]
 name = "jumanji"
 version = "1.1.1"
-source = { git = "https://github.com/instadeepai/jumanji?rev=fix%2Fconnector-test#83c1f7dbb57d5e93e127fa62fce60cad95cec0ec" }
+source = { git = "https://github.com/instadeepai/jumanji?rev=fix%2Fconnector-test-part-1#611bd379b459089b3e37ca7e3de9e13689a8b596" }
 dependencies = [
     { name = "chex" },
     { name = "dm-env" },
