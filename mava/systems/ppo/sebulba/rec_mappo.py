@@ -29,7 +29,7 @@ import numpy as np
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
-from jax import tree
+from jax import tree_util as tree
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.sharding import Mesh, NamedSharding, PartitionSpec, Sharding
@@ -112,7 +112,7 @@ def rollout(
     ) -> Tuple:
         """Get action and value."""
 
-        batched_observation = tree.map(lambda x: x[jnp.newaxis, :], observation)
+        batched_observation = tree.tree_map(lambda x: x[jnp.newaxis, :], observation)
         ac_in = (batched_observation, dones[jnp.newaxis, :])
         policy_hidden_state, actor_policy = actor_apply_fn(
             params.actor_params, hstates.policy_hidden_state, ac_in
@@ -225,7 +225,7 @@ def get_learner_step_fn(
         # Add a batch dimension to the observation.
         (params, opt_states, key, env_state, last_timestep, last_done, hstates) = learner_state
 
-        batched_last_observation = tree.map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
+        batched_last_observation = tree.tree_map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
         ac_in = (batched_last_observation, last_done[jnp.newaxis, :])
 
         # Run the network.
@@ -367,7 +367,7 @@ def get_learner_step_fn(
                 config.system.rollout_length // config.system.recurrent_chunk_size
             )
             batch_size = num_learner_envs * num_recurrent_chunks
-            batch = tree.map(
+            batch = tree.tree_map(
                 lambda x: x.reshape(
                     config.system.recurrent_chunk_size,
                     batch_size,
@@ -378,14 +378,14 @@ def get_learner_step_fn(
             permutation = jax.random.permutation(
                 shuffle_key, num_learner_envs * num_recurrent_chunks
             )
-            shuffled_batch = tree.map(lambda x: jnp.take(x, permutation, axis=1), batch)
-            reshaped_batch = tree.map(
+            shuffled_batch = tree.tree_map(lambda x: jnp.take(x, permutation, axis=1), batch)
+            reshaped_batch = tree.tree_map(
                 lambda x: jnp.reshape(
                     x, (x.shape[0], config.system.num_minibatches, -1, *x.shape[2:])
                 ),
                 shuffled_batch,
             )
-            minibatches = tree.map(lambda x: jnp.swapaxes(x, 1, 0), reshaped_batch)
+            minibatches = tree.tree_map(lambda x: jnp.swapaxes(x, 1, 0), reshaped_batch)
 
             # Update minibatches
             (params, opt_states, _), loss_info = jax.lax.scan(
@@ -436,7 +436,7 @@ def get_learner_step_fn(
         """
         # This function is shard mapped on the batch axis, but `_update_step` needs
         # the first axis to be time
-        traj_batch = tree.map(switch_leading_axes, traj_batch)
+        traj_batch = tree.tree_map(switch_leading_axes, traj_batch)
         learner_state, loss_info = _update_step(learner_state, traj_batch)
 
         return learner_state, loss_info
@@ -491,10 +491,10 @@ def learner_thread(
                     source.update(params)
 
         # Pass all the metrics and  params to the main thread (evaluator) for logging and evaluation
-        ep_metrics, train_metrics = tree.map(lambda *x: np.asarray(x), *metrics)
-        rollout_times: Dict[str, NDArray] = tree.map(lambda *x: np.mean(x), *rollout_times_array)
+        ep_metrics, train_metrics = tree.tree_map(lambda *x: np.asarray(x), *metrics)
+        rollout_times: Dict[str, NDArray] = tree.tree_map(lambda *x: np.mean(x), *rollout_times_array)
         timing_dict = rollout_times | learn_times
-        timing_dict = tree.map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
+        timing_dict = tree.tree_map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
 
         eval_queue.put((ep_metrics, train_metrics, learner_state, timing_dict))
 

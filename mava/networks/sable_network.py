@@ -19,7 +19,7 @@ import chex
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
-from jax import tree
+from jax import tree_util as tree
 from omegaconf import DictConfig
 
 from mava.networks.retention import MultiScaleRetention
@@ -302,15 +302,15 @@ class Decoder(nn.Module):
         step_count: chex.Array,
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Apply chunkwise decoding."""
-        updated_hstates = tree.map(jnp.zeros_like, hstates)
+        updated_hstates = tree.tree_map(jnp.zeros_like, hstates)
         action_embeddings = self.action_encoder(action)
         x = self.ln(action_embeddings)
 
         # Apply the decoder blocks
         for i, block in enumerate(self.blocks):
-            hs = tree.map(lambda x, j=i: x[:, :, j], hstates)
+            hs = tree.tree_map(lambda x, j=i: x[:, :, j], hstates)
             x, hs_new = block(x=x, obs_rep=obs_rep, hstates=hs, dones=dones, step_count=step_count)
-            updated_hstates = tree.map(
+            updated_hstates = tree.tree_map(
                 lambda x, y, j=i: x.at[:, :, j].set(y), updated_hstates, hs_new
             )
 
@@ -326,15 +326,15 @@ class Decoder(nn.Module):
         step_count: chex.Array,
     ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
         """Apply recurrent decoding."""
-        updated_hstates = tree.map(jnp.zeros_like, hstates)
+        updated_hstates = tree.tree_map(jnp.zeros_like, hstates)
         action_embeddings = self.action_encoder(action)
         x = self.ln(action_embeddings)
 
         # Apply the decoder blocks
         for i, block in enumerate(self.blocks):
-            hs = tree.map(lambda x, i=i: x[:, :, i], hstates)
+            hs = tree.tree_map(lambda x, i=i: x[:, :, i], hstates)
             x, hs_new = block.recurrent(x=x, obs_rep=obs_rep, hstates=hs, step_count=step_count)
-            updated_hstates = tree.map(
+            updated_hstates = tree.tree_map(
                 lambda x, y, j=i: x.at[:, :, j].set(y), updated_hstates, hs_new
             )
 
@@ -455,7 +455,7 @@ class SableNetwork(nn.Module):
         )
 
         # Decay the hidden states: each timestep we decay the hidden states once
-        decayed_hstates = tree.map(lambda x: x * self.decay_kappas, hstates)
+        decayed_hstates = tree.tree_map(lambda x: x * self.decay_kappas, hstates)
 
         value, obs_rep, updated_enc_hs = self.act_encoder_fn(
             encoder=self.encoder,

@@ -75,7 +75,7 @@ def init(
 
     def replicate(x: Any) -> Any:
         """First replicate the update batch dim then put on devices."""
-        x = tree.map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
+        x = tree.tree_map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
         return jax.device_put_replicated(x, devices)
 
     env, eval_env = environments.make(cfg)
@@ -93,7 +93,7 @@ def init(
     # Make dummy inputs to init recurrent Q network -> need shape (T, B, N, ...)
     init_obs = env.observation_spec.generate_value()  # (N, ...)
     # (B, T, N, ...)
-    init_obs_batched = tree.map(lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs)
+    init_obs_batched = tree.tree_map(lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs)
     init_term_or_trunc = jnp.zeros((1, 1, 1), dtype=bool)  # (T, B, 1)
     init_x = (init_obs_batched, init_term_or_trunc)  # pack the RNN dummy inputs
     # (B, N, ...)
@@ -217,8 +217,8 @@ def make_update_fns(
             cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
         )
 
-        obs = tree.map(lambda x: x[jnp.newaxis, ...], obs)
-        term_or_trunc = tree.map(lambda x: x[jnp.newaxis, ...], term_or_trunc)
+        obs = tree.tree_map(lambda x: x[jnp.newaxis, ...], obs)
+        term_or_trunc = tree.tree_map(lambda x: x[jnp.newaxis, ...], term_or_trunc)
 
         next_hidden_state, eps_greedy_dist = q_net.apply(
             params, hidden_state, (obs, term_or_trunc), eps
@@ -255,7 +255,7 @@ def make_update_fns(
             obs, action, reward, terminal, term_or_trunc, next_timestep.extras["real_next_obs"]
         )
         # Add dummy time dim
-        transition = tree.map(lambda x: x[:, jnp.newaxis, ...], transition)
+        transition = tree.tree_map(lambda x: x[:, jnp.newaxis, ...], transition)
         next_buffer_state = rb.add(buffer_state, transition)
 
         # Next obs and term_or_trunc for learner state
@@ -332,8 +332,8 @@ def make_update_fns(
     ) -> Tuple[QNetParams, optax.OptState, Metrics]:
         """Update the Q parameters."""
         # Get data aligned with current/next timestep
-        data = tree.map(lambda x: x[:, :-1, ...], data_full)
-        data_next = tree.map(lambda x: x[:, 1:, ...], data_full)
+        data = tree.tree_map(lambda x: x[:, :-1, ...], data_full)
+        data_next = tree.tree_map(lambda x: x[:, 1:, ...], data_full)
 
         obs = data.obs
         term_or_trunc = data.term_or_trunc
@@ -523,7 +523,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
         term_or_trunc = timestep.last()
         net_input = (timestep.observation, term_or_trunc[..., jnp.newaxis])
-        net_input = tree.map(lambda x: x[jnp.newaxis], net_input)  # add batch dim to obs
+        net_input = tree.tree_map(lambda x: x[jnp.newaxis], net_input)  # add batch dim to obs
         next_hidden_state, eps_greedy_dist = q_net.apply(params, hidden_state, net_input)
         action = eps_greedy_dist.sample(seed=key).squeeze(0)
         return action, {"hidden_state": next_hidden_state}

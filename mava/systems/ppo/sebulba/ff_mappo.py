@@ -29,7 +29,7 @@ import numpy as np
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
-from jax import tree
+from jax import tree_util as tree
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.sharding import Mesh, NamedSharding, PartitionSpec, Sharding
@@ -312,9 +312,9 @@ def get_learner_step_fn(
             batch_size = config.system.rollout_length * num_learner_envs
             permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
-            batch = tree.map(lambda x: merge_leading_dims(x, 2), batch)
-            shuffled_batch = tree.map(lambda x: jnp.take(x, permutation, axis=0), batch)
-            minibatches = tree.map(
+            batch = tree.tree_map(lambda x: merge_leading_dims(x, 2), batch)
+            shuffled_batch = tree.tree_map(lambda x: jnp.take(x, permutation, axis=0), batch)
+            minibatches = tree.tree_map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 shuffled_batch,
             )
@@ -355,7 +355,7 @@ def get_learner_step_fn(
         """
         # This function is shard mapped on the batch axis, but `_update_step` needs
         # the first axis to be time
-        traj_batch = tree.map(switch_leading_axes, traj_batch)
+        traj_batch = tree.tree_map(switch_leading_axes, traj_batch)
         learner_state, loss_info = _update_step(learner_state, traj_batch)
 
         return learner_state, loss_info
@@ -401,10 +401,10 @@ def learner_thread(
                     source.update(params)
 
         # Pass all the metrics and  params to the main thread (evaluator) for logging and evaluation
-        ep_metrics, train_metrics = tree.map(lambda *x: np.asarray(x), *metrics)
-        rollout_times: Dict[str, NDArray] = tree.map(lambda *x: np.mean(x), *rollout_times_array)
+        ep_metrics, train_metrics = tree.tree_map(lambda *x: np.asarray(x), *metrics)
+        rollout_times: Dict[str, NDArray] = tree.tree_map(lambda *x: np.mean(x), *rollout_times_array)
         timing_dict = rollout_times | learn_times
-        timing_dict = tree.map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
+        timing_dict = tree.tree_map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
 
         eval_queue.put((ep_metrics, train_metrics, learner_state, timing_dict))
 

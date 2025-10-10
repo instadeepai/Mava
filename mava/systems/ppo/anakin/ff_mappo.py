@@ -23,7 +23,7 @@ import jax.numpy as jnp
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
-from jax import tree
+from jax import tree_util as tree
 from omegaconf import DictConfig, OmegaConf
 
 from mava.evaluator import get_eval_fn, make_ff_eval_act_fn
@@ -238,9 +238,9 @@ def get_learner_fn(
             batch_size = config.system.rollout_length * config.arch.num_envs
             permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
-            batch = tree.map(lambda x: merge_leading_dims(x, 2), batch)
-            shuffled_batch = tree.map(lambda x: jnp.take(x, permutation, axis=0), batch)
-            minibatches = tree.map(
+            batch = tree.tree_map(lambda x: merge_leading_dims(x, 2), batch)
+            shuffled_batch = tree.tree_map(lambda x: jnp.take(x, permutation, axis=0), batch)
+            minibatches = tree.tree_map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 shuffled_batch,
             )
@@ -331,7 +331,7 @@ def learner_setup(
 
     # Initialise observation with obs of all agents.
     obs = env.observation_spec.generate_value()
-    init_x = tree.map(lambda x: x[jnp.newaxis, ...], obs)
+    init_x = tree.tree_map(lambda x: x[jnp.newaxis, ...], obs)
 
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(actor_net_key, init_x)
@@ -363,8 +363,8 @@ def learner_setup(
         (n_devices, config.system.update_batch_size, config.arch.num_envs) + x.shape[1:]
     )
     # (devices, update batch size, num_envs, ...)
-    env_states = tree.map(reshape_states, env_states)
-    timesteps = tree.map(reshape_states, timesteps)
+    env_states = tree.tree_map(reshape_states, env_states)
+    timesteps = tree.tree_map(reshape_states, timesteps)
 
     # Load model from checkpoint if specified.
     if config.logger.checkpointing.load_model:
@@ -388,7 +388,7 @@ def learner_setup(
 
     # Duplicate learner for update_batch_size.
     broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
-    replicate_learner = tree.map(broadcast, replicate_learner)
+    replicate_learner = tree.tree_map(broadcast, replicate_learner)
 
     # Duplicate learner across devices.
     replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())

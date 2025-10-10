@@ -20,7 +20,7 @@ from typing import Any, Dict, Optional, Tuple, Type
 import absl.logging as absl_logging
 import orbax.checkpoint
 from chex import Numeric
-from jax import tree
+from jax import tree_util as tree
 from omegaconf import DictConfig, OmegaConf
 
 from mava.types import MavaState
@@ -96,7 +96,7 @@ class Checkpointer:
         # Convert metadata to JSON-ready format
         if metadata is not None and isinstance(metadata, DictConfig):
             metadata = OmegaConf.to_container(metadata, resolve=True)
-        metadata_json_ready = tree.map(get_json_ready, metadata)
+        metadata_json_ready = tree.tree_map(get_json_ready, metadata)
 
         self._manager = orbax.checkpoint.CheckpointManager(
             directory=os.path.join(os.getcwd(), rel_dir, model_name, checkpoint_str),

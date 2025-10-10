@@ -84,8 +84,8 @@ def get_actions(
     log_std = jnp.zeros((batch_size, num_agents))
 
     for agent in range(num_agents):
-        actor_params_per_agent = tree.map(lambda x, agent=agent: x[agent], actor_params)
-        obs_per_agent = tree.map(lambda x, agent=agent: x[:, agent], obs)
+        actor_params_per_agent = tree.tree_map(lambda x, agent=agent: x[agent], actor_params)
+        obs_per_agent = tree.tree_map(lambda x, agent=agent: x[:, agent], obs)
 
         pi = actor_net.apply(actor_params_per_agent, obs_per_agent)
         action = pi.sample(seed=keys[agent])
@@ -132,7 +132,7 @@ def init(
 
     def replicate(x: Any) -> Any:
         """First replicate the update batch dim then put on devices."""
-        x = tree.map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
+        x = tree.tree_map(lambda y: jnp.broadcast_to(y, (cfg.system.update_batch_size, *y.shape)), x)
         return jax.device_put_replicated(x, devices)
 
     env, eval_env = environments.make(cfg, add_global_state=True)
@@ -148,7 +148,7 @@ def init(
     concat_acts = jnp.concatenate([act_single for _ in range(n_agents)], axis=0)
     concat_acts_batched = concat_acts[jnp.newaxis, ...]  # batch + concat of all agents actions
     obs = env.observation_spec.generate_value()
-    obs_single_batched = tree.map(lambda x: x[0][jnp.newaxis, ...], obs)
+    obs_single_batched = tree.tree_map(lambda x: x[0][jnp.newaxis, ...], obs)
 
     # Making actor network
     actor_torso = hydra.utils.instantiate(cfg.network.actor_network.pre_torso)

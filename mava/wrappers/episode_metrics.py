@@ -18,7 +18,7 @@ import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax import tree
+from jax import tree_util as tree
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
 
@@ -126,9 +126,9 @@ def get_final_step_metrics(metrics: Dict[str, chex.Array]) -> Tuple[Dict[str, ch
     final_metrics: Dict[str, chex.Array]
     # If it didn't make it to the final step, return zeros.
     if not has_final_ep_step:
-        final_metrics = tree.map(np.zeros_like, metrics)
+        final_metrics = tree.tree_map(np.zeros_like, metrics)
     else:
-        final_metrics = tree.map(lambda x: x[is_final_ep], metrics)
+        final_metrics = tree.tree_map(lambda x: x[is_final_ep], metrics)
 
     # Keep is_terminal_step in the metrics for the logger to use
     final_metrics["is_terminal_step"] = is_final_ep

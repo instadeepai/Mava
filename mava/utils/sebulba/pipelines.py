@@ -21,7 +21,7 @@ import jax.numpy as jnp
 import numpy as np
 from colorama import Fore, Style
 from flashbax import make_trajectory_buffer
-from jax import tree
+from jax import tree_util as tree
 from jax.sharding import Sharding
 from jumanji.types import TimeStep
 from omegaconf import DictConfig
@@ -38,7 +38,7 @@ QUEUE_PUT_TIMEOUT = 100
 def _stack_trajectory(trajectory: List[MavaTransition]) -> MavaTransition:
     """Stack a list of parallel_env transitions into a single
     transition of shape [rollout_len, num_envs, ...]."""
-    return tree.map(lambda *x: jnp.stack(x, axis=0).swapaxes(0, 1), *trajectory)  # type: ignore
+    return tree.tree_map(lambda *x: jnp.stack(x, axis=0).swapaxes(0, 1), *trajectory)  # type: ignore
 
 
 # Modified from https://github.com/instadeepai/sebulba/blob/main/sebulba/core.py
@@ -273,7 +273,7 @@ class OffPolicyPipeline(threading.Thread):
         sampled_batch: List[MavaTransition] = [
             self.buffer_sample(state, sample_key).experience for state in self.buffer_states
         ]
-        transitions: MavaTransition = tree.map(lambda *x: np.concatenate(x), *sampled_batch)
+        transitions: MavaTransition = tree.tree_map(lambda *x: np.concatenate(x), *sampled_batch)
         transitions = jax.device_put(transitions, device=self.sharding)
 
         self.rate_limiter.sample()

@@ -27,7 +27,7 @@ import optax
 from colorama import Fore, Style
 from flashbax.vault import Vault
 from flax.core.frozen_dict import FrozenDict
-from jax import tree
+from jax import tree_util as tree
 from omegaconf import DictConfig, OmegaConf
 from optax._src.base import OptState
 from rich.pretty import pprint
@@ -285,9 +285,9 @@ def get_learner_fn(
             batch_size = config.system.rollout_length * config.arch.num_envs
             permutation = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
-            batch = tree.map(lambda x: merge_leading_dims(x, 2), batch)
-            shuffled_batch = tree.map(lambda x: jnp.take(x, permutation, axis=0), batch)
-            minibatches = tree.map(
+            batch = tree.tree_map(lambda x: merge_leading_dims(x, 2), batch)
+            shuffled_batch = tree.tree_map(lambda x: jnp.take(x, permutation, axis=0), batch)
+            minibatches = tree.tree_map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 shuffled_batch,
             )
@@ -382,7 +382,7 @@ def learner_setup(
 
     # Initialise observation with obs of all agents.
     obs = env.observation_spec.generate_value()
-    init_x = tree.map(lambda x: x[jnp.newaxis, ...], obs)
+    init_x = tree.tree_map(lambda x: x[jnp.newaxis, ...], obs)
     # Initialise actor params and optimiser state.
     actor_params = actor_network.init(key_p, init_x)
     actor_opt_state = actor_optim.init(actor_params)
@@ -419,8 +419,8 @@ def learner_setup(
     reshape_states = lambda x: x.reshape(
         (n_devices, config.system.update_batch_size, config.arch.num_envs) + x.shape[1:]
     )
-    env_states = tree.map(reshape_states, env_states)
-    timesteps = tree.map(reshape_states, timesteps)
+    env_states = tree.tree_map(reshape_states, env_states)
+    timesteps = tree.tree_map(reshape_states, timesteps)
 
     # Initialize dones with shape (num_envs, num_agents)
     dones = jnp.zeros((config.arch.num_envs, config.system.num_agents), dtype=bool)
@@ -436,7 +436,7 @@ def learner_setup(
 
     # Duplicate learner for update_batch_size.
     broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
-    replicate_learner = tree.map(broadcast, replicate_learner)
+    replicate_learner = tree.tree_map(broadcast, replicate_learner)
 
     # Duplicate learner across devices.
     replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())
@@ -545,9 +545,9 @@ def run_experiment(_config: DictConfig) -> None:
     def _reshape_experience(experience: Dict[str, chex.Array]) -> Dict[str, chex.Array]:
         """Reshape experience to match buffer."""
         # Swap the T and NE axes (D, NU, UB, T, NE, ...) -> (D, NU, UB, NE, T, ...)
-        experience = tree.map(lambda x: x.swapaxes(3, 4), experience)
+        experience = tree.tree_map(lambda x: x.swapaxes(3, 4), experience)
         # Merge 4 leading dimensions into 1. (D, NU, UB, NE, T ...) -> (D * NU * UB * NE, T, ...)
-        experience = tree.map(lambda x: x.reshape(-1, *x.shape[4:]), experience)
+        experience = tree.tree_map(lambda x: x.reshape(-1, *x.shape[4:]), experience)
         return experience
 
     # Use vault to record experience

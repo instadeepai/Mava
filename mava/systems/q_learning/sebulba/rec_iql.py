@@ -113,8 +113,8 @@ def rollout(
             config.system.eps_min, 1 - (t / config.system.eps_decay) * (1 - config.system.eps_min)
         )
 
-        obs = tree.map(lambda x: x[jnp.newaxis, ...], obs)
-        term_or_trunc = tree.map(lambda x: x[jnp.newaxis, ...], term_or_trunc)
+        obs = tree.tree_map(lambda x: x[jnp.newaxis, ...], obs)
+        term_or_trunc = tree.tree_map(lambda x: x[jnp.newaxis, ...], term_or_trunc)
 
         next_hidden_state, eps_greedy_dist = q_net.apply(
             params, hidden_state, (obs, term_or_trunc), eps
@@ -131,7 +131,7 @@ def rollout(
     hstate = ScannedRNN.initialize_carry(
         (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
-    hstate_tpu = tree.map(move_to_device, hstate)
+    hstate_tpu = tree.tree_map(move_to_device, hstate)
     step_count = 0
 
     # Loop till the desired num_updates is reached.
@@ -276,8 +276,8 @@ def get_learner_step_fn(
             params, opt_states, t_train, traj_batch = update_state
 
             # Get data aligned with current/next timestep
-            data_first = tree.map(lambda x: x[:, :-1, ...], traj_batch)
-            data_next = tree.map(lambda x: x[:, 1:, ...], traj_batch)
+            data_first = tree.tree_map(lambda x: x[:, :-1, ...], traj_batch)
+            data_next = tree.tree_map(lambda x: x[:, 1:, ...], traj_batch)
 
             obs = data_first.obs
             term_or_trunc = data_first.term_or_trunc
@@ -421,21 +421,21 @@ def learner_thread(
         if ep_metrics_list:
             # [{metric1 : (num_envs, ...), ...}] * n_rollouts -->
             # {metric1 : (n_rollouts, num_envs, ...), ...
-            ep_metrics = tree.map(lambda *x: np.asarray(x), *ep_metrics_list)
+            ep_metrics = tree.tree_map(lambda *x: np.asarray(x), *ep_metrics_list)
 
             # [{metric1: value1, ...}] * n_rollouts -->
             # {metric1: mean(value1_rollout1, value1_rollout2, ...), ...}
-            rollout_times = tree.map(lambda *x: np.mean(x), *rollout_times_list)
+            rollout_times = tree.tree_map(lambda *x: np.mean(x), *rollout_times_list)
         else:
             rollout_times = {}
             ep_metrics = {}
 
-        train_metrics = tree.map(lambda *x: np.asarray(x), *train_metrics)
+        train_metrics = tree.tree_map(lambda *x: np.asarray(x), *train_metrics)
 
         # learn_times : {metric1: (1,) or (num_updates_per_eval,), ...}
         time_metrics = rollout_times | learn_times
         # time_metrics  : {metric1: Array, ...} - > {metric1: mean(Array), ...}
-        time_metrics = tree.map(np.mean, time_metrics, is_leaf=lambda x: isinstance(x, list))
+        time_metrics = tree.tree_map(np.mean, time_metrics, is_leaf=lambda x: isinstance(x, list))
 
         eval_queue.put((ep_metrics, train_metrics, learner_state, time_metrics))
 
@@ -476,7 +476,7 @@ def learner_setup(
         init_agents_view, init_action_mask, jnp.zeros(1, dtype=jnp.int32)
     )  # (A, ...)
     # (B, T, A, ...)
-    init_obs_batched = tree.map(lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs)
+    init_obs_batched = tree.tree_map(lambda x: x[jnp.newaxis, jnp.newaxis, ...], init_obs)
     dones = jnp.zeros((1, 1, 1), dtype=bool)  # (T, B, 1)
     init_x = (init_obs_batched, dones)  # pack the RNN dummy inputs
     # (B, A, ...)

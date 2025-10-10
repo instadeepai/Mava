@@ -30,7 +30,7 @@ import numpy as np
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict as Params
-from jax import tree
+from jax import tree_util as tree
 from jax.experimental import mesh_utils
 from jax.experimental.shard_map import shard_map
 from jax.sharding import Mesh, NamedSharding, PartitionSpec, Sharding
@@ -137,7 +137,7 @@ def rollout(
                 with RecordTimeTo(actor_timings["get_params_time"]):
                     params = params_source.get()  # Get the latest parameters from the learner
 
-                obs_tpu = tree.map(move_to_device, timestep.observation)
+                obs_tpu = tree.tree_map(move_to_device, timestep.observation)
 
                 prev_dones = np.repeat(timestep.last(), config.system.num_agents).reshape(
                     config.arch.num_envs, -1
@@ -156,7 +156,7 @@ def rollout(
                 # Updated the dones and Hstates
                 dones = timestep.last()
                 dones = np.expand_dims(dones, (1, 2, 3, 4))
-                hstates = tree.map(
+                hstates = tree.tree_map(
                     lambda hs, dones=dones: np.where(dones, np.zeros_like(hs), hs), hstates
                 )
 
@@ -218,7 +218,7 @@ def get_learner_step_fn(
             hstates=last_hstate,
             key=key,
         )
-        last_done = tree.map(
+        last_done = tree.tree_map(
             lambda x: jnp.repeat(x, config.system.num_agents).reshape(num_learner_envs, -1),
             final_timestep.last(),
         )
@@ -329,24 +329,24 @@ def get_learner_step_fn(
             batch_size = num_learner_envs
             batch_perm = jax.random.permutation(shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
-            batch = tree.map(lambda x: jnp.take(x, batch_perm, axis=1), batch)
+            batch = tree.tree_map(lambda x: jnp.take(x, batch_perm, axis=1), batch)
 
             # Shuffle hidden states
-            initial_hstate = tree.map(lambda x: jnp.take(x, batch_perm, axis=0), initial_hstate)
+            initial_hstate = tree.tree_map(lambda x: jnp.take(x, batch_perm, axis=0), initial_hstate)
 
             # Shuffle agents
             agent_perm = jax.random.permutation(agent_shuffle_key, config.system.num_agents)
-            batch = tree.map(lambda x: jnp.take(x, agent_perm, axis=2), batch)
+            batch = tree.tree_map(lambda x: jnp.take(x, agent_perm, axis=2), batch)
 
             # Concatenate time and agents
-            batch = tree.map(concat_time_and_agents, batch)
+            batch = tree.tree_map(concat_time_and_agents, batch)
 
             # Split into minibatches
-            minibatches = tree.map(
+            minibatches = tree.tree_map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 batch,
             )
-            last_hs_minibatch = tree.map(
+            last_hs_minibatch = tree.tree_map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 initial_hstate,
             )
@@ -402,7 +402,7 @@ def get_learner_step_fn(
         """
         # This function is shard mapped on the batch axis, but `_update_step` needs
         # the first axis to be time
-        traj_batch = tree.map(switch_leading_axes, traj_batch)
+        traj_batch = tree.tree_map(switch_leading_axes, traj_batch)
         learner_state, loss_info = _update_step(
             learner_state, traj_batch, initial_hstate, updated_hstates
         )
@@ -459,10 +459,10 @@ def learner_thread(
                     source.update(params)
 
         # Pass all the metrics and  params to the main thread (evaluator) for logging and evaluation
-        ep_metrics, train_metrics = tree.map(lambda *x: np.asarray(x), *metrics)
-        rollout_times: Dict[str, NDArray] = tree.map(lambda *x: np.mean(x), *rollout_times_array)
+        ep_metrics, train_metrics = tree.tree_map(lambda *x: np.asarray(x), *metrics)
+        rollout_times: Dict[str, NDArray] = tree.tree_map(lambda *x: np.mean(x), *rollout_times_array)
         timing_dict = rollout_times | learn_times
-        timing_dict = tree.map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
+        timing_dict = tree.tree_map(np.mean, timing_dict, is_leaf=lambda x: isinstance(x, list))
 
         eval_queue.put((ep_metrics, train_metrics, learner_state, timing_dict))
 
@@ -527,10 +527,10 @@ def learner_setup(
     init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
     step_count = jnp.zeros((config.system.num_agents))
     init_x = Observation(init_obs, init_action_mask, step_count)
-    init_x = tree.map(lambda x: x[jnp.newaxis, ...], init_x)  # Add batch dim
+    init_x = tree.tree_map(lambda x: x[jnp.newaxis, ...], init_x)  # Add batch dim
 
     init_hs = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
-    init_hs = tree.map(lambda x: x[0, jnp.newaxis], init_hs)
+    init_hs = tree.tree_map(lambda x: x[0, jnp.newaxis], init_hs)
 
     # Initialise params and optimiser state.
     params = sable_network.init(

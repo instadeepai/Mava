@@ -20,7 +20,7 @@ import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax import tree
+from jax import tree_util as tree
 from typing_extensions import TypeAlias
 
 # Different types used for indexing arrays: int/slice or tuple of int/slice
@@ -29,7 +29,7 @@ Indexer: TypeAlias = Union[int, slice, Tuple[slice, ...], Tuple[int, ...]]
 
 def tree_slice(pytree: chex.ArrayTree, i: Indexer) -> chex.ArrayTree:
     """Returns: a new pytree where for each leaf: leaf[i] is returned."""
-    return tree.map(lambda x: x[i], pytree)
+    return tree.tree_map(lambda x: x[i], pytree)
 
 
 def tree_at_set(old_tree: chex.ArrayTree, i: Indexer, new_tree: chex.ArrayTree) -> chex.ArrayTree:
@@ -38,7 +38,7 @@ def tree_at_set(old_tree: chex.ArrayTree, i: Indexer, new_tree: chex.ArrayTree) 
     """
     chex.assert_trees_all_equal_structs(old_tree, new_tree)
     chex.assert_trees_all_equal_dtypes(old_tree, new_tree)
-    return tree.map(lambda old, new: old.at[i].set(new), old_tree, new_tree)
+    return tree.tree_map(lambda old, new: old.at[i].set(new), old_tree, new_tree)
 
 
 def ndim_at_least(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
@@ -90,7 +90,7 @@ def unreplicate_n_dims(x: Any, unreplicate_depth: int = 2) -> Any:
     duplication for running multiple updates across devices and in parallel with `vmap`.
     This is typically one axis for device replication, and one for the `update batch size`.
     """
-    return tree.map(lambda x: x[(0,) * unreplicate_depth], x)  # type: ignore
+    return tree.tree_map(lambda x: x[(0,) * unreplicate_depth], x)  # type: ignore
 
 
 def unreplicate_batch_dim(x: Any) -> Any:
@@ -100,9 +100,9 @@ def unreplicate_batch_dim(x: Any) -> Any:
     In mava's case it is always the second dimension, after the device dimension.
     We simply take element 0 as the params are identical across this dimension.
     """
-    return tree.map(lambda x: x[:, 0, ...], x)  # type: ignore
+    return tree.tree_map(lambda x: x[:, 0, ...], x)  # type: ignore
 
 
 def switch_leading_axes(arr: chex.Array) -> chex.Array:
     """Switches the first two axes, generally used for BT -> TB."""
-    return tree.map(lambda x: x.swapaxes(0, 1), arr)
+    return tree.tree_map(lambda x: x.swapaxes(0, 1), arr)

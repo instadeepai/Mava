@@ -24,7 +24,7 @@ import jax.numpy as jnp
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
-from jax import tree
+from jax import tree_util as tree
 from omegaconf import DictConfig, OmegaConf
 
 from mava.evaluator import get_eval_fn, get_num_eval_envs, make_rec_eval_act_fn
@@ -106,7 +106,7 @@ def get_learner_fn(
             key, policy_key = jax.random.split(key)
 
             # Add a batch dimension to the observation.
-            batched_observation = tree.map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
+            batched_observation = tree.tree_map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
             ac_in = (batched_observation, last_done[jnp.newaxis, :])
 
             # Run the network.
@@ -151,7 +151,7 @@ def get_learner_fn(
         params, opt_states, key, env_state, last_timestep, last_done, hstates = learner_state
 
         # Add a batch dimension to the observation.
-        batched_last_observation = tree.map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
+        batched_last_observation = tree.tree_map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
         ac_in = (batched_last_observation, last_done[jnp.newaxis, :])
 
         # Run the network.
@@ -298,7 +298,7 @@ def get_learner_fn(
             num_recurrent_chunks = (
                 config.system.rollout_length // config.system.recurrent_chunk_size
             )
-            batch = tree.map(
+            batch = tree.tree_map(
                 lambda x: x.reshape(
                     config.system.recurrent_chunk_size,
                     config.arch.num_envs * num_recurrent_chunks,
@@ -309,14 +309,14 @@ def get_learner_fn(
             permutation = jax.random.permutation(
                 shuffle_key, config.arch.num_envs * num_recurrent_chunks
             )
-            shuffled_batch = tree.map(lambda x: jnp.take(x, permutation, axis=1), batch)
-            reshaped_batch = tree.map(
+            shuffled_batch = tree.tree_map(lambda x: jnp.take(x, permutation, axis=1), batch)
+            reshaped_batch = tree.tree_map(
                 lambda x: jnp.reshape(
                     x, (x.shape[0], config.system.num_minibatches, -1, *x.shape[2:])
                 ),
                 shuffled_batch,
             )
-            minibatches = tree.map(lambda x: jnp.swapaxes(x, 1, 0), reshaped_batch)
+            minibatches = tree.tree_map(lambda x: jnp.swapaxes(x, 1, 0), reshaped_batch)
 
             # Update minibatches
             (params, opt_states, entropy_key), loss_info = jax.lax.scan(
@@ -440,11 +440,11 @@ def learner_setup(
 
     # Initialise observation with obs of all agents.
     init_obs = env.observation_spec.generate_value()
-    init_obs = tree.map(
+    init_obs = tree.tree_map(
         lambda x: jnp.repeat(x[jnp.newaxis, ...], config.arch.num_envs, axis=0),
         init_obs,
     )
-    init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs)
+    init_obs = tree.tree_map(lambda x: x[jnp.newaxis, ...], init_obs)
     init_done = jnp.zeros((1, config.arch.num_envs, num_agents), dtype=bool)
     init_x = (init_obs, init_done)
 
@@ -499,8 +499,8 @@ def learner_setup(
         (n_devices, config.system.update_batch_size, config.arch.num_envs) + x.shape[1:]
     )
     # (devices, update batch size, num_envs, ...)
-    env_states = tree.map(reshape_states, env_states)
-    timesteps = tree.map(reshape_states, timesteps)
+    env_states = tree.tree_map(reshape_states, env_states)
+    timesteps = tree.tree_map(reshape_states, timesteps)
 
     # Define params to be replicated across devices and batches.
     dones = jnp.zeros(
@@ -513,7 +513,7 @@ def learner_setup(
 
     # Duplicate learner for update_batch_size.
     broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
-    replicate_learner = tree.map(broadcast, replicate_learner)
+    replicate_learner = tree.tree_map(broadcast, replicate_learner)
 
     # Duplicate learner across devices.
     replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())

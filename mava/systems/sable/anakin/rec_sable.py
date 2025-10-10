@@ -25,7 +25,7 @@ import jax.numpy as jnp
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict as Params
-from jax import tree
+from jax import tree_util as tree
 from jumanji.types import TimeStep
 from omegaconf import DictConfig, OmegaConf
 
@@ -107,7 +107,7 @@ def get_learner_fn(
             # Reset hidden state if done.
             done = timestep.last()
             done = jnp.expand_dims(done, (1, 2, 3, 4))
-            hstates = tree.map(lambda hs: jnp.where(done, jnp.zeros_like(hs), hs), hstates)
+            hstates = tree.tree_map(lambda hs: jnp.where(done, jnp.zeros_like(hs), hs), hstates)
 
             prev_done = last_timestep.last().repeat(env.num_agents).reshape(num_envs, -1)
             transition = Transition(
@@ -118,7 +118,7 @@ def get_learner_fn(
             return learner_state, (transition, metrics)
 
         # Copy old hidden states: to be used in the training loop
-        prev_hstates = tree.map(lambda x: jnp.copy(x), learner_state.hstates)
+        prev_hstates = tree.tree_map(lambda x: jnp.copy(x), learner_state.hstates)
 
         # Step environment for rollout length
         learner_state, (traj_batch, episode_metrics) = jax.lax.scan(
@@ -266,24 +266,24 @@ def get_learner_fn(
             batch_size = config.arch.num_envs
             batch_perm = jax.random.permutation(batch_shuffle_key, batch_size)
             batch = (traj_batch, advantages, targets)
-            batch = tree.map(lambda x: jnp.take(x, batch_perm, axis=1), batch)
+            batch = tree.tree_map(lambda x: jnp.take(x, batch_perm, axis=1), batch)
 
             # Shuffle hidden states
-            prev_hstates = tree.map(lambda x: jnp.take(x, batch_perm, axis=0), prev_hstates)
+            prev_hstates = tree.tree_map(lambda x: jnp.take(x, batch_perm, axis=0), prev_hstates)
 
             # Shuffle agents
             agent_perm = jax.random.permutation(agent_shuffle_key, config.system.num_agents)
-            batch = tree.map(lambda x: jnp.take(x, agent_perm, axis=2), batch)
+            batch = tree.tree_map(lambda x: jnp.take(x, agent_perm, axis=2), batch)
 
             # Concatenate time and agents
-            batch = tree.map(concat_time_and_agents, batch)
+            batch = tree.tree_map(concat_time_and_agents, batch)
 
             # Split into minibatches
-            minibatches = tree.map(
+            minibatches = tree.tree_map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 batch,
             )
-            prev_hs_minibatch = tree.map(
+            prev_hs_minibatch = tree.tree_map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 prev_hstates,
             )
@@ -395,9 +395,9 @@ def learner_setup(
 
     # Get mock inputs to initialise network.
     init_obs = env.observation_spec.generate_value()
-    init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs)  # Add batch dim
+    init_obs = tree.tree_map(lambda x: x[jnp.newaxis, ...], init_obs)  # Add batch dim
     init_hs = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
-    init_hs = tree.map(lambda x: x[0, jnp.newaxis], init_hs)
+    init_hs = tree.tree_map(lambda x: x[0, jnp.newaxis], init_hs)
 
     # Initialise params and optimiser state.
     params = sable_network.init(
@@ -430,8 +430,8 @@ def learner_setup(
         (n_devices, config.system.update_batch_size, config.arch.num_envs) + x.shape[1:]
     )
     # (devices, update batch size, num_envs, ...)
-    env_states = tree.map(reshape_states, env_states)
-    timesteps = tree.map(reshape_states, timesteps)
+    env_states = tree.tree_map(reshape_states, env_states)
+    timesteps = tree.tree_map(reshape_states, timesteps)
 
     # Initialise hidden state.
     init_hstates = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
@@ -456,8 +456,8 @@ def learner_setup(
 
     # Duplicate learner for update_batch_size.
     broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
-    replicate_learner = tree.map(broadcast, replicate_learner)
-    init_hstates = tree.map(broadcast, init_hstates)
+    replicate_learner = tree.tree_map(broadcast, replicate_learner)
+    init_hstates = tree.tree_map(broadcast, init_hstates)
 
     # Duplicate learner across devices.
     replicate_learner = flax.jax_utils.replicate(replicate_learner, devices=jax.devices())
@@ -605,7 +605,7 @@ def run_experiment(_config: DictConfig) -> float:
     if config.arch.absolute_metric:
         eval_batch_size = get_num_eval_envs(config, absolute_metric=True)
         abs_hs = get_init_hidden_state(config.network.net_config, eval_batch_size)
-        abs_hs = tree.map(lambda x: x[jnp.newaxis], abs_hs)
+        abs_hs = tree.tree_map(lambda x: x[jnp.newaxis], abs_hs)
         abs_metric_evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=True)
         eval_keys = jax.random.split(key, n_devices)
 
