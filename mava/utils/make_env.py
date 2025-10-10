@@ -18,9 +18,11 @@ import gymnasium
 import gymnasium as gym
 import gymnasium.vector
 import gymnasium.wrappers
+
 # import jaxmarl
 import jumanji
-import matrax
+
+# import matrax
 # from gigastep import ScenarioBuilder
 # from jaxmarl.environments.smax import map_name_to_scenario
 from jumanji.environments.routing.cleaner.generator import (
@@ -49,13 +51,13 @@ from mava.wrappers import (
     GymToJumanji,
     LbfWrapper,
     # MabraxWrapper,
-    MatraxWrapper,
+    # MatraxWrapper,
     # MPEWrapper,
     RecordEpisodeMetrics,
     RwareWrapper,
-    SmacWrapper,
+    # SmacWrapper,
     # SmaxWrapper,
-    UoeWrapper,
+    # UoeWrapper,
     VectorConnectorWrapper,
     async_multiagent_worker,
 )
@@ -73,15 +75,15 @@ _jumanji_registry = {
 }
 
 # Registry mapping environment names directly to the corresponding wrapper classes.
-_matrax_registry = {"Matrax": MatraxWrapper}
+# _matrax_registry = {"Matrax": MatraxWrapper}
 # _jaxmarl_registry = {"Smax": SmaxWrapper, "MaBrax": MabraxWrapper, "MPE": MPEWrapper}
 # _gigastep_registry = {"Gigastep": GigastepWrapper}
 
-_gym_registry = {
-    "RobotWarehouse": UoeWrapper,
-    "LevelBasedForaging": UoeWrapper,
-    "SMACLite": SmacWrapper,
-}
+# _gym_registry = {
+#     "RobotWarehouse": UoeWrapper,
+#     "LevelBasedForaging": UoeWrapper,
+#     "SMACLite": SmacWrapper,
+# }
 
 
 def add_extra_wrappers(
@@ -168,33 +170,33 @@ def make_jumanji_env(config: DictConfig, add_global_state: bool = False) -> Tupl
 #     return train_env, eval_env
 
 
-def make_matrax_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
-    """
-    Creates Matrax environments for training and evaluation.
-
-    Args:
-    ----
-        env_name: The name of the environment to create.
-        config: The configuration of the environment.
-        add_global_state: Whether to add the global state to the observation.
-
-    Returns:
-    -------
-        A tuple containing a train and evaluation Matrax environment.
-
-    """
-    # Select the Matrax wrapper.
-    wrapper = _matrax_registry[config.env.scenario.name]
-
-    # Create envs.
-    task_name = config["env"]["scenario"]["task_name"]
-    train_env = matrax.make(task_name, **config.env.kwargs)
-    eval_env = matrax.make(task_name, **config.env.kwargs)
-    train_env = wrapper(train_env, add_global_state)
-    eval_env = wrapper(eval_env, add_global_state)
-
-    train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
-    return train_env, eval_env
+# def make_matrax_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
+#     """
+#     Creates Matrax environments for training and evaluation.
+#
+#     Args:
+#     ----
+#         env_name: The name of the environment to create.
+#         config: The configuration of the environment.
+#         add_global_state: Whether to add the global state to the observation.
+#
+#     Returns:
+#     -------
+#         A tuple containing a train and evaluation Matrax environment.
+#
+#     """
+#     # Select the Matrax wrapper.
+#     wrapper = _matrax_registry[config.env.scenario.name]
+#
+#     # Create envs.
+#     task_name = config["env"]["scenario"]["task_name"]
+#     train_env = matrax.make(task_name, **config.env.kwargs)
+#     eval_env = matrax.make(task_name, **config.env.kwargs)
+#     train_env = wrapper(train_env, add_global_state)
+#     eval_env = wrapper(eval_env, add_global_state)
+#
+#     train_env, eval_env = add_extra_wrappers(train_env, eval_env, config)
+#     return train_env, eval_env
 
 
 # def make_gigastep_env(
@@ -226,42 +228,42 @@ def make_matrax_env(config: DictConfig, add_global_state: bool = False) -> Tuple
 #     return train_env, eval_env
 
 
-def make_gym_env(
-    config: DictConfig,
-    num_env: int,
-    add_global_state: bool = False,
-) -> GymToJumanji:
-    """
-     Create a gymnasium environment.
-
-    Args:
-        config (Dict): The configuration of the environment.
-        num_env (int) : The number of parallel envs to create.
-        add_global_state (bool): Whether to add the global state to the observation. Default False.
-
-    Returns:
-        Async environments.
-    """
-    wrapper = _gym_registry[config.env.env_name]
-    config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
-
-    def create_gym_env(config: DictConfig, add_global_state: bool = False) -> gymnasium.Env:
-        registered_name = f"{config.env.scenario.name}:{config.env.scenario.task_name}"
-        env = gym.make(registered_name, disable_env_checker=True, **config.env.kwargs)
-        wrapped_env = wrapper(env, config.env.use_shared_rewards, add_global_state)
-        if config.system.add_agent_id:
-            wrapped_env = GymAgentIDWrapper(wrapped_env)
-        wrapped_env = GymRecordEpisodeMetrics(wrapped_env)
-        return wrapped_env
-
-    envs = gymnasium.vector.AsyncVectorEnv(
-        [lambda: create_gym_env(config, add_global_state) for _ in range(num_env)],
-        worker=async_multiagent_worker,
-    )
-
-    envs = GymToJumanji(envs)
-
-    return envs
+# def make_gym_env(
+#     config: DictConfig,
+#     num_env: int,
+#     add_global_state: bool = False,
+# ) -> GymToJumanji:
+#     """
+#      Create a gymnasium environment.
+#
+#     Args:
+#         config (Dict): The configuration of the environment.
+#         num_env (int) : The number of parallel envs to create.
+#         add_global_state (bool): Whether to add the global state to the observation. Default False.
+#
+#     Returns:
+#         Async environments.
+#     """
+#     wrapper = _gym_registry[config.env.env_name]
+#     config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
+#
+#     def create_gym_env(config: DictConfig, add_global_state: bool = False) -> gymnasium.Env:
+#         registered_name = f"{config.env.scenario.name}:{config.env.scenario.task_name}"
+#         env = gym.make(registered_name, disable_env_checker=True, **config.env.kwargs)
+#         wrapped_env = wrapper(env, config.env.use_shared_rewards, add_global_state)
+#         if config.system.add_agent_id:
+#             wrapped_env = GymAgentIDWrapper(wrapped_env)
+#         wrapped_env = GymRecordEpisodeMetrics(wrapped_env)
+#         return wrapped_env
+#
+#     envs = gymnasium.vector.AsyncVectorEnv(
+#         [lambda: create_gym_env(config, add_global_state) for _ in range(num_env)],
+#         worker=async_multiagent_worker,
+#     )
+#
+#     envs = GymToJumanji(envs)
+#
+#     return envs
 
 
 def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
@@ -284,8 +286,8 @@ def make(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, M
         return make_jumanji_env(config, add_global_state)
     # elif env_name in _jaxmarl_registry:
     #     return make_jaxmarl_env(config, add_global_state)
-    elif env_name in _matrax_registry:
-        return make_matrax_env(config, add_global_state)
+    # elif env_name in _matrax_registry:
+    #     return make_matrax_env(config, add_global_state)
     # elif env_name in _gigastep_registry:
     #     return make_gigastep_env(config, add_global_state)
     else:

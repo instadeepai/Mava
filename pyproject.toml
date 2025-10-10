@@ -12,7 +12,7 @@ dynamic = ["version"]
 license = { file = "LICENSE" }
 description = "Distributed Multi-Agent Reinforcement Learning in JAX."
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
+requires-python = "~=3.10.0"
 keywords = [
   "multi-agent",
   "reinforcement learning",
@@ -29,8 +29,6 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
   "Topic :: Software Development :: Libraries :: Python Modules",
   "License :: OSI Approved :: Apache Software License",
@@ -38,25 +36,25 @@ classifiers = [
 dependencies = [
   "colorama",
   "distrax",
-  "flashbax~=0.1.0",
-  "flax>=0.8.1,<0.10.4",
+  # "flashbax~=0.1.0",
+  "flax",
   "gymnasium==1.0.0",
-  "hydra-core==1.3.2",
+  "hydra-core",
   "id-marl-eval @ git+https://github.com/instadeepai/marl-eval",
-  "jax>=0.5.0,<0.7.0",
-  "jaxlib>=0.5.0,<0.7.0",
-  "jumanji>= 1.1.0",
-  "lbforaging",
-  "matrax>= 0.0.5",
+  "jax==0.4.10",
+  "jaxlib==0.4.10",
+  "jumanji @ git+https://github.com/instadeepai/jumanji@40f4a3306dd4bd22c9138a5ba88c0b8effb586da",
+  # "lbforaging",
+  # "matrax>= 0.0.5",
   "neptune",
-  "numpy==1.26.4",
+  "numpy~=1.24.0",
   "omegaconf",
   "optax",
   "protobuf~=3.20",
-  "rware",
+  # "rware",
   "scipy==1.12.0",
   "setuptools",
-  "smaclite @ git+https://github.com/uoe-agents/smaclite.git",
+  # "smaclite @ git+https://github.com/uoe-agents/smaclite.git",
   "tensorboard_logger",
   "tensorflow_probability",
   "type_enforced",                                               # needed because gigastep is missing this dependency
