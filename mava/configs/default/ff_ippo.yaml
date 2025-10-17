@@ -3,9 +3,20 @@ defaults:
   - arch: anakin
   - system: ppo/ff_ippo
   - network: mlp  # [mlp, cnn]
-  - env: rware  # [cleaner, connector, vector-connector, gigastep, lbf, mabrax, matrax, rware, smax, mpe]
+  - env: jaxnav  # [cleaner, connector, vector-connector, gigastep, lbf, mabrax, matrax, rware, smax, mpe]
   - _self_
 
 hydra:
   searchpath:
     - file://mava/configs
+
+ued:
+  batch_size: 1000
+  num_batches: 5
+  rollout_steps: 1000
+  num_to_save: 1000
+  num_sampled: 128
+
+arch:
+  num_envs: 256
+

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Dict, Tuple
+from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 import chex
 import jax
@@ -80,9 +80,10 @@ class RecordEpisodeMetrics(Wrapper):
         self,
         state: RecordEpisodeMetricsState,
         action: chex.Array,
+        reset_state: Optional[RecordEpisodeMetricsState] = None,
     ) -> Tuple[RecordEpisodeMetricsState, TimeStep]:
         """Step the environment."""
-        env_state, timestep = self._env.step(state.env_state, action)
+        env_state, timestep = self._env.step(state.env_state, action, reset_state.env_state if reset_state else None)
 
         done = timestep.last()
         not_done = 1 - done
@@ -109,6 +110,25 @@ class RecordEpisodeMetrics(Wrapper):
             episode_return=episode_return_info,
             episode_length=episode_length_info,
         )
+        return state, timestep
+
+    def set_env_instance(self, env_instance, key: chex.PRNGKey) -> Tuple[RecordEpisodeMetricsState, TimeStep]:
+        state, timestep = self._env.set_env_instance(env_instance, key)
+
+        state = RecordEpisodeMetricsState(
+            state,
+            key,
+            jnp.array(0.0, dtype=float),
+            jnp.array(0, dtype=int),
+            jnp.array(0.0, dtype=float),
+            jnp.array(0, dtype=int),
+        )
+        timestep.extras["episode_metrics"] = {
+            "episode_return": jnp.array(0.0, dtype=float),
+            "episode_length": jnp.array(0, dtype=int),
+            "is_terminal_step": jnp.array(False, dtype=bool),
+        }
+
         return state, timestep
 
 

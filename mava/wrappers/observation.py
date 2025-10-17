@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from functools import cached_property
-from typing import Tuple, Union
+from typing import Optional, Tuple, Union
 
 import chex
 import jax.numpy as jnp
@@ -64,9 +64,16 @@ class AgentIDWrapper(Wrapper):
         self,
         state: State,
         action: chex.Array,
+        reset_state: Optional[chex.Array] = None,
     ) -> Tuple[State, TimeStep]:
         """Step the environment."""
-        state, timestep = self._env.step(state, action)
+        state, timestep = self._env.step(state, action, reset_state)
+        timestep.observation = self._add_agent_ids(timestep, self._env.num_agents)
+
+        return state, timestep
+
+    def set_env_instance(self, env_instance, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
+        state, timestep = self._env.set_env_instance(env_instance, key)
         timestep.observation = self._add_agent_ids(timestep, self._env.num_agents)
 
         return state, timestep

@@ -1,0 +1,16 @@
+defaults:
+  - _self_
+
+env_name: JaxNav 
+scenario:
+  name: jaxnav
+  task_name: JaxNav
+
+eval_metric: episode_return
+
+implicit_agent_id: False
+log_win_rate: False
+kwargs:
+  num_agents: 2
+  act_type: Discrete
+  info_by_agent: True

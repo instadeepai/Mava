@@ -16,7 +16,7 @@ import copy
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Generic, List, Tuple, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 import chex
 import jax
@@ -30,6 +30,7 @@ from jaxmarl.environments.mabrax import MABraxEnv
 from jaxmarl.environments.mpe.simple import State as MPEState
 from jaxmarl.environments.mpe.simple_spread import SimpleSpreadMPE
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
+from jaxmarl.environments.jaxnav.jaxnav_env import JaxNav, EnvInstance
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper
@@ -219,11 +220,11 @@ class JaxMarlWrapper(Wrapper, ABC):
         return state, timestep
 
     def step(
-        self, state: JaxMarlState, action: Array
+        self, state: JaxMarlState, action: Array, reset_state: Optional[JaxMarlState] = None
     ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
         key, step_key = jax.random.split(state.key)
         obs, env_state, reward, done, _ = self._env.step(
-            step_key, state.state, unbatchify(action, self.agents)
+            step_key, state.state, unbatchify(action, self.agents), reset_state.state
         )
 
         metrics: Dict[str, Any] = {"env_metrics": {}}  # default to no metrics
@@ -617,3 +618,70 @@ class MPEGraphWrapper(GraphWrapper):
             observation=obs_spec,
             graph=graph_spec,
         )
+
+class JaxNavWrapper(JaxMarlWrapper):
+    """Wrapper for the JaxNav environment."""
+
+    def __init__(
+        self,
+        env: JaxNav,
+        has_global_state: bool = False,
+    ):
+        super().__init__(env, has_global_state, env.max_steps)
+        self._env: JaxNav
+
+    @cached_property
+    def action_dim(self) -> chex.Array:
+        "Get the actions dim for each agent."
+        # Adjusted automatically based on the action_type specified in the kwargs.
+        if _is_discrete(self._env.action_space(self.agents[0])):
+            return self._env.action_space(self.agents[0]).n
+        return self._env.action_space(self.agents[0]).shape[0]
+
+    def action_mask(self, wrapped_env_state: Any) -> Array:
+        """Get action mask for each agent."""
+        return jnp.ones((self.num_agents, self.action_dim), dtype=bool)
+
+    def get_global_state(self, wrapped_env_state: Any, obs: Dict[str, Array]) -> Array:
+        """Get global state from observation for each agent."""
+        return jnp.tile(self._env.get_world_state(wrapped_env_state), (self.num_agents, 1))
+
+    def reset(
+        self, key: PRNGKey
+    ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        state, ts = super().reset(key)
+        extras = {"env_metrics": {"GoalR": jnp.zeros((self.num_agents), dtype=jnp.int32)}}
+        ts = ts.replace(extras=extras)
+        return state, ts
+
+    def step(
+        self, state: JaxMarlState, action: Array, reset_state: Optional[JaxMarlState] = None
+    ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        key, step_key = jax.random.split(state.key)
+        obs, env_state, reward, done, info = self._env.step(
+            step_key, state.state, unbatchify(action, self.agents), reset_state.state if reset_state else None
+        )
+
+        obs = self._create_observation(obs, env_state)
+        obs = obs._replace(step_count=jnp.repeat(state.step, self.num_agents))
+        step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
+
+        ts = TimeStep(
+            step_type=step_type,
+            reward=batchify(reward, self.agents),
+            discount=(1.0 - batchify(done, self.agents)).astype(float),
+            observation=obs,
+            extras={"env_metrics": {"GoalR": info["GoalR"]}},
+        )
+        state = JaxMarlState(env_state, key, state.step + jnp.array(1, dtype=int))
+
+        return state, ts
+
+    def set_env_instance(self, env_instance: EnvInstance, key) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        obs, env_state = self._env.set_env_instance(env_instance)
+        obs = self._create_observation(obs, env_state)
+
+        ts = restart(obs, shape=(self.num_agents,), extras={"env_metrics": {"GoalR": jnp.zeros((self.num_agents), dtype=jnp.int32)}})
+        state = JaxMarlState(env_state, key, jnp.array(0, dtype=int))
+
+        return state, ts

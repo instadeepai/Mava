@@ -1,0 +1,48 @@
+defaults:
+  - logger: logger
+  - arch: anakin
+  - system: ppo/rec_ippo
+  - network: rnn # [rnn, rcnn]
+  - env: jaxnav # [cleaner, connector, vector-connector, gigastep, lbf, mabrax, matrax, rware, smax, mpe]
+  - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs
+
+ued:
+  batch_size: 1000
+  num_batches: 5
+  rollout_steps: 2000
+  num_to_save: 100
+  sampling_ratio: 1.0
+
+arch:
+  num_envs: 128
+  num_evaluation: 457
+
+system:
+  num_updates: 22850
+  rollout_length: 256
+  
+env:
+  kwargs:
+    num_agents: 2
+    map_params:
+      map_size: [7, 7]
+      fill: 0.3
+    max_w: 0.6
+    coll_rew: -4.0
+
+network:
+  hidden_state_dim: 128
+  actor_network:
+    pre_torso:
+      layer_sizes: [128]
+    post_torso:
+      layer_sizes: [128]
+  critic_network:
+    pre_torso:
+      layer_sizes: [128]
+    post_torso:
+      layer_sizes: [128]
