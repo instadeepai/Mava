@@ -172,7 +172,7 @@ def get_learner_fn(
             learner_state_with_start_state = (learner_state, start_state)
             return learner_state_with_start_state, (transition, metrics)
 
-        jax.debug.print("Start of learn")
+        # jax.debug.print("Start of learn")
         # Sample learnable states and random states
         learner_state, learnable_instances = learner_state_with_learnable_instances
         key, sampled_key, gen_key = jax.random.split(learner_state.key, 3)
@@ -204,14 +204,14 @@ def get_learner_fn(
         learner_state = RNNLearnerState(learner_state.params, learner_state.opt_states, learner_state.key, env_state, timestep, dones, hstates)
         learner_state_with_start_state = (learner_state, start_state)
 
-        jax.debug.print("Start gettign traj")
+        # jax.debug.print("Start gettign traj")
         # Step environment for rollout length
         learner_state_with_start_state, (traj_batch, episode_metrics) = jax.lax.scan(
             _env_step, learner_state_with_start_state, None, config.system.rollout_length
         )
         learner_state, _ = learner_state_with_start_state
 
-        jax.debug.print("Start updating")
+        # jax.debug.print("Start updating")
         # Calculate advantage
         params, opt_states, key, env_state, last_timestep, last_done, hstates = learner_state
 
@@ -683,9 +683,9 @@ def run_experiment(_config: DictConfig) -> float:
         start_time = time.time()
 
         key, learnable_key = jax.random.split(key)
-        print("Getting Learnable Instances")
+        # print("Getting Learnable Instances")
         learnabilities, learnable_instances = get_learnability_set(learnable_key, unreplicate_n_dims(learner_state.params.actor_params), actor_network.apply, config, env)
-        print("Finished Getting Learnable Instances")
+        # print("Finished Getting Learnable Instances")
         broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
         replicate_learnable_instances = tree.map(broadcast, learnable_instances)
 
@@ -833,19 +833,19 @@ def get_learnability_set(rng, actor_params, actor_apply_fn, config, env: JaxMarl
         runner_state, traj_batch = jax.lax.scan(
             _env_step, runner_state, None, config.ued.rollout_steps
         )
-        print("traj batch done", traj_batch[0].shape)
-        print("traj batch gr", traj_batch[1].shape)
+        # print("traj batch done", traj_batch[0].shape)
+        # print("traj batch gr", traj_batch[1].shape)
         o = _calc_outcomes_by_agent(
             config.ued.rollout_steps,
             traj_batch[0],
             traj_batch[1],
         )
-        print("o", o)
+        # print("o", o)
         success_by_env = o["success_rate"].reshape(
             (env.num_agents, config.ued.batch_size)
         )
         learnability_by_env = (success_by_env * (1 - success_by_env)).sum(axis=0)
-        print("learnability_by_env", learnability_by_env)
+        # print("learnability_by_env", learnability_by_env)
         return None, (learnability_by_env, env_instances)
     
     rngs = jax.random.split(rng, config.ued.num_batches)
@@ -858,12 +858,12 @@ def get_learnability_set(rng, actor_params, actor_apply_fn, config, env: JaxMarl
     )
     learnability = learnability.flatten()
     top_1000 = jnp.argsort(learnability)[-config.ued.num_to_save :]
-    print("top 1000", top_1000)
+    # print("top 1000", top_1000)
 
     top_1000_instances = jax.tree_map(
         lambda x: x.at[top_1000].get(), flat_env_instances
     )
-    print("top 1000 instances", top_1000_instances)
+    # print("top 1000 instances", top_1000_instances)
     return learnability.at[top_1000].get(), top_1000_instances
 
 
