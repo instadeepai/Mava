@@ -593,6 +593,7 @@ def run_experiment(_config: DictConfig) -> float:
     logger = MavaLogger(config)
     logger.log_config(OmegaConf.to_container(config, resolve=True))
 
+    print("Test Print -1")
     # Set up checkpointer
     save_checkpoint = config.logger.checkpointing.save_model
     if save_checkpoint:
