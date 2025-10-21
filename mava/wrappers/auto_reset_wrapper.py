@@ -15,7 +15,7 @@
 # Note this is only here until this is merged into jumanji
 # PR: https://github.com/instadeepai/jumanji/pull/223
 
-from typing import Tuple
+from typing import Any, Optional, Tuple
 
 import chex
 import jax
@@ -85,9 +85,14 @@ class AutoResetWrapper(Wrapper):
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep[Observation]]:
         return self._obs_in_extras(*super().reset(key))
 
-    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep[Observation]]:
+    def step(
+        self,
+        state: State,
+        action: chex.Array,
+        reset_state: Optional[Any] = None,
+    ) -> Tuple[State, TimeStep[Observation]]:
         """Step the environment, with automatic resetting if the episode terminates."""
-        state, timestep = self._env.step(state, action)
+        state, timestep = self._env.step(state, action, reset_state.state if reset_state else None)
 
         # Overwrite the state and timestep appropriately if the episode terminates.
         state, timestep = jax.lax.cond(

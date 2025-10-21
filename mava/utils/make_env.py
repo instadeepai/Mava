@@ -48,6 +48,7 @@ from mava.wrappers import (
     GymAgentIDWrapper,
     GymRecordEpisodeMetrics,
     GymToJumanji,
+    JaxNavWrapper,
     LbfWrapper,
     MabraxWrapper,
     MatraxWrapper,
@@ -83,6 +84,7 @@ _jaxmarl_registry: registry_type = {
     "Smax": {"wrapper": SmaxWrapper},
     "MaBrax": {"wrapper": MabraxWrapper},
     "MPE": {"wrapper": MPEWrapper, "graph_wrapper": MPEGraphWrapper},
+    "JaxNav": {"wrapper": JaxNavWrapper},
 }
 _gigastep_registry: registry_type = {"Gigastep": {"wrapper": GigastepWrapper}}
 

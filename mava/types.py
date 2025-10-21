@@ -66,7 +66,12 @@ class MarlEnv(Protocol):
         """
         ...
 
-    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
+    def step(
+        self,
+        state: State,
+        action: chex.Array,
+        reset_state: Optional[Any] = None,
+    ) -> Tuple[State, TimeStep]:
         """Run one timestep of the environment's dynamics.
 
         Args:
