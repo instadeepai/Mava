@@ -603,11 +603,14 @@ def run_experiment(_config: DictConfig) -> float:
         )
 
     # Create an initial hidden state used for resetting memory for evaluation
+    print("Test Print 0")
     eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
+    print("Test Print 1")
     eval_hs = ScannedRNN.initialize_carry(
         (n_devices, eval_batch_size, config.system.num_agents),
         config.network.hidden_state_dim,
     )
+    print("Test Print 2")
 
     # Run experiment for a total number of evaluations.
     max_episode_return = -jnp.inf
