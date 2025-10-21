@@ -378,6 +378,8 @@ def get_learner_fn(
                 - hstateS (HiddenStates): The initial hidden states of the RNN.
 
         """
+        print("Compiling learner_fn")
+        jax.debug.print("Running compiled learner_fn")
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
         learner_state, (episode_info, loss_info) = jax.lax.scan(
