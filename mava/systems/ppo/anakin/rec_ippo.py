@@ -589,6 +589,7 @@ def run_experiment(_config: DictConfig) -> float:
     )
 
     # Logger setup
+    print("Test Print Logger")
     logger = MavaLogger(config)
     logger.log_config(OmegaConf.to_container(config, resolve=True))
 
@@ -611,10 +612,13 @@ def run_experiment(_config: DictConfig) -> float:
     # Run experiment for a total number of evaluations.
     max_episode_return = -jnp.inf
     best_params = None
+    print("Test Print For Loop")
     for eval_step in range(config.arch.num_evaluation):
         # Train.
         start_time = time.time()
+        print("Test Print Start Time")
         learner_output = learn(learner_state)
+        print("Test Print Learner Output")
         jax.block_until_ready(learner_output)
 
         # Log the results of the training.
