@@ -14,21 +14,21 @@
 
 import copy
 import time
-from typing import Any, Tuple
 from functools import partial
+from typing import Any, Callable, Tuple
 
 import chex
 import flax
 import hydra
 import jax
 import jax.numpy as jnp
+import jaxmarl
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from jax import tree
-from omegaconf import DictConfig, OmegaConf
 from jaxmarl.environments.jaxnav.jaxnav_env import EnvInstance
-import jaxmarl
+from omegaconf import DictConfig, OmegaConf
 
 from mava.evaluator import get_eval_fn, get_num_eval_envs, make_rec_eval_act_fn
 from mava.networks import RecurrentActor as Actor
@@ -56,9 +56,8 @@ from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
-from mava.wrappers.episode_metrics import get_final_step_metrics
+from mava.wrappers.episode_metrics import RecordEpisodeMetrics, get_final_step_metrics
 from mava.wrappers.jaxmarl import JaxMarlWrapper, JaxNavWrapper
-from mava.wrappers.episode_metrics import RecordEpisodeMetrics
 from mava.wrappers.observation import AgentIDWrapper
 
 
@@ -95,7 +94,9 @@ def get_learner_fn(
     actor_apply_fn, critic_apply_fn = apply_fns
     actor_update_fn, critic_update_fn = update_fns
 
-    def _update_step(learner_state_with_learnable_instances: Tuple[RNNLearnerState, EnvInstance], _: Any) -> Tuple[RNNLearnerState, Tuple]:
+    def _update_step(
+        learner_state_with_learnable_instances: Tuple[RNNLearnerState, EnvInstance], _: Any
+    ) -> Tuple[RNNLearnerState, Tuple]:
         """A single update of the network.
 
         This function steps the environment and records the trajectory batch for
@@ -152,7 +153,9 @@ def get_learner_fn(
             value, action, log_prob = value.squeeze(0), action.squeeze(0), log_prob.squeeze(0)
 
             # Step the environment.
-            env_state, timestep = jax.vmap(env.step, in_axes=(0, 0, 0))(env_state, action, start_state)
+            env_state, timestep = jax.vmap(env.step, in_axes=(0, 0, 0))(
+                env_state, action, start_state
+            )
 
             done = timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
@@ -174,19 +177,29 @@ def get_learner_fn(
 
         # jax.debug.print("Start of learn")
         # Sample learnable states and random states
+        # TODO: fix this so that it doesn't always reset the environment
         learner_state, learnable_instances = learner_state_with_learnable_instances
         key, sampled_key, gen_key = jax.random.split(learner_state.key, 3)
         sampled_key_0, sampled_key_1 = jax.random.split(sampled_key, 2)
-        sampled_idxs = jax.random.randint(sampled_key_0, (config.ued.num_sampled,), 0, config.ued.batch_size * config.ued.num_batches)
+        sampled_idxs = jax.random.randint(
+            sampled_key_0,
+            (config.ued.num_sampled,),
+            0,
+            config.ued.batch_size * config.ued.num_batches,
+        )
         sampled_keys = jax.random.split(sampled_key_1, config.ued.num_sampled)
-        env_instances_sampled = jax.tree_util.tree_map(lambda x: x[sampled_idxs], learnable_instances)
-        env_state_sampled, timestep_sampled = jax.vmap(env.set_env_instance, in_axes=(0,0))(
+        env_instances_sampled = jax.tree_util.tree_map(
+            lambda x: x[sampled_idxs], learnable_instances
+        )
+        env_state_sampled, timestep_sampled = jax.vmap(env.set_env_instance, in_axes=(0, 0))(
             env_instances_sampled, sampled_keys
         )
 
         gen_keys = jax.random.split(gen_key, config.arch.num_envs - config.ued.num_sampled)
         env_state_gen, timestep_gen = jax.vmap(env.reset)(gen_keys)
-        timestep = jax.tree_util.tree_map(lambda x,y: jnp.concatenate([x,y], axis=0), timestep_gen, timestep_sampled)
+        timestep = jax.tree_util.tree_map(
+            lambda x, y: jnp.concatenate([x, y], axis=0), timestep_gen, timestep_sampled
+        )
         env_state = jax.tree_util.tree_map(
             lambda x, y: jnp.concatenate([x, y], axis=0),
             env_state_gen,
@@ -201,7 +214,15 @@ def get_learner_fn(
             (config.arch.num_envs, config.system.num_agents), config.network.hidden_state_dim
         )
         hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
-        learner_state = RNNLearnerState(learner_state.params, learner_state.opt_states, learner_state.key, env_state, timestep, dones, hstates)
+        learner_state = RNNLearnerState(
+            learner_state.params,
+            learner_state.opt_states,
+            learner_state.key,
+            env_state,
+            timestep,
+            dones,
+            hstates,
+        )
         learner_state_with_start_state = (learner_state, start_state)
 
         # jax.debug.print("Start gettign traj")
@@ -425,7 +446,9 @@ def get_learner_fn(
         learner_state_with_learnable_instances = (learner_state, learnable_instances)
         return learner_state_with_learnable_instances, (episode_metrics, loss_info)
 
-    def learner_fn(learner_state_with_learnable_instances: Tuple[RNNLearnerState, EnvInstance]) -> ExperimentOutput[RNNLearnerState]:
+    def learner_fn(
+        learner_state_with_learnable_instances: Tuple[RNNLearnerState, EnvInstance],
+    ) -> ExperimentOutput[RNNLearnerState]:
         """Learner function.
 
         This function represents the learner, it updates the network parameters
@@ -447,7 +470,10 @@ def get_learner_fn(
         batched_update_step = jax.vmap(_update_step, in_axes=(0, None), axis_name="batch")
 
         learner_state_with_learnable_instances, (episode_info, loss_info) = jax.lax.scan(
-            batched_update_step, learner_state_with_learnable_instances, None, config.system.num_updates_per_eval
+            batched_update_step,
+            learner_state_with_learnable_instances,
+            None,
+            config.system.num_updates_per_eval,
         )
         return ExperimentOutput(
             learner_state=learner_state_with_learnable_instances[0],
@@ -684,13 +710,21 @@ def run_experiment(_config: DictConfig) -> float:
 
         key, learnable_key = jax.random.split(key)
         # print("Getting Learnable Instances")
-        learnabilities, learnable_instances = get_learnability_set(learnable_key, unreplicate_n_dims(learner_state.params.actor_params), actor_network.apply, config, env)
+        learnabilities, learnable_instances = get_learnability_set(
+            learnable_key,
+            unreplicate_n_dims(learner_state.params.actor_params),
+            actor_network.apply,
+            config,
+            env,
+        )
         # print("Finished Getting Learnable Instances")
         broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
         replicate_learnable_instances = tree.map(broadcast, learnable_instances)
 
         # Duplicate learnable states across devices.
-        replicate_learnable_instances = flax.jax_utils.replicate(replicate_learnable_instances, devices=jax.devices())
+        replicate_learnable_instances = flax.jax_utils.replicate(
+            replicate_learnable_instances, devices=jax.devices()
+        )
         learner_state_with_learnable_instances = (learner_state, replicate_learnable_instances)
         learner_output = learn(learner_state_with_learnable_instances)
         jax.block_until_ready(learner_output)
@@ -755,66 +789,133 @@ def run_experiment(_config: DictConfig) -> float:
 
     return eval_performance
 
-@partial(jax.jit, static_argnums=(2, 3, 4))
+
+def rollout_env_step_fn(
+    rng: chex.PRNGKey,
+    env_state: chex.Array,
+    obs: chex.Array,
+    last_done: chex.Array,
+    last_hstate: chex.Array,
+    actor_apply_fn: Callable,
+    actor_params: FrozenDict,
+    env: JaxMarlWrapper,
+    reset_state: chex.Array,
+) -> Tuple[chex.Array, chex.Array]:
+    num_agents = last_done.shape[1]
+    num_envs = last_done.shape[0]
+
+    # Add a batch dimension to the observation.
+    batched_observation = tree.map(lambda x: x[jnp.newaxis, :], obs)
+    ac_in = (batched_observation, last_done[jnp.newaxis, :])
+
+    # SELECT ACTION
+    rng, policy_rng = jax.random.split(rng)
+    hstate, actor_policy = actor_apply_fn(actor_params, last_hstate, ac_in)
+    action = actor_policy.sample(seed=policy_rng)
+    action = action.squeeze(0)
+
+    # STEP ENVIRONMENT
+    env_state, timestep = jax.vmap(env.step)(env_state, action, reset_state)
+
+    # LOG EPISODE METRICS
+    done = jnp.repeat(timestep.last(), num_agents)
+    done = done.reshape(num_envs, -1)
+
+    goal_reached = timestep.extras["env_metrics"]["GoalR"]
+
+    metrics = (goal_reached,)
+
+    return rng, env_state, timestep, done, hstate, metrics
+
+
+@partial(jax.vmap, in_axes=(None, 1, 1))
+@partial(jax.jit, static_argnums=(0,))
+def calc_outcomes_by_agent(max_steps: int, dones, goal_reached):
+    idxs = jnp.arange(max_steps)
+
+    @partial(jax.vmap, in_axes=(0, 0))
+    def _ep_outcomes(start_idx, end_idx):
+        mask = (idxs > start_idx) & (idxs <= end_idx) & (end_idx != max_steps)
+        success = jnp.sum(goal_reached * mask)
+        # jax.debug.breakpoint()
+        return success
+
+    done_idxs = jnp.argwhere(dones, size=10, fill_value=max_steps).squeeze()
+    mask_done = jnp.where(done_idxs == max_steps, 0, 1)
+    success = _ep_outcomes(jnp.concatenate([jnp.array([-1]), done_idxs[:-1]]), done_idxs)
+
+    # jax.debug.breakpoint()
+    return {
+        "success_rate": success.mean(where=mask_done),
+    }
+
+
+def test_calc_outcomes_by_agent():
+    # 3 env, 2 agents, 10 steps
+    max_steps = 10
+    # dones: steps x envs x agents
+    dones_e0_a0 = jnp.array([0, 0, 1, 0, 0, 1, 0, 0, 0, 1]).reshape(-1, 1, 1)
+    dones_e0_a1 = jnp.array([0, 1, 0, 1, 0, 1, 0, 0, 0, 1]).reshape(-1, 1, 1)
+    dones_e1_a0 = jnp.array([0, 0, 1, 0, 0, 0, 1, 0, 0, 1]).reshape(-1, 1, 1)
+    dones_e1_a1 = jnp.array([0, 0, 1, 0, 0, 1, 0, 0, 0, 1]).reshape(-1, 1, 1)
+    dones_e2_a0 = jnp.array([0, 0, 1, 0, 0, 1, 0, 0, 0, 1]).reshape(-1, 1, 1)
+    dones_e2_a1 = jnp.array([0, 0, 1, 0, 0, 1, 0, 0, 0, 1]).reshape(-1, 1, 1)
+
+    dones_a0 = jnp.concatenate([dones_e0_a0, dones_e1_a0, dones_e2_a0], axis=1)
+    dones_a1 = jnp.concatenate([dones_e0_a1, dones_e1_a1, dones_e2_a1], axis=1)
+
+    dones = jnp.concatenate([dones_a0, dones_a1], axis=2)
+    goal_reached_e0_a0 = jnp.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 1]).reshape(-1, 1, 1)
+    goal_reached_e0_a1 = jnp.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 1]).reshape(-1, 1, 1)
+    goal_reached_e1_a0 = jnp.array([0, 0, 1, 0, 0, 0, 0, 0, 0, 1]).reshape(-1, 1, 1)
+    goal_reached_e1_a1 = jnp.array([0, 0, 1, 0, 0, 0, 0, 0, 0, 1]).reshape(-1, 1, 1)
+    goal_reached_e2_a0 = jnp.array([0, 0, 1, 0, 0, 1, 0, 0, 0, 1]).reshape(-1, 1, 1)
+    goal_reached_e2_a1 = jnp.array([0, 0, 1, 0, 0, 1, 0, 0, 0, 1]).reshape(-1, 1, 1)
+
+    goal_reached_a0 = jnp.concatenate(
+        [goal_reached_e0_a0, goal_reached_e1_a0, goal_reached_e2_a0], axis=1
+    )
+    goal_reached_a1 = jnp.concatenate(
+        [goal_reached_e0_a1, goal_reached_e1_a1, goal_reached_e2_a1], axis=1
+    )
+    goal_reached = jnp.concatenate([goal_reached_a0, goal_reached_a1], axis=2)
+
+    dones_by_agent = dones.reshape(max_steps, -1)
+    goal_reached_by_agent = goal_reached.reshape(max_steps, -1)
+
+    o = calc_outcomes_by_agent(max_steps, dones_by_agent, goal_reached_by_agent)
+
+    success_by_env_current = o["success_rate"].reshape(2, 3)
+
+    success_by_env_new = o["success_rate"].reshape(3, 2)
+
+    print(o)
+
+
 def get_learnability_set(rng, actor_params, actor_apply_fn, config, env: JaxMarlWrapper):
     def _batch_step(_, rng):
         def _env_step(runner_state, _: Any):
             """Step the environment."""
             rng, env_state, obs, last_done, last_hstate, start_state = runner_state
 
-            # Add a batch dimension to the observation.
-            batched_observation = tree.map(lambda x: x[jnp.newaxis, :], obs)
-            ac_in = (batched_observation, last_done[jnp.newaxis, :])
-
-            # SELECT ACTION
-            rng, policy_rng = jax.random.split(rng)
-            hstate, actor_policy = actor_apply_fn(
-                actor_params, last_hstate, ac_in
+            rng, env_state, timestep, done, hstate, metrics = rollout_env_step_fn(
+                rng,
+                env_state,
+                obs,
+                last_done,
+                last_hstate,
+                actor_apply_fn,
+                actor_params,
+                env,
+                start_state,
             )
-            action = actor_policy.sample(seed=policy_rng)
-            action = action.squeeze(0)
-
-            # STEP ENVIRONMENT
-            env_state, timestep = jax.vmap(env.step)(env_state, action, start_state)
-
-            # LOG EPISODE METRICS
-            done = jnp.repeat(timestep.last(), config["system"]["num_agents"])
-            goal_reached = jnp.ravel(timestep.extras["env_metrics"]["GoalR"])
-
-            transition = (
-                done, goal_reached
-            )
-            done = done.reshape(config.ued.batch_size, -1)
             runner_state = (rng, env_state, timestep.observation, done, hstate, start_state)
-            return runner_state, transition
-
-        @partial(jax.vmap, in_axes=(None, 1, 1))
-        @partial(jax.jit, static_argnums=(0,))
-        def _calc_outcomes_by_agent(max_steps: int, dones, goal_reached):
-            idxs = jnp.arange(max_steps)
-
-            @partial(jax.vmap, in_axes=(0, 0))
-            def __ep_outcomes(start_idx, end_idx):
-                mask = (
-                    (idxs > start_idx) & (idxs <= end_idx) & (end_idx != max_steps)
-                )
-                success = jnp.sum(goal_reached * mask)
-                return success
-
-            done_idxs = jnp.argwhere(dones, size=10, fill_value=max_steps).squeeze()
-            mask_done = jnp.where(done_idxs == max_steps, 0, 1)
-            success = __ep_outcomes(
-                jnp.concatenate([jnp.array([-1]), done_idxs[:-1]]), done_idxs
-            )
-
-            return {
-                "success_rate": success.mean(where=mask_done),
-            }
+            return runner_state, (done, metrics[0])
 
         # sample envs
         rng, _rng = jax.random.split(rng)
         reset_rng = jax.random.split(_rng, config.ued.batch_size)
-        env_state, timestep= jax.vmap(env.reset)(reset_rng)
+        env_state, timestep = jax.vmap(env.reset)(reset_rng)
         env_instances = EnvInstance(
             agent_pos=env_state.env_state.state.pos,
             agent_theta=env_state.env_state.state.theta,
@@ -835,35 +936,35 @@ def get_learnability_set(rng, actor_params, actor_apply_fn, config, env: JaxMarl
         )
         # print("traj batch done", traj_batch[0].shape)
         # print("traj batch gr", traj_batch[1].shape)
-        o = _calc_outcomes_by_agent(
+        dones_by_agent = traj_batch[0].reshape(config.ued.rollout_steps, -1)
+        goal_reached_by_agent = traj_batch[1].reshape(config.ued.rollout_steps, -1)
+
+        o = calc_outcomes_by_agent(
             config.ued.rollout_steps,
-            traj_batch[0],
-            traj_batch[1],
+            dones_by_agent,
+            goal_reached_by_agent,
         )
         # print("o", o)
         success_by_env = o["success_rate"].reshape(
-            (env.num_agents, config.ued.batch_size)
+            (config.ued.batch_size, config.system.num_agents)
         )
-        learnability_by_env = (success_by_env * (1 - success_by_env)).sum(axis=0)
+        learnability_by_env = (success_by_env * (1 - success_by_env)).sum(axis=1)
         # print("learnability_by_env", learnability_by_env)
         return None, (learnability_by_env, env_instances)
-    
-    rngs = jax.random.split(rng, config.ued.num_batches)
-    _, (learnability, env_instances) = jax.lax.scan(
-        _batch_step, None, rngs, config.ued.num_batches
-    )
 
-    flat_env_instances = jax.tree_map(
-        lambda x: x.reshape((-1,) + x.shape[2:]), env_instances
-    )
+    print("Starting get_learnability_set")
+
+    rngs = jax.random.split(rng, config.ued.num_batches)
+    _, (learnability, env_instances) = jax.lax.scan(_batch_step, None, rngs, config.ued.num_batches)
+
+    flat_env_instances = jax.tree.map(lambda x: x.reshape((-1,) + x.shape[2:]), env_instances)
     learnability = learnability.flatten()
     top_1000 = jnp.argsort(learnability)[-config.ued.num_to_save :]
     # print("top 1000", top_1000)
 
-    top_1000_instances = jax.tree_map(
-        lambda x: x.at[top_1000].get(), flat_env_instances
-    )
+    top_1000_instances = jax.tree.map(lambda x: x.at[top_1000].get(), flat_env_instances)
     # print("top 1000 instances", top_1000_instances)
+    print("Finished get_learnability_set")
     return learnability.at[top_1000].get(), top_1000_instances
 
 
@@ -886,7 +987,94 @@ def test_get_learnability_set(_config: DictConfig) -> None:
     )
 
     single_actor_params = unreplicate_n_dims(learner_state.params.actor_params)
-    learnability, top_1000_instances = get_learnability_set(key, single_actor_params, actor_network.apply, config, env)
+    learnability, top_instances = get_learnability_set(
+        key, single_actor_params, actor_network.apply, config, env
+    )
+
+    # Validate the top instances by rolling them out
+    print(f"\n{Fore.CYAN}{'='*80}")
+    print(f"Validating Top {config.ued.num_to_save} Instances")
+    print(f"{'='*80}{Style.RESET_ALL}\n")
+
+    key, key_instance = jax.random.split(key_e)
+    instance_keys = jax.random.split(key_instance, config.ued.num_to_save)
+    env_state, timestep = jax.vmap(env.set_env_instance, in_axes=(0, 0))(
+        top_instances, instance_keys
+    )
+
+    # Initialize hidden state for the actor
+    dones = jnp.zeros((config.ued.num_to_save, env.num_agents), dtype=bool)
+    hstate = ScannedRNN.initialize_carry(
+        (config.ued.num_to_save, env.num_agents), config.network.hidden_state_dim
+    )
+
+    # Rollout function
+    def _step(carry, _):
+        rng, env_state, obs, last_done, last_hstate, start_state = carry
+
+        rng, env_state, timestep, done, hstate, metrics = rollout_env_step_fn(
+            rng,
+            env_state,
+            obs,
+            last_done,
+            last_hstate,
+            actor_network.apply,
+            single_actor_params,
+            env,
+            start_state,
+        )
+        new_carry = (rng, env_state, timestep.observation, done, hstate, start_state)
+
+        return new_carry, (done, metrics[0])
+
+    # Run rollout
+    start_state = env_state
+    key, step_key = jax.random.split(key)
+    initial_carry = (step_key, env_state, timestep.observation, dones, hstate, start_state)
+    _, (dones_traj, goals_traj) = jax.lax.scan(_step, initial_carry, None, config.ued.rollout_steps)
+
+    # Print results
+    print(f"{Fore.GREEN}Validation Results:{Style.RESET_ALL}\n")
+    print(f"{'Index':<8} {'Learnability':<15} {'Actual Success':<18} {'Per-Agent Success':<25}")
+    print("-" * 80)
+
+    for i in range(config.ued.num_to_save):
+        learnability_score = float(learnability[i])
+
+        o = calc_outcomes_by_agent(
+            config.ued.rollout_steps, dones_traj[:, i, :], goals_traj[:, i, :]
+        )
+
+        actual_success = float(validation_results[i]["success_rate"])
+        per_agent = validation_results[i]["per_agent_success"]
+        per_agent_str = "[" + ", ".join([f"{float(s):.2f}" for s in per_agent]) + "]"
+
+        # Color code based on success rate
+        if actual_success > 0.8:
+            color = Fore.RED  # Too easy
+        elif actual_success > 0.2:
+            color = Fore.GREEN  # Good learning zone
+        else:
+            color = Fore.YELLOW  # Too hard
+
+        print(
+            f"{color}{i:<8} {learnability_score:<15.4f} {actual_success:<18.2f} {per_agent_str:<25}{Style.RESET_ALL}"
+        )
+
+    # Summary statistics
+    avg_learnability = float(jnp.mean(learnability))
+    avg_success = float(jnp.mean(jnp.array([r["success_rate"] for r in validation_results])))
+
+    print("\n" + "-" * 80)
+    print(f"{Fore.CYAN}Summary:{Style.RESET_ALL}")
+    print(f"  Average Learnability Score: {avg_learnability:.4f}")
+    print(f"  Average Actual Success Rate: {avg_success:.4f}")
+    print(
+        f"  Target Range (0.2-0.8): {Fore.GREEN}✓{Style.RESET_ALL}"
+        if 0.2 <= avg_success <= 0.8
+        else f"{Fore.RED}✗{Style.RESET_ALL}"
+    )
+    print(f"\n{Fore.CYAN}{'='*80}{Style.RESET_ALL}\n")
 
 
 @hydra.main(
@@ -900,6 +1088,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
     OmegaConf.set_struct(cfg, False)
 
     # Run experiment.
+    # test_calc_outcomes_by_agent()
     eval_performance = run_experiment(cfg)
     print(f"{Fore.CYAN}{Style.BRIGHT}Recurrent SFL IPPO experiment completed{Style.RESET_ALL}")
     return eval_performance
