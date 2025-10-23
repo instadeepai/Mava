@@ -670,7 +670,12 @@ class JaxNavWrapper(JaxMarlWrapper):
             jnp.array(0, dtype=int),
             metrics={"Success": jnp.zeros((self.num_agents,), jnp.int32)},
         )
-        extras = {"env_metrics": {"Success": state.metrics["Success"]}}
+        extras = {
+            "env_metrics": {
+                "GoalR": jnp.zeros((self.num_agents), dtype=jnp.int32),
+                "Success": state.metrics["Success"],
+            }
+        }
         timestep = restart(obs, shape=(self.num_agents,), extras=extras)
 
         return state, timestep
@@ -690,14 +695,18 @@ class JaxNavWrapper(JaxMarlWrapper):
         obs = obs._replace(step_count=jnp.repeat(state.step, self.num_agents))
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
 
-        success = state.metrics["Success"] | info["GoalR"]
+        goal_just_reached = info["GoalR"]
+        success = state.metrics["Success"] | goal_just_reached
 
         ts = TimeStep(
             step_type=step_type,
             reward=batchify(reward, self.agents),
             discount=(1.0 - batchify(done, self.agents)).astype(float),
             observation=obs,
-            extras={"env_metrics": {"Success": success}},
+            extras={"env_metrics": {"GoalR": goal_just_reached, "Success": success}},
+        )
+        success = jax.lax.select(
+            done["__all__"], jnp.zeros((self.num_agents), dtype=jnp.int32), success
         )
         state = JaxNavState(
             env_state, key, state.step + jnp.array(1, dtype=int), metrics={"Success": success}
@@ -714,7 +723,12 @@ class JaxNavWrapper(JaxMarlWrapper):
         ts = restart(
             obs,
             shape=(self.num_agents,),
-            extras={"env_metrics": {"Success": jnp.zeros((self.num_agents), dtype=jnp.int32)}},
+            extras={
+                "env_metrics": {
+                    "GoalR": jnp.zeros((self.num_agents), dtype=jnp.int32),
+                    "Success": jnp.zeros((self.num_agents), dtype=jnp.int32),
+                }
+            },
         )
         state = JaxNavState(
             env_state,

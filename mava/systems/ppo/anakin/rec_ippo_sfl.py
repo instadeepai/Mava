@@ -696,7 +696,7 @@ def run_experiment(_config: DictConfig) -> float:
 
         key, learnable_key = jax.random.split(key)
         # print("Getting Learnable Instances")
-        learnabilities, learnable_instances = get_learnability_set(
+        _, _, learnable_instances = get_learnability_set(
             learnable_key,
             unreplicate_n_dims(learner_state.params.actor_params),
             actor_network.apply,
@@ -802,6 +802,7 @@ def rollout_env_step_fn(
 
     # STEP ENVIRONMENT
     env_state, timestep = jax.vmap(env.step)(env_state, action, reset_state)
+    # jax.lax.cond(timestep.extras['env_metrics']['Success'].sum() > 0, lambda: jax.debug.breakpoint(), lambda: None)
 
     # LOG EPISODE METRICS
     done = jnp.repeat(timestep.last(), num_agents)
@@ -948,22 +949,23 @@ def get_learnability_set(rng, actor_params, actor_apply_fn, config, env: JaxMarl
 
     flat_env_instances = jax.tree.map(lambda x: x.reshape((-1,) + x.shape[2:]), env_instances)
     learnability = learnability.flatten()
+    flat_success = success.reshape(-1, config.system.num_agents)
     top_1000 = jnp.argsort(learnability)[-config.ued.num_to_save :]
     # print("top 1000", top_1000)
 
     top_1000_instances = jax.tree.map(lambda x: x.at[top_1000].get(), flat_env_instances)
     # print("top 1000 instances", top_1000_instances)
     print("Finished get_learnability_set")
-    return learnability.at[top_1000].get(), top_1000_instances
+    return flat_success.at[top_1000, :].get(), learnability.at[top_1000].get(), top_1000_instances
 
 
 def test_get_learnability_set(_config: DictConfig) -> None:
     """Tests get_learnability_set."""
-    _config.logger.system_name = "ff_ippo"
+    _config.logger.system_name = "rec_ippo_sfl"
     config = copy.deepcopy(_config)
 
     # Create the enviroments for train and eval.
-    env, eval_env = make_env(config)
+    env, _ = make_env(config)
 
     # PRNG keys.
     key, key_e, actor_net_key, critic_net_key = jax.random.split(
@@ -976,7 +978,7 @@ def test_get_learnability_set(_config: DictConfig) -> None:
     )
 
     single_actor_params = unreplicate_n_dims(learner_state.params.actor_params)
-    learnability, top_instances = get_learnability_set(
+    success, learnability, top_instances = get_learnability_set(
         key, single_actor_params, actor_network.apply, config, env
     )
 
@@ -1014,13 +1016,20 @@ def test_get_learnability_set(_config: DictConfig) -> None:
         )
         new_carry = (rng, env_state, timestep.observation, done, hstate, start_state)
 
-        return new_carry, (done, metrics[0])
+        return new_carry, (done, metrics[0], timestep.extras["env_metrics"]["Success"])
+
+    # Need to fix this
+    def _calc_success_rate(dones: chex.Array, successes: chex.Array) -> chex.Array:
+        done_idxs = jnp.argwhere(dones.flatten()).squeeze()
+        return successes.flatten().at[done_idxs].get().mean()
 
     # Run rollout
     start_state = env_state
     key, step_key = jax.random.split(key)
     initial_carry = (step_key, env_state, timestep.observation, dones, hstate, start_state)
-    _, (dones_traj, goals_traj) = jax.lax.scan(_step, initial_carry, None, config.ued.rollout_steps)
+    _, (dones_traj, goals_traj, successes_traj) = jax.lax.scan(
+        _step, initial_carry, None, config.ued.rollout_steps
+    )
 
     # Print results
     print(f"{Fore.GREEN}Validation Results:{Style.RESET_ALL}\n")
@@ -1032,27 +1041,17 @@ def test_get_learnability_set(_config: DictConfig) -> None:
 
         o = calc_outcomes_by_agent(
             config.ued.rollout_steps, dones_traj[:, i, :], goals_traj[:, i, :]
-        )
+        )["success_rate"]
 
-        actual_success = float(validation_results[i]["success_rate"])
-        per_agent = validation_results[i]["per_agent_success"]
-        per_agent_str = "[" + ", ".join([f"{float(s):.2f}" for s in per_agent]) + "]"
+        actual_success = _calc_success_rate(dones_traj[:, i, :], successes_traj[:, i, :])
 
-        # Color code based on success rate
-        if actual_success > 0.8:
-            color = Fore.RED  # Too easy
-        elif actual_success > 0.2:
-            color = Fore.GREEN  # Good learning zone
-        else:
-            color = Fore.YELLOW  # Too hard
-
-        print(
-            f"{color}{i:<8} {learnability_score:<15.4f} {actual_success:<18.2f} {per_agent_str:<25}{Style.RESET_ALL}"
-        )
+        print(learnability_score)
+        print(o.mean())
+        print(actual_success)
 
     # Summary statistics
     avg_learnability = float(jnp.mean(learnability))
-    avg_success = float(jnp.mean(jnp.array([r["success_rate"] for r in validation_results])))
+    avg_success = float(jnp.mean(successes_traj))
 
     print("\n" + "-" * 80)
     print(f"{Fore.CYAN}Summary:{Style.RESET_ALL}")
