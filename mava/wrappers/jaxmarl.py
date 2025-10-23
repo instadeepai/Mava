@@ -26,11 +26,11 @@ from chex import Array, PRNGKey
 from gymnax.environments import spaces as gymnax_spaces
 from jaxmarl.environments import SMAX
 from jaxmarl.environments import spaces as jaxmarl_spaces
+from jaxmarl.environments.jaxnav.jaxnav_env import EnvInstance, JaxNav
 from jaxmarl.environments.mabrax import MABraxEnv
 from jaxmarl.environments.mpe.simple import State as MPEState
 from jaxmarl.environments.mpe.simple_spread import SimpleSpreadMPE
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
-from jaxmarl.environments.jaxnav.jaxnav_env import JaxNav, EnvInstance
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper
@@ -619,6 +619,17 @@ class MPEGraphWrapper(GraphWrapper):
             graph=graph_spec,
         )
 
+
+@dataclass
+class JaxNavState(Generic[JaxMarlStateType]):
+    """Wrapper around a JaxMarl state to provide necessary attributes for jumanji environments."""
+
+    state: JaxMarlStateType
+    key: chex.PRNGKey
+    step: int
+    metrics: dict
+
+
 class JaxNavWrapper(JaxMarlWrapper):
     """Wrapper for the JaxNav environment."""
 
@@ -648,40 +659,68 @@ class JaxNavWrapper(JaxMarlWrapper):
 
     def reset(
         self, key: PRNGKey
-    ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
-        state, ts = super().reset(key)
-        extras = {"env_metrics": {"GoalR": jnp.zeros((self.num_agents), dtype=jnp.int32)}}
-        ts = ts.replace(extras=extras)
-        return state, ts
+    ) -> Tuple[JaxNavState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        key, reset_key = jax.random.split(key)
+        obs, env_state = self._env.reset(reset_key)
+
+        obs = self._create_observation(obs, env_state)
+        state = JaxNavState(
+            env_state,
+            key,
+            jnp.array(0, dtype=int),
+            metrics={"Success": jnp.zeros((self.num_agents,), jnp.int32)},
+        )
+        extras = {"env_metrics": {"Success": state.metrics["Success"]}}
+        timestep = restart(obs, shape=(self.num_agents,), extras=extras)
+
+        return state, timestep
 
     def step(
-        self, state: JaxMarlState, action: Array, reset_state: Optional[JaxMarlState] = None
-    ) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+        self, state: JaxNavState, action: Array, reset_state: Optional[JaxMarlState] = None
+    ) -> Tuple[JaxNavState, TimeStep[Union[Observation, ObservationGlobalState]]]:
         key, step_key = jax.random.split(state.key)
         obs, env_state, reward, done, info = self._env.step(
-            step_key, state.state, unbatchify(action, self.agents), reset_state.state if reset_state else None
+            step_key,
+            state.state,
+            unbatchify(action, self.agents),
+            reset_state.state if reset_state else None,
         )
 
         obs = self._create_observation(obs, env_state)
         obs = obs._replace(step_count=jnp.repeat(state.step, self.num_agents))
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
 
+        success = state.metrics["Success"] | info["GoalR"]
+
         ts = TimeStep(
             step_type=step_type,
             reward=batchify(reward, self.agents),
             discount=(1.0 - batchify(done, self.agents)).astype(float),
             observation=obs,
-            extras={"env_metrics": {"GoalR": info["GoalR"]}},
+            extras={"env_metrics": {"Success": success}},
         )
-        state = JaxMarlState(env_state, key, state.step + jnp.array(1, dtype=int))
+        state = JaxNavState(
+            env_state, key, state.step + jnp.array(1, dtype=int), metrics={"Success": success}
+        )
 
         return state, ts
 
-    def set_env_instance(self, env_instance: EnvInstance, key) -> Tuple[JaxMarlState, TimeStep[Union[Observation, ObservationGlobalState]]]:
+    def set_env_instance(
+        self, env_instance: EnvInstance, key
+    ) -> Tuple[JaxNavState, TimeStep[Union[Observation, ObservationGlobalState]]]:
         obs, env_state = self._env.set_env_instance(env_instance)
         obs = self._create_observation(obs, env_state)
 
-        ts = restart(obs, shape=(self.num_agents,), extras={"env_metrics": {"GoalR": jnp.zeros((self.num_agents), dtype=jnp.int32)}})
-        state = JaxMarlState(env_state, key, jnp.array(0, dtype=int))
+        ts = restart(
+            obs,
+            shape=(self.num_agents,),
+            extras={"env_metrics": {"Success": jnp.zeros((self.num_agents), dtype=jnp.int32)}},
+        )
+        state = JaxNavState(
+            env_state,
+            key,
+            jnp.array(0, dtype=int),
+            metrics={"Success": jnp.zeros((self.num_agents,), jnp.int32)},
+        )
 
         return state, ts

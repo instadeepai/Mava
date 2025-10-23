@@ -179,7 +179,10 @@ def get_learner_fn(
         # Sample learnable states and random states
         # TODO: fix this so that it doesn't always reset the environment
         learner_state, learnable_instances = learner_state_with_learnable_instances
+
         key, sampled_key, gen_key = jax.random.split(learner_state.key, 3)
+
+        # Sample learnable states
         sampled_key_0, sampled_key_1 = jax.random.split(sampled_key, 2)
         sampled_idxs = jax.random.randint(
             sampled_key_0,
@@ -191,46 +194,29 @@ def get_learner_fn(
         env_instances_sampled = jax.tree_util.tree_map(
             lambda x: x[sampled_idxs], learnable_instances
         )
-        env_state_sampled, timestep_sampled = jax.vmap(env.set_env_instance, in_axes=(0, 0))(
+        env_state_sampled, _ = jax.vmap(env.set_env_instance, in_axes=(0, 0))(
             env_instances_sampled, sampled_keys
         )
 
+        # Generate random states
         gen_keys = jax.random.split(gen_key, config.arch.num_envs - config.ued.num_sampled)
-        env_state_gen, timestep_gen = jax.vmap(env.reset)(gen_keys)
-        timestep = jax.tree_util.tree_map(
-            lambda x, y: jnp.concatenate([x, y], axis=0), timestep_gen, timestep_sampled
-        )
+        env_state_gen, _ = jax.vmap(env.reset)(gen_keys)
+
+        # Concatenate sampled and generated states
         env_state = jax.tree_util.tree_map(
             lambda x, y: jnp.concatenate([x, y], axis=0),
             env_state_gen,
             env_state_sampled,
         )
-        start_state = env_state
-        dones = jnp.zeros((config.arch.num_envs, config.system.num_agents), dtype=bool)
-        policy_hidden_state = ScannedRNN.initialize_carry(
-            (config.arch.num_envs, config.system.num_agents), config.network.hidden_state_dim
-        )
-        critic_hidden_state = ScannedRNN.initialize_carry(
-            (config.arch.num_envs, config.system.num_agents), config.network.hidden_state_dim
-        )
-        hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
-        learner_state = RNNLearnerState(
-            learner_state.params,
-            learner_state.opt_states,
-            learner_state.key,
-            env_state,
-            timestep,
-            dones,
-            hstates,
-        )
-        learner_state_with_start_state = (learner_state, start_state)
+        reset_state = env_state
+        learner_state_with_reset_state = (learner_state, reset_state)
 
         # jax.debug.print("Start gettign traj")
         # Step environment for rollout length
-        learner_state_with_start_state, (traj_batch, episode_metrics) = jax.lax.scan(
-            _env_step, learner_state_with_start_state, None, config.system.rollout_length
+        learner_state_with_reset_state, (traj_batch, episode_metrics) = jax.lax.scan(
+            _env_step, learner_state_with_reset_state, None, config.system.rollout_length
         )
-        learner_state, _ = learner_state_with_start_state
+        learner_state, _ = learner_state_with_reset_state
 
         # jax.debug.print("Start updating")
         # Calculate advantage
@@ -950,12 +936,15 @@ def get_learnability_set(rng, actor_params, actor_apply_fn, config, env: JaxMarl
         )
         learnability_by_env = (success_by_env * (1 - success_by_env)).sum(axis=1)
         # print("learnability_by_env", learnability_by_env)
-        return None, (learnability_by_env, env_instances)
+        # jax.debug.breakpoint()
+        return None, (success_by_env, learnability_by_env, env_instances)
 
     print("Starting get_learnability_set")
 
     rngs = jax.random.split(rng, config.ued.num_batches)
-    _, (learnability, env_instances) = jax.lax.scan(_batch_step, None, rngs, config.ued.num_batches)
+    _, (success, learnability, env_instances) = jax.lax.scan(
+        _batch_step, None, rngs, config.ued.num_batches
+    )
 
     flat_env_instances = jax.tree.map(lambda x: x.reshape((-1,) + x.shape[2:]), env_instances)
     learnability = learnability.flatten()
@@ -1089,6 +1078,7 @@ def hydra_entry_point(cfg: DictConfig) -> float:
 
     # Run experiment.
     # test_calc_outcomes_by_agent()
+    # _ = test_get_learnability_set(cfg)
     eval_performance = run_experiment(cfg)
     print(f"{Fore.CYAN}{Style.BRIGHT}Recurrent SFL IPPO experiment completed{Style.RESET_ALL}")
     return eval_performance
