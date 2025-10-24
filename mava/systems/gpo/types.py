@@ -22,6 +22,20 @@ from tensorflow_probability.substrates.jax.distributions import Distribution
 from typing_extensions import NamedTuple
 
 
+class Params(NamedTuple):
+    """Parameters of an actor critic network."""
+
+    guider_params: FrozenDict
+    actor_params: FrozenDict
+
+
+class OptStates(NamedTuple):
+    """OptStates of actor critic learner."""
+
+    guider_opt_state: OptState
+    actor_opt_state: OptState
+
+
 class SableNetworkConfig(NamedTuple):
     """Configuration for the Sable network."""
 
@@ -30,7 +44,7 @@ class SableNetworkConfig(NamedTuple):
     embed_dim: int
 
 
-class HiddenStates(NamedTuple):
+class SableHiddenStates(NamedTuple):
     """Hidden states for the encoder and decoder."""
 
     encoder: Array
@@ -38,32 +52,43 @@ class HiddenStates(NamedTuple):
     decoder_cross_retn: Array
 
 
-class RecLearnerState(NamedTuple):
-    """State of the learner for Memory Sable"""
+class HiddenStates(NamedTuple):
+    """Hidden states for the encoder and decoder."""
 
-    params: FrozenDict
-    opt_states: OptState
+    sable_hidden_state: SableHiddenStates
+    policy_hidden_state: Array
+
+
+class GPOLearnerState(NamedTuple):
+    """State of the `Learner` for recurrent architectures."""
+
+    params: Params
+    opt_states: OptStates
     key: PRNGKey
     env_state: Array
     timestep: TimeStep
+    dones: Array
     hstates: HiddenStates
 
 
-class FFLearnerState(NamedTuple):
-    """State of the learner for ff-Sable"""
+class GPOTransition(NamedTuple):
+    """Transition tuple for PPO."""
 
-    params: FrozenDict
-    opt_states: OptState
-    key: PRNGKey
-    env_state: Array
-    timestep: TimeStep
+    done: Array
+    action: Array
+    value: Array
+    reward: Array
+    log_prob: Array
+    obs: Array
+    hstates: HiddenStates
 
 
 ActorApply = Callable[
     [FrozenDict, Array, Array, HiddenStates, PRNGKey],
     Tuple[Array, Array, Array, Array, HiddenStates],
 ]
-LearnerApply = Callable[
+SableApply = Callable[
     [FrozenDict, Array, Array, Array, HiddenStates, Array, PRNGKey],
     Tuple[Array, Array, Array, Distribution],
 ]
+LearnerApply = Callable[[FrozenDict, Array, Array], Tuple[Array, Distribution]]

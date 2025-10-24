@@ -107,7 +107,7 @@ Mava has implementations of multiple on- and off-policy multi-agent algorithms t
 | MAT        | [`mat.py`](mava/systems/mat/anakin/mat.py)       | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/abs/2205.14953) | [Link](mava/systems/mat/README.md) |
 | Sable      | [`ff_sable.py`](mava/systems/sable/anakin/ff_sable.py)  | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/abs/2410.01706) | [Link](mava/systems/sable/README.md) |
 |            | [`rec_sable.py`](mava/systems/sable/anakin/rec_sable.py) | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/abs/2410.01706) | [Link](mava/systems/sable/README.md) |
-
+| GPO        | [`rec_magpo.py`](mava/systems/gpo/anakin/rec_magpo.py) | ✅         | ✅       | ✅     |         | [Link](https://arxiv.org/abs/2507.18059) | [Link](mava/systems/gpo/README.md) |
 <h2>Environments</h2>
 
 These are the environments which Mava supports _out of the box_, to add a new environment, please use the [existing wrapper implementations](mava/wrappers/) as an example. We also indicate whether the environment is implemented in JAX or not. JAX-based environments can be used with algorithms that follow the Anakin distribution architecture, while non-JAX environments can be used with algorithms following the Sebulba architecture.

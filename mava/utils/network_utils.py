@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple, Union
 
-import hydra
+from typing import Dict, Iterator, Tuple, Union
+
 from gymnasium.spaces import Discrete, MultiDiscrete, Space
+from hydra.utils import get_class
 from jumanji.specs import DiscreteArray, MultiDiscreteArray, Spec
 from omegaconf import DictConfig
+from omegaconf.omegaconf import OmegaConf
 
 from mava.networks.gnn import GNN
 
@@ -33,16 +35,33 @@ def get_action_head(action_types: Union[Spec, Space]) -> Tuple[Dict[str, str], s
     return {"_target_": "mava.networks.heads.ContinuousActionHead"}, _CONTINUOUS
 
 
+def _find_key(key: str, d: dict) -> Iterator:
+    """
+    Recursively searches for a key in a nested dictionary and yields its values.
+
+    This function traverses a dictionary, including any dictionaries nested within it.
+    It uses a generator (`yield`) to return each matching value as it is found.
+
+    Args:
+        key (str): The key to search for.
+        d (dict): The dictionary to search within.
+
+    Yields:
+        The value associated with each found instance of the key.
+    """
+    for k, v in d.items():
+        if k == key:  # If the current key matches the target key, yield its value.
+            yield v
+
+        if isinstance(v, dict):  # If the value is another dictionary, recurse into it.
+            yield from _find_key(key, v)
+
+
 def is_gnn_based(config: DictConfig) -> bool:
-    """Checks if either actor or critic network's pre-torso uses a GNN architecture.
+    """Checks if any of the networks use a GNN architecture.
 
     Returns:
-        True if either the actor or critic network uses a GNN architecture, False otherwise.
+        True any of the networks use a GNN architecture, false otherwise.
     """
-    return issubclass(
-        hydra.utils.get_class(config.network.actor_network.pre_torso._target_),
-        GNN,
-    ) or issubclass(
-        hydra.utils.get_class(config.network.critic_network.pre_torso._target_),
-        GNN,
-    )
+    net_config = OmegaConf.to_container(config.network, resolve=True)
+    return any(issubclass(get_class(net), GNN) for net in _find_key("_target_", net_config))
