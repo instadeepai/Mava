@@ -52,7 +52,7 @@ uv sync
 source .venv/bin/activate
 ```
 
-To install MAVA with a GPU or TPU aware version of JAX
+To install Mava with a GPU or TPU aware version of JAX
 
 ```bash
 uv sync --extra cuda12  # GPU aware JAX
