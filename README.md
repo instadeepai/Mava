@@ -84,7 +84,7 @@ python mava/systems/ppo/anakin/ff_ippo.py env=lbf
 Different scenarios can also be run by making the following config updates from the terminal:
 
 ```bash
-python mava/systems/ff_ippo.py env=rware env/scenario=tiny-4ag
+python mava/systems/ppo/anakin/ff_ippo.py env=rware env/scenario=tiny-4ag
 ```
 
 Additionally, we also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first multi-agent system.
