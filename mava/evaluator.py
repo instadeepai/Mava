@@ -27,6 +27,7 @@ from jumanji.types import TimeStep
 from omegaconf import DictConfig
 from typing_extensions import TypeAlias
 
+from mava.networks import ScannedRNN
 from mava.types import (
     Action,
     ActorApply,
@@ -166,6 +167,113 @@ def get_eval_fn(
         end_time = time.time()
         total_timesteps = jnp.sum(metrics["episode_length"])
         metrics["steps_per_second"] = total_timesteps / (end_time - start_time)
+        return metrics
+
+    return timed_eval_fn
+
+
+def get_singleton_eval_fn(
+    envs: list[MarlEnv], act_fn: EvalActFn, config: DictConfig, absolute_metric: bool
+) -> EvalFn:
+    """Creates a function that can be used to evaluate agents on a given environment.
+
+    Args:
+    ----
+        env: an environment that conforms to the mava environment spec.
+        act_fn: a function that takes in params, timestep, key and optionally a state
+                and returns actions and optionally a state (see `EvalActFn`).
+        config: the system config.
+        absolute_metric: whether or not this evaluator calculates the absolute_metric.
+                This determines how many evaluation episodes it does.
+    """
+    n_devices = jax.device_count()
+    eval_episodes = (
+        config.arch.num_absolute_metric_eval_episodes
+        if absolute_metric
+        else config.arch.num_eval_episodes
+    )
+    n_vmapped_envs = get_num_eval_envs(config, absolute_metric)
+    n_parallel_envs = n_vmapped_envs * n_devices
+    episode_loops = 1
+
+    # Warnings if num eval episodes is not divisible by num parallel envs.
+    if eval_episodes % n_parallel_envs != 0:
+        warnings.warn(
+            f"Number of evaluation episodes ({eval_episodes}) is not divisible by `num_envs` * "
+            f"`num_devices` ({n_parallel_envs} * {n_devices}). Some extra evaluations will be "
+            f"executed. New number of evaluation episodes = {episode_loops * n_parallel_envs}",
+            stacklevel=2,
+        )
+
+    def eval_fn(
+        env: MarlEnv, params: FrozenDict, key: PRNGKey, init_act_state: ActorState
+    ) -> Metrics:
+        """Evaluates the given params on an environment and returns relevent metrics.
+
+        Metrics are collected by the `RecordEpisodeMetrics` wrapper: episode return and length,
+        also win rate for environments that support it.
+
+        Returns: Dict[str, Array] - dictionary of metric name to metric values for each episode.
+        """
+
+        def _env_step(eval_state: _EvalEnvStepState, _: Any) -> Tuple[_EvalEnvStepState, TimeStep]:
+            """Performs a single environment step"""
+            env_state, ts, key, actor_state = eval_state
+
+            key, act_key = jax.random.split(key)
+            action, actor_state = act_fn(params, ts, act_key, actor_state)
+            env_state, ts = jax.vmap(env.step)(env_state, action)
+
+            return (env_state, ts, key, actor_state), ts
+
+        def _episode(key: PRNGKey, _: Any) -> Tuple[PRNGKey, Metrics]:
+            """Simulates `num_envs` episodes."""
+            key, reset_key = jax.random.split(key)
+            reset_keys = jax.random.split(reset_key, n_vmapped_envs)
+            env_state, ts = jax.vmap(env.reset)(reset_keys)
+
+            step_state = env_state, ts, key, init_act_state
+            _, timesteps = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit + 1))
+
+            metrics = timesteps.extras["episode_metrics"] | timesteps.extras["env_metrics"]
+
+            # find the first instance of done to get the metrics at that timestep, we don't
+            # care about subsequent steps because we only the results from the first episode
+            done_idx = jnp.argmax(timesteps.last(), axis=0)
+            metrics = tree.map(lambda m: m[done_idx, jnp.arange(n_vmapped_envs)], metrics)
+
+            return key, metrics
+
+        # This loop is important because we don't want too many parallel envs.
+        # So in evaluation we have num_envs parallel envs and loop enough times
+        # so that we do at least `eval_episodes` number of episodes.
+        _, metrics = jax.lax.scan(_episode, key, xs=None, length=episode_loops)
+        metrics = tree.map(lambda x: x.reshape(-1), metrics)  # flatten metrics
+        return metrics
+
+    def timed_eval_fn(params: FrozenDict, key: PRNGKey) -> Metrics:
+        """Wrapper around eval function to time it and add in steps per second metric."""
+        eval_fn_jitted = jax.jit(eval_fn, static_argnums=(0,))
+        params, key = jax.tree.map(lambda x: x[0], (params, key))
+        metrics_by_env = []
+        for i, env in enumerate(envs):
+            act_state = {
+                "hidden_state": ScannedRNN.initialize_carry(
+                    (n_vmapped_envs, env.num_agents),
+                    config.network.hidden_state_dim,
+                )
+            }
+            start_time = time.time()
+
+            metrics = eval_fn_jitted(env, params, key, act_state)
+            metrics = jax.block_until_ready(metrics)
+
+            end_time = time.time()
+            total_timesteps = jnp.sum(metrics["episode_length"])
+            metrics["steps_per_second"] = total_timesteps / (end_time - start_time)
+            metrics_by_env.append(jax.tree.map(lambda x: jnp.mean(x), metrics))
+
+        metrics = jax.tree.map(lambda *x: jnp.stack(x), *metrics_by_env)
         return metrics
 
     return timed_eval_fn

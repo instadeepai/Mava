@@ -27,10 +27,16 @@ import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from jax import tree
+from jaxmarl.environments.jaxnav import make_jaxnav_singleton_collection
 from jaxmarl.environments.jaxnav.jaxnav_env import EnvInstance
 from omegaconf import DictConfig, OmegaConf
 
-from mava.evaluator import get_eval_fn, get_num_eval_envs, make_rec_eval_act_fn
+from mava.evaluator import (
+    get_eval_fn,
+    get_num_eval_envs,
+    get_singleton_eval_fn,
+    make_rec_eval_act_fn,
+)
 from mava.networks import RecurrentActor as Actor
 from mava.networks import RecurrentValueNet as Critic
 from mava.networks import ScannedRNN
@@ -58,30 +64,34 @@ from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import RecordEpisodeMetrics, get_final_step_metrics
 from mava.wrappers.jaxmarl import JaxMarlWrapper, JaxNavWrapper
-from mava.wrappers.observation import AgentIDWrapper
 
 
 def make_env(config: DictConfig) -> MarlEnv:
     kwargs = dict(config.env.kwargs)
     # Create jaxmarl envs.
     train_env: MarlEnv = JaxNavWrapper(
-        jaxmarl.make(config.env.scenario.name, **kwargs),
+        jaxmarl.make(config.env.scenario.name, num_agents=config.env.num_agents, **kwargs),
     )
     eval_env: MarlEnv = JaxNavWrapper(
-        jaxmarl.make(config.env.scenario.name, **kwargs),
+        jaxmarl.make(config.env.scenario.name, num_agents=config.env.num_agents, **kwargs),
     )
+    eval_envs = [
+        JaxNavWrapper(e) for e in make_jaxnav_singleton_collection("multi", **config.env.kwargs)[0]
+    ]
 
     # Disable the AgentID wrapper if the environment has implicit agent IDs.
-    config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
+    # config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
 
-    if config.system.add_agent_id:
-        train_env = AgentIDWrapper(train_env)
-        eval_env = AgentIDWrapper(eval_env)
+    # if config.system.add_agent_id:
+    #     train_env = AgentIDWrapper(train_env)
+    #     eval_env = AgentIDWrapper(eval_env)
+    #     eval_envs = [AgentIDWrapper(e) for e in eval_envs]
 
     train_env = RecordEpisodeMetrics(train_env)
     eval_env = RecordEpisodeMetrics(eval_env)
+    eval_envs = [RecordEpisodeMetrics(e) for e in eval_envs]
 
-    return train_env, eval_env
+    return train_env, eval_env, eval_envs
 
 
 def get_learner_fn(
@@ -630,7 +640,7 @@ def run_experiment(_config: DictConfig) -> float:
         ), "Number of envs must be divisibile by number of minibatches."
 
     # Create the enviroments for train and eval.
-    env, eval_env = make_env(config)
+    env, eval_env, eval_envs_hard = make_env(config)
 
     # PRNG keys.
     key, key_e, actor_net_key, critic_net_key = jax.random.split(
@@ -646,7 +656,7 @@ def run_experiment(_config: DictConfig) -> float:
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
     eval_act_fn = make_rec_eval_act_fn(actor_network.apply, config)
-    evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
+    evaluator = get_singleton_eval_fn(eval_envs_hard, eval_act_fn, config, absolute_metric=False)
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
@@ -733,7 +743,7 @@ def run_experiment(_config: DictConfig) -> float:
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
         # Evaluate.
-        eval_metrics = evaluator(trained_params, eval_keys, {"hidden_state": eval_hs})
+        eval_metrics = evaluator(trained_params, eval_keys)
         logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
         episode_return = jnp.mean(eval_metrics["episode_return"])
 
