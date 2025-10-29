@@ -198,7 +198,7 @@ def get_learner_fn(
             sampled_key_0,
             (config.ued.num_sampled,),
             0,
-            config.ued.batch_size * config.ued.num_batches,
+            config.ued.num_to_save,
         )
         sampled_keys = jax.random.split(sampled_key_1, config.ued.num_sampled)
         env_instances_sampled = jax.tree_util.tree_map(
