@@ -706,7 +706,7 @@ def run_experiment(_config: DictConfig) -> float:
 
         key, learnable_key = jax.random.split(key)
         # print("Getting Learnable Instances")
-        _, _, learnable_instances = get_learnability_set(
+        _, learnability_scores, learnable_instances = get_learnability_set(
             learnable_key,
             unreplicate_n_dims(learner_state.params.actor_params),
             actor_network.apply,
@@ -728,14 +728,17 @@ def run_experiment(_config: DictConfig) -> float:
         # Log the results of the training.
         elapsed_time = time.time() - start_time
         t = int(steps_per_rollout * (eval_step + 1))
+        num_updates = (eval_step + 1) * config.system.num_updates_per_eval
         episode_metrics, ep_completed = get_final_step_metrics(learner_output.episode_metrics)
         episode_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
 
         # Separately log timesteps, actoring metrics and training metrics.
-        logger.log({"timestep": t}, t, eval_step, LogEvent.MISC)
+        logger.log({"timestep": t}, num_updates, eval_step, LogEvent.MISC)
         if ep_completed:  # only log episode metrics if an episode was completed in the rollout.
-            logger.log(episode_metrics, t, eval_step, LogEvent.ACT)
-        logger.log(learner_output.train_metrics, t, eval_step, LogEvent.TRAIN)
+            logger.log(episode_metrics, num_updates, eval_step, LogEvent.ACT)
+        train_metrics = learner_output.train_metrics
+        train_metrics["learnability"] = learnability_scores
+        logger.log(train_metrics, num_updates, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.
         trained_params = unreplicate_batch_dim(learner_state.params.actor_params)
@@ -744,7 +747,9 @@ def run_experiment(_config: DictConfig) -> float:
         eval_keys = eval_keys.reshape(n_devices, -1)
         # Evaluate.
         eval_metrics = evaluator(trained_params, eval_keys)
-        logger.log(eval_metrics, t, eval_step, LogEvent.EVAL)
+        logger.log(
+            eval_metrics, eval_step * config.system.num_updates_per_eval, eval_step, LogEvent.EVAL
+        )
         episode_return = jnp.mean(eval_metrics["episode_return"])
 
         if save_checkpoint:
@@ -889,7 +894,9 @@ def test_calc_outcomes_by_agent():
     print(o)
 
 
-def get_learnability_set(rng, actor_params, actor_apply_fn, config, env: JaxMarlWrapper):
+def get_learnability_set(
+    rng, actor_params, actor_apply_fn, config, env: JaxMarlWrapper
+) -> Tuple[chex.Array, chex.Array, EnvInstance]:
     def _batch_step(_, rng):
         def _env_step(runner_state, _: Any):
             """Step the environment."""
@@ -1026,7 +1033,7 @@ def test_get_learnability_set(_config: DictConfig) -> None:
         )
         new_carry = (rng, env_state, timestep.observation, done, hstate, start_state)
 
-        return new_carry, (done, metrics[0], timestep.extras["env_metrics"]["Success"])
+        return new_carry, (done, metrics[0], timestep.extras["env_metrics"]["win_rate"])
 
     # Need to fix this
     def _calc_success_rate(dones: chex.Array, successes: chex.Array) -> chex.Array:

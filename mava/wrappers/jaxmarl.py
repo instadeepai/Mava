@@ -668,12 +668,12 @@ class JaxNavWrapper(JaxMarlWrapper):
             env_state,
             key,
             jnp.array(0, dtype=int),
-            metrics={"Success": jnp.zeros((self.num_agents,), jnp.int32)},
+            metrics={"win_rate": jnp.zeros((self.num_agents,), jnp.int32)},
         )
         extras = {
             "env_metrics": {
                 "GoalR": jnp.zeros((self.num_agents), dtype=jnp.int32),
-                "Success": state.metrics["Success"],
+                "win_rate": state.metrics["win_rate"],
             }
         }
         timestep = restart(obs, shape=(self.num_agents,), extras=extras)
@@ -696,20 +696,20 @@ class JaxNavWrapper(JaxMarlWrapper):
         step_type = jax.lax.select(done["__all__"], StepType.LAST, StepType.MID)
 
         goal_just_reached = info["GoalR"]
-        success = state.metrics["Success"] | goal_just_reached
+        success = state.metrics["win_rate"] | goal_just_reached
 
         ts = TimeStep(
             step_type=step_type,
             reward=batchify(reward, self.agents),
             discount=(1.0 - batchify(done, self.agents)).astype(float),
             observation=obs,
-            extras={"env_metrics": {"GoalR": goal_just_reached, "Success": success}},
+            extras={"env_metrics": {"GoalR": goal_just_reached, "win_rate": success}},
         )
         success = jax.lax.select(
             done["__all__"], jnp.zeros((self.num_agents), dtype=jnp.int32), success
         )
         state = JaxNavState(
-            env_state, key, state.step + jnp.array(1, dtype=int), metrics={"Success": success}
+            env_state, key, state.step + jnp.array(1, dtype=int), metrics={"win_rate": success}
         )
 
         return state, ts
@@ -726,7 +726,7 @@ class JaxNavWrapper(JaxMarlWrapper):
             extras={
                 "env_metrics": {
                     "GoalR": jnp.zeros((self.num_agents), dtype=jnp.int32),
-                    "Success": jnp.zeros((self.num_agents), dtype=jnp.int32),
+                    "win_rate": jnp.zeros((self.num_agents), dtype=jnp.int32),
                 }
             },
         )
@@ -734,7 +734,7 @@ class JaxNavWrapper(JaxMarlWrapper):
             env_state,
             key,
             jnp.array(0, dtype=int),
-            metrics={"Success": jnp.zeros((self.num_agents,), jnp.int32)},
+            metrics={"win_rate": jnp.zeros((self.num_agents,), jnp.int32)},
         )
 
         return state, ts
