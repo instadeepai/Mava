@@ -22,19 +22,16 @@ import flax
 import hydra
 import jax
 import jax.numpy as jnp
-import jaxmarl
+import jumanji
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from jax import tree
-from jaxmarl.environments.jaxnav import make_jaxnav_singleton_collection
-from jaxmarl.environments.jaxnav.jaxnav_env import EnvInstance
 from omegaconf import DictConfig, OmegaConf
 
 from mava.evaluator import (
     get_eval_fn,
     get_num_eval_envs,
-    get_singleton_eval_fn,
     make_rec_eval_act_fn,
 )
 from mava.networks import RecurrentActor as Actor
@@ -59,25 +56,31 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
 from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.make_env import _jumanji_registry
 from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
+from mava.wrappers.auto_reset_wrapper import DeterministicAutoResetWrapper
 from mava.wrappers.episode_metrics import RecordEpisodeMetrics, get_final_step_metrics
-from mava.wrappers.jaxmarl import JaxMarlWrapper, JaxNavWrapper
+
+
+def make_jumanji_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
+    # Config generator and select the wrapper.
+    generator = _jumanji_registry[config.env.env_name]["generator"]
+    generator = generator(**config.env.scenario.task_config)
+    wrapper = _jumanji_registry[config.env.env_name]["wrapper"]
+
+    # Create envs.
+    env_config = {**config.env.kwargs, **config.env.scenario.env_kwargs}
+    train_env = jumanji.make(config.env.scenario.name, generator=generator, **env_config)
+    eval_env = jumanji.make(config.env.scenario.name, generator=generator, **env_config)
+    train_env = wrapper(train_env, add_global_state=add_global_state)
+    eval_env = wrapper(eval_env, add_global_state=add_global_state)
+    return train_env, eval_env
 
 
 def make_env(config: DictConfig) -> MarlEnv:
-    kwargs = dict(config.env.kwargs)
-    # Create jaxmarl envs.
-    train_env: MarlEnv = JaxNavWrapper(
-        jaxmarl.make(config.env.scenario.name, num_agents=config.env.num_agents, **kwargs),
-    )
-    eval_env: MarlEnv = JaxNavWrapper(
-        jaxmarl.make(config.env.scenario.name, num_agents=config.env.num_agents, **kwargs),
-    )
-    eval_envs = [
-        JaxNavWrapper(e) for e in make_jaxnav_singleton_collection("multi", **config.env.kwargs)[0]
-    ]
+    train_env, eval_env = make_jumanji_env(config)
 
     # Disable the AgentID wrapper if the environment has implicit agent IDs.
     # config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
@@ -87,11 +90,13 @@ def make_env(config: DictConfig) -> MarlEnv:
     #     eval_env = AgentIDWrapper(eval_env)
     #     eval_envs = [AgentIDWrapper(e) for e in eval_envs]
 
+    train_env = DeterministicAutoResetWrapper(train_env)
+
     train_env = RecordEpisodeMetrics(train_env)
     eval_env = RecordEpisodeMetrics(eval_env)
-    eval_envs = [RecordEpisodeMetrics(e) for e in eval_envs]
+    # eval_envs = [RecordEpisodeMetrics(e) for e in eval_envs]
 
-    return train_env, eval_env, eval_envs
+    return train_env, eval_env
 
 
 def get_learner_fn(
@@ -105,7 +110,7 @@ def get_learner_fn(
     actor_update_fn, critic_update_fn = update_fns
 
     def _update_step(
-        learner_state_with_learnable_instances: Tuple[RNNLearnerState, EnvInstance], _: Any
+        learner_state_learnable_env_state: Tuple[RNNLearnerState, Any], _: Any
     ) -> Tuple[RNNLearnerState, Tuple]:
         """A single update of the network.
 
@@ -188,7 +193,7 @@ def get_learner_fn(
         # jax.debug.print("Start of learn")
         # Sample learnable states and random states
         # TODO: fix this so that it doesn't always reset the environment
-        learner_state, learnable_instances = learner_state_with_learnable_instances
+        learner_state, learnable_env_state = learner_state_learnable_env_state
 
         key, sampled_key, gen_key = jax.random.split(learner_state.key, 3)
 
@@ -200,26 +205,19 @@ def get_learner_fn(
             0,
             config.ued.num_to_save,
         )
-        sampled_keys = jax.random.split(sampled_key_1, config.ued.num_sampled)
-        env_instances_sampled = jax.tree_util.tree_map(
-            lambda x: x[sampled_idxs], learnable_instances
-        )
-        env_state_sampled, _ = jax.vmap(env.set_env_instance, in_axes=(0, 0))(
-            env_instances_sampled, sampled_keys
-        )
+        env_state_sampled = jax.tree_util.tree_map(lambda x: x[sampled_idxs], learnable_env_state)
 
         # Generate random states
         gen_keys = jax.random.split(gen_key, config.arch.num_envs - config.ued.num_sampled)
         env_state_gen, _ = jax.vmap(env.reset)(gen_keys)
 
         # Concatenate sampled and generated states
-        env_state = jax.tree_util.tree_map(
+        state_re = jax.tree_util.tree_map(
             lambda x, y: jnp.concatenate([x, y], axis=0),
             env_state_gen,
             env_state_sampled,
         )
-        reset_state = env_state
-        learner_state_with_reset_state = (learner_state, reset_state)
+        learner_state_with_reset_state = (learner_state, state_re)
 
         # jax.debug.print("Start gettign traj")
         # Step environment for rollout length
@@ -439,11 +437,11 @@ def get_learner_fn(
             last_done,
             hstates,
         )
-        learner_state_with_learnable_instances = (learner_state, learnable_instances)
-        return learner_state_with_learnable_instances, (episode_metrics, loss_info)
+        learner_state_learnable_env_state = (learner_state, learnable_env_state)
+        return learner_state_learnable_env_state, (episode_metrics, loss_info)
 
     def learner_fn(
-        learner_state_with_learnable_instances: Tuple[RNNLearnerState, EnvInstance],
+        learner_state_with_learnable_instances: Tuple[RNNLearnerState, Any],
     ) -> ExperimentOutput[RNNLearnerState]:
         """Learner function.
 
@@ -640,7 +638,7 @@ def run_experiment(_config: DictConfig) -> float:
         ), "Number of envs must be divisibile by number of minibatches."
 
     # Create the enviroments for train and eval.
-    env, eval_env, eval_envs_hard = make_env(config)
+    env, eval_env = make_env(config)
 
     # PRNG keys.
     key, key_e, actor_net_key, critic_net_key = jax.random.split(
@@ -656,7 +654,7 @@ def run_experiment(_config: DictConfig) -> float:
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
     eval_act_fn = make_rec_eval_act_fn(actor_network.apply, config)
-    evaluator = get_singleton_eval_fn(eval_envs_hard, eval_act_fn, config, absolute_metric=False)
+    evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
@@ -746,7 +744,7 @@ def run_experiment(_config: DictConfig) -> float:
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
         # Evaluate.
-        eval_metrics = evaluator(trained_params, eval_keys)
+        eval_metrics = evaluator(trained_params, eval_keys, {"hidden_state": eval_hs})
         logger.log(
             eval_metrics, eval_step * config.system.num_updates_per_eval, eval_step, LogEvent.EVAL
         )
@@ -799,7 +797,7 @@ def rollout_env_step_fn(
     last_hstate: chex.Array,
     actor_apply_fn: Callable,
     actor_params: FrozenDict,
-    env: JaxMarlWrapper,
+    env: Any,
     reset_state: chex.Array,
 ) -> Tuple[chex.Array, chex.Array]:
     num_agents = last_done.shape[1]
@@ -823,7 +821,7 @@ def rollout_env_step_fn(
     done = jnp.repeat(timestep.last(), num_agents)
     done = done.reshape(num_envs, -1)
 
-    goal_reached = timestep.extras["env_metrics"]["GoalR"]
+    goal_reached = env_state.env_state.agents.connected
 
     metrics = (goal_reached,)
 
@@ -838,7 +836,7 @@ def calc_outcomes_by_agent(max_steps: int, dones, goal_reached):
     @partial(jax.vmap, in_axes=(0, 0))
     def _ep_outcomes(start_idx, end_idx):
         mask = (idxs > start_idx) & (idxs <= end_idx) & (end_idx != max_steps)
-        success = jnp.sum(goal_reached * mask)
+        success = jnp.max(goal_reached * mask)
         # jax.debug.breakpoint()
         return success
 
@@ -895,12 +893,12 @@ def test_calc_outcomes_by_agent():
 
 
 def get_learnability_set(
-    rng, actor_params, actor_apply_fn, config, env: JaxMarlWrapper
-) -> Tuple[chex.Array, chex.Array, EnvInstance]:
+    rng, actor_params, actor_apply_fn, config, env: Any
+) -> Tuple[chex.Array, chex.Array, Any]:
     def _batch_step(_, rng):
         def _env_step(runner_state, _: Any):
             """Step the environment."""
-            rng, env_state, obs, last_done, last_hstate, start_state = runner_state
+            rng, env_state, obs, last_done, last_hstate, reset_key = runner_state
 
             rng, env_state, timestep, done, hstate, metrics = rollout_env_step_fn(
                 rng,
@@ -911,22 +909,15 @@ def get_learnability_set(
                 actor_apply_fn,
                 actor_params,
                 env,
-                start_state,
+                reset_key,
             )
-            runner_state = (rng, env_state, timestep.observation, done, hstate, start_state)
+            runner_state = (rng, env_state, timestep.observation, done, hstate, reset_key)
             return runner_state, (done, metrics[0])
 
         # sample envs
         rng, _rng = jax.random.split(rng)
         reset_rng = jax.random.split(_rng, config.ued.batch_size)
         env_state, timestep = jax.vmap(env.reset)(reset_rng)
-        env_instances = EnvInstance(
-            agent_pos=env_state.env_state.state.pos,
-            agent_theta=env_state.env_state.state.theta,
-            goal_pos=env_state.env_state.state.goal,
-            map_data=env_state.env_state.state.map_data,
-            rew_lambda=env_state.env_state.state.rew_lambda,
-        )
         dones = jnp.zeros(
             (config.ued.batch_size, config.system.num_agents),
             dtype=bool,
@@ -955,25 +946,25 @@ def get_learnability_set(
         learnability_by_env = (success_by_env * (1 - success_by_env)).sum(axis=1)
         # print("learnability_by_env", learnability_by_env)
         # jax.debug.breakpoint()
-        return None, (success_by_env, learnability_by_env, env_instances)
+        return None, (success_by_env, learnability_by_env, env_state)
 
     print("Starting get_learnability_set")
 
     rngs = jax.random.split(rng, config.ued.num_batches)
-    _, (success, learnability, env_instances) = jax.lax.scan(
+    _, (success, learnability, env_state_ts) = jax.lax.scan(
         _batch_step, None, rngs, config.ued.num_batches
     )
 
-    flat_env_instances = jax.tree.map(lambda x: x.reshape((-1,) + x.shape[2:]), env_instances)
+    flat_env_state_ts = jax.tree.map(lambda x: x.reshape((-1,) + x.shape[2:]), env_state_ts)
     learnability = learnability.flatten()
     flat_success = success.reshape(-1, config.system.num_agents)
-    top_1000 = jnp.argsort(learnability)[-config.ued.num_to_save :]
+    top_k = jnp.argsort(learnability)[-config.ued.num_to_save :]
     # print("top 1000", top_1000)
 
-    top_1000_instances = jax.tree.map(lambda x: x.at[top_1000].get(), flat_env_instances)
-    # print("top 1000 instances", top_1000_instances)
+    top_k_states = jax.tree.map(lambda x: x.at[top_k].get(), flat_env_state_ts)
+    # print("top 1000 instances", top_1000_env_state_ts)
     print("Finished get_learnability_set")
-    return flat_success.at[top_1000, :].get(), learnability.at[top_1000].get(), top_1000_instances
+    return flat_success.at[top_k, :].get(), learnability.at[top_k].get(), top_k_states
 
 
 def test_get_learnability_set(_config: DictConfig) -> None:

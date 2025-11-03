@@ -15,7 +15,7 @@
 
 from abc import ABC, abstractmethod
 from functools import cached_property
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import chex
 import jax
@@ -82,7 +82,9 @@ class JumanjiMarlWrapper(Wrapper, ABC):
 
         return state, timestep
 
-    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
+    def step(
+        self, state: State, action: chex.Array, reset_state: Optional[State] = None
+    ) -> Tuple[State, TimeStep]:
         """Step the environment."""
         state, timestep = self._env.step(state, action)
         timestep = self.modify_timestep(timestep)

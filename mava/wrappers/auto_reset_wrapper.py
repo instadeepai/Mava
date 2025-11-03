@@ -20,6 +20,7 @@ from typing import Any, Optional, Tuple
 import chex
 import jax
 from jumanji.env import State
+from jumanji.environments.routing.connector.types import Observation as ConnectorObservation
 from jumanji.types import TimeStep
 from jumanji.wrappers import Observation, Wrapper
 
@@ -104,3 +105,49 @@ class AutoResetWrapper(Wrapper):
         )
 
         return state, timestep
+
+
+class DeterministicAutoResetWrapper(Wrapper):
+    # This init isn't really needed as jumanji.Wrapper will forward the attributes,
+    # but mypy doesn't realize this.
+    def __init__(self, env: MarlEnv):
+        super().__init__(env)
+        self._env: MarlEnv
+
+        self.num_agents = self._env.num_agents
+        self.time_limit = self._env.time_limit
+        self.action_dim = self._env.action_dim
+
+    def step(
+        self,
+        state: State,
+        action: chex.Array,
+        state_re: chex.PRNGKey,
+    ) -> Tuple[State, TimeStep[Observation]]:
+        """Step the environment, with automatic resetting if the episode terminates."""
+        state_st, timestep_st = self._env.step(state, action)
+        reset_observation = connector_init_state_to_observation(self._env, state_re)
+        reset_timestep_raw = timestep_st.replace(
+            observation=reset_observation, extras=timestep_st.extras["env_metrics"]
+        )
+        timestep_re = self._env.modify_timestep(reset_timestep_raw)
+
+        # Auto-reset environment based on termination
+        state = jax.tree.map(
+            lambda x, y: jax.lax.select(timestep_st.last(), x, y), state_re, state_st
+        )
+        timestep = jax.tree.map(
+            lambda x, y: jax.lax.select(timestep_st.last(), x, y), timestep_re, timestep_st
+        )
+
+        return state, timestep
+
+
+def connector_init_state_to_observation(env, state: State) -> ConnectorObservation:
+    action_mask = jax.vmap(env._get_action_mask, (0, None))(state.agents, state.grid)
+    observation = ConnectorObservation(
+        grid=state.grid,
+        action_mask=action_mask,
+        step_count=state.step_count,
+    )
+    return observation
