@@ -823,7 +823,7 @@ def rollout_env_step_fn(
 
     goal_reached = env_state.env_state.agents.connected
 
-    metrics = (goal_reached,)
+    metrics = (goal_reached, timestep.extras["env_metrics"]["won_episode"])
 
     return rng, env_state, timestep, done, hstate, metrics
 
@@ -912,7 +912,7 @@ def get_learnability_set(
                 reset_key,
             )
             runner_state = (rng, env_state, timestep.observation, done, hstate, reset_key)
-            return runner_state, (done, metrics[0])
+            return runner_state, (done, *metrics)
 
         # sample envs
         rng, _rng = jax.random.split(rng)
@@ -939,14 +939,22 @@ def get_learnability_set(
             dones_by_agent,
             goal_reached_by_agent,
         )
-        # print("o", o)
+
+        won_episode_outcomes = calc_outcomes_by_agent(
+            config.ued.rollout_steps,
+            traj_batch[0][:, :, 0],
+            traj_batch[2],
+        )
+        # jax.debug.print("won_episode_outcomes: {won_episode_outcomes}", won_episode_outcomes)
+        success_by_env_0 = won_episode_outcomes["success_rate"]
+        learnability_by_env_0 = success_by_env_0 * (1 - success_by_env_0)
         success_by_env = o["success_rate"].reshape(
             (config.ued.batch_size, config.system.num_agents)
         )
         learnability_by_env = (success_by_env * (1 - success_by_env)).sum(axis=1)
         # print("learnability_by_env", learnability_by_env)
         # jax.debug.breakpoint()
-        return None, (success_by_env, learnability_by_env, env_state)
+        return None, (success_by_env_0, learnability_by_env_0, env_state)
 
     print("Starting get_learnability_set")
 
