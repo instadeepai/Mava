@@ -27,6 +27,10 @@ import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
 from jax import tree
+from jumanji.environments.routing.connector.generator import (
+    RandomWalkGenerator,
+    UniformRandomGenerator,
+)
 from omegaconf import DictConfig, OmegaConf
 
 from mava.evaluator import (
@@ -66,14 +70,20 @@ from mava.wrappers.episode_metrics import RecordEpisodeMetrics, get_final_step_m
 
 def make_jumanji_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
     # Config generator and select the wrapper.
-    generator = _jumanji_registry[config.env.env_name]["generator"]
-    generator = generator(**config.env.scenario.task_config)
+    if config.env.generator == "random_walk":
+        train_generator = RandomWalkGenerator(**config.env.scenario.task_config)
+    elif config.env.generator == "uniform":
+        train_generator = UniformRandomGenerator(**config.env.scenario.task_config)
+    else:
+        raise ValueError(f"Generator {config.env.generator} not supported.")
+
+    eval_generator = RandomWalkGenerator(**config.env.scenario.task_config)
     wrapper = _jumanji_registry[config.env.env_name]["wrapper"]
 
     # Create envs.
     env_config = {**config.env.kwargs, **config.env.scenario.env_kwargs}
-    train_env = jumanji.make(config.env.scenario.name, generator=generator, **env_config)
-    eval_env = jumanji.make(config.env.scenario.name, generator=generator, **env_config)
+    train_env = jumanji.make(config.env.scenario.name, generator=train_generator, **env_config)
+    eval_env = jumanji.make(config.env.scenario.name, generator=eval_generator, **env_config)
     train_env = wrapper(train_env, add_global_state=add_global_state)
     eval_env = wrapper(eval_env, add_global_state=add_global_state)
     return train_env, eval_env
@@ -704,7 +714,7 @@ def run_experiment(_config: DictConfig) -> float:
 
         key, learnable_key = jax.random.split(key)
         # print("Getting Learnable Instances")
-        _, learnability_scores, learnable_instances = get_learnability_set(
+        success_scores, learnability_scores, learnable_instances = get_learnability_set(
             learnable_key,
             unreplicate_n_dims(learner_state.params.actor_params),
             actor_network.apply,
@@ -736,6 +746,7 @@ def run_experiment(_config: DictConfig) -> float:
             logger.log(episode_metrics, num_updates, eval_step, LogEvent.ACT)
         train_metrics = learner_output.train_metrics
         train_metrics["learnability"] = learnability_scores
+        train_metrics["learnability_win_rate"] = success_scores
         logger.log(train_metrics, num_updates, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.
@@ -828,9 +839,9 @@ def rollout_env_step_fn(
     return rng, env_state, timestep, done, hstate, metrics
 
 
-@partial(jax.vmap, in_axes=(None, 1, 1))
-@partial(jax.jit, static_argnums=(0,))
-def calc_outcomes_by_agent(max_steps: int, dones, goal_reached):
+@partial(jax.vmap, in_axes=(None, None, 1, 1))
+@partial(jax.jit, static_argnums=(0, 1))
+def calc_outcomes_by_agent(max_steps: int, max_episodes: int, dones, goal_reached):
     idxs = jnp.arange(max_steps)
 
     @partial(jax.vmap, in_axes=(0, 0))
@@ -840,7 +851,7 @@ def calc_outcomes_by_agent(max_steps: int, dones, goal_reached):
         # jax.debug.breakpoint()
         return success
 
-    done_idxs = jnp.argwhere(dones, size=10, fill_value=max_steps).squeeze()
+    done_idxs = jnp.argwhere(dones, size=max_episodes, fill_value=max_steps).squeeze()
     mask_done = jnp.where(done_idxs == max_steps, 0, 1)
     success = _ep_outcomes(jnp.concatenate([jnp.array([-1]), done_idxs[:-1]]), done_idxs)
 
@@ -936,12 +947,14 @@ def get_learnability_set(
 
         o = calc_outcomes_by_agent(
             config.ued.rollout_steps,
+            config.ued.max_episodes,
             dones_by_agent,
             goal_reached_by_agent,
         )
 
         won_episode_outcomes = calc_outcomes_by_agent(
             config.ued.rollout_steps,
+            config.ued.max_episodes,
             traj_batch[0][:, :, 0],
             traj_batch[2],
         )
@@ -952,9 +965,10 @@ def get_learnability_set(
             (config.ued.batch_size, config.system.num_agents)
         )
         learnability_by_env = (success_by_env * (1 - success_by_env)).sum(axis=1)
+        perfect_regret = 1 - success_by_env_0
         # print("learnability_by_env", learnability_by_env)
         # jax.debug.breakpoint()
-        return None, (success_by_env_0, learnability_by_env_0, env_state)
+        return None, (success_by_env_0, perfect_regret, env_state)
 
     print("Starting get_learnability_set")
 
