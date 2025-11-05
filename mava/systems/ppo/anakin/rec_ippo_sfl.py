@@ -36,6 +36,7 @@ from omegaconf import DictConfig, OmegaConf
 from mava.evaluator import (
     get_eval_fn,
     get_num_eval_envs,
+    get_singleton_eval_fn,
     make_rec_eval_act_fn,
 )
 from mava.networks import RecurrentActor as Actor
@@ -58,6 +59,7 @@ from mava.types import (
 )
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
+from mava.utils.connector_eval import get_eval_envs
 from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.make_env import _jumanji_registry
@@ -66,6 +68,7 @@ from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
 from mava.wrappers.auto_reset_wrapper import DeterministicAutoResetWrapper
 from mava.wrappers.episode_metrics import RecordEpisodeMetrics, get_final_step_metrics
+from mava.wrappers.jumanji import VectorConnectorWrapper
 
 
 def make_jumanji_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
@@ -91,6 +94,7 @@ def make_jumanji_env(config: DictConfig, add_global_state: bool = False) -> Tupl
 
 def make_env(config: DictConfig) -> MarlEnv:
     train_env, eval_env = make_jumanji_env(config)
+    eval_envs = get_eval_envs()
 
     # Disable the AgentID wrapper if the environment has implicit agent IDs.
     # config.system.add_agent_id = config.system.add_agent_id & (~config.env.implicit_agent_id)
@@ -101,12 +105,12 @@ def make_env(config: DictConfig) -> MarlEnv:
     #     eval_envs = [AgentIDWrapper(e) for e in eval_envs]
 
     train_env = DeterministicAutoResetWrapper(train_env)
-
+    eval_envs = [RecordEpisodeMetrics(VectorConnectorWrapper(e)) for e in eval_envs]
     train_env = RecordEpisodeMetrics(train_env)
     eval_env = RecordEpisodeMetrics(eval_env)
     # eval_envs = [RecordEpisodeMetrics(e) for e in eval_envs]
 
-    return train_env, eval_env
+    return train_env, eval_env, eval_envs
 
 
 def get_learner_fn(
@@ -648,7 +652,7 @@ def run_experiment(_config: DictConfig) -> float:
         ), "Number of envs must be divisibile by number of minibatches."
 
     # Create the enviroments for train and eval.
-    env, eval_env = make_env(config)
+    env, eval_env, eval_envs = make_env(config)
 
     # PRNG keys.
     key, key_e, actor_net_key, critic_net_key = jax.random.split(
@@ -664,7 +668,7 @@ def run_experiment(_config: DictConfig) -> float:
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
     eval_act_fn = make_rec_eval_act_fn(actor_network.apply, config)
-    evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
+    evaluator = get_singleton_eval_fn(eval_envs, eval_act_fn, config, absolute_metric=False)
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
@@ -755,7 +759,7 @@ def run_experiment(_config: DictConfig) -> float:
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
         # Evaluate.
-        eval_metrics = evaluator(trained_params, eval_keys, {"hidden_state": eval_hs})
+        eval_metrics = evaluator(trained_params, eval_keys)
         logger.log(
             eval_metrics, eval_step * config.system.num_updates_per_eval, eval_step, LogEvent.EVAL
         )

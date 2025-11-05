@@ -15,6 +15,16 @@
 # Auto-generated level data
 # Do not edit manually
 
+from typing import List
+
+import chex
+import jax
+import jax.numpy as jnp
+from jumanji.environments.routing.connector import Connector
+from jumanji.environments.routing.connector.constants import POSITION, TARGET
+from jumanji.environments.routing.connector.generator import Generator
+from jumanji.environments.routing.connector.types import Agent, State
+
 LEVELS = {
     "cc_easy_5_3_2": {
         "grid_size": 5,
@@ -123,3 +133,42 @@ LEVELS = {
         "target_pos": [[2, 4], [3, 2], [3, 1], [4, 0], [2, 1]],
     },
 }
+
+
+class SingletonGenerator(Generator):
+    def __init__(self, level_name: str):
+        self._grid_size = LEVELS[level_name]["grid_size"]
+        self._num_agents = LEVELS[level_name]["num_agents"]
+        level_data = LEVELS[level_name]
+
+        grid = jnp.zeros((self._grid_size, self._grid_size), dtype=jnp.int32)
+        start_pos = jnp.array(level_data["start_pos"])
+        target_pos = jnp.array(level_data["target_pos"])
+        grid = grid.at[start_pos[:, 0], start_pos[:, 1]].set(
+            POSITION + jnp.arange(self._num_agents) * 3
+        )
+        grid = grid.at[target_pos[:, 0], target_pos[:, 1]].set(
+            TARGET + jnp.arange(self._num_agents) * 3
+        )
+
+        agents = Agent(
+            id=jnp.arange(self._num_agents), start=start_pos, target=target_pos, position=start_pos
+        )
+        self.state = State(
+            grid=grid,
+            step_count=jnp.array(0),
+            agents=agents,
+            key=jax.random.PRNGKey(0),
+        )
+
+    def __call__(self, key: chex.PRNGKey) -> State:
+        return self.state
+
+
+def get_eval_envs() -> List[Connector]:
+    envs = []
+    for level_name in LEVELS.keys():
+        generator = SingletonGenerator(level_name)
+        envs.append(Connector(generator=generator))
+
+    return envs
