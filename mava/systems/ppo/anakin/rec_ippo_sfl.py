@@ -977,20 +977,20 @@ def get_learnability_set(
     print("Starting get_learnability_set")
 
     rngs = jax.random.split(rng, config.ued.num_batches)
-    _, (success, learnability, env_state_ts) = jax.lax.scan(
+    _, (success, learnability, env_state) = jax.lax.scan(
         _batch_step, None, rngs, config.ued.num_batches
     )
 
-    flat_env_state_ts = jax.tree.map(lambda x: x.reshape((-1,) + x.shape[2:]), env_state_ts)
+    flat_env_state = jax.tree.map(lambda x: x.reshape((-1,) + x.shape[2:]), env_state)
     learnability = learnability.flatten()
-    flat_success = success.reshape(-1, config.system.num_agents)
+    flat_success = success.reshape((-1,) + success.shape[2:])
     top_k = jnp.argsort(learnability)[-config.ued.num_to_save :]
     # print("top 1000", top_1000)
 
-    top_k_states = jax.tree.map(lambda x: x.at[top_k].get(), flat_env_state_ts)
+    top_k_states = jax.tree.map(lambda x: x.at[top_k].get(), flat_env_state)
     # print("top 1000 instances", top_1000_env_state_ts)
     print("Finished get_learnability_set")
-    return flat_success.at[top_k, :].get(), learnability.at[top_k].get(), top_k_states
+    return flat_success.at[top_k].get(), learnability.at[top_k].get(), top_k_states
 
 
 def test_get_learnability_set(_config: DictConfig) -> None:
