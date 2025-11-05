@@ -83,7 +83,9 @@ class RecordEpisodeMetrics(Wrapper):
         reset_state: Optional[RecordEpisodeMetricsState] = None,
     ) -> Tuple[RecordEpisodeMetricsState, TimeStep]:
         """Step the environment."""
-        env_state, timestep = self._env.step(state.env_state, action, reset_state.env_state if reset_state else None)
+        env_state, timestep = self._env.step(
+            state.env_state, action, reset_state.env_state if reset_state else None
+        )
 
         done = timestep.last()
         not_done = 1 - done
@@ -112,7 +114,9 @@ class RecordEpisodeMetrics(Wrapper):
         )
         return state, timestep
 
-    def set_env_instance(self, env_instance, key: chex.PRNGKey) -> Tuple[RecordEpisodeMetricsState, TimeStep]:
+    def set_env_instance(
+        self, env_instance, key: chex.PRNGKey
+    ) -> Tuple[RecordEpisodeMetricsState, TimeStep]:
         state, timestep = self._env.set_env_instance(env_instance, key)
 
         state = RecordEpisodeMetricsState(

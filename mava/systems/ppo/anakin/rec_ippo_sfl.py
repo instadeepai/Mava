@@ -1013,9 +1013,9 @@ def test_get_learnability_set(_config: DictConfig) -> None:
     )
 
     # Validate the top instances by rolling them out
-    print(f"\n{Fore.CYAN}{'='*80}")
+    print(f"\n{Fore.CYAN}{'=' * 80}")
     print(f"Validating Top {config.ued.num_to_save} Instances")
-    print(f"{'='*80}{Style.RESET_ALL}\n")
+    print(f"{'=' * 80}{Style.RESET_ALL}\n")
 
     key, key_instance = jax.random.split(key_e)
     instance_keys = jax.random.split(key_instance, config.ued.num_to_save)
@@ -1092,7 +1092,7 @@ def test_get_learnability_set(_config: DictConfig) -> None:
         if 0.2 <= avg_success <= 0.8
         else f"{Fore.RED}✗{Style.RESET_ALL}"
     )
-    print(f"\n{Fore.CYAN}{'='*80}{Style.RESET_ALL}\n")
+    print(f"\n{Fore.CYAN}{'=' * 80}{Style.RESET_ALL}\n")
 
 
 @hydra.main(
