@@ -24,6 +24,7 @@ from jumanji.environments.routing.connector import Connector
 from jumanji.environments.routing.connector.constants import POSITION, TARGET
 from jumanji.environments.routing.connector.generator import Generator
 from jumanji.environments.routing.connector.types import Agent, State
+from jumanji.environments.routing.connector.utils import get_action_masks
 
 LEVELS = {
     "cc_easy_5_3_2": {
@@ -154,11 +155,13 @@ class SingletonGenerator(Generator):
         agents = Agent(
             id=jnp.arange(self._num_agents), start=start_pos, target=target_pos, position=start_pos
         )
+        action_mask = get_action_masks(agents, grid)
         self.state = State(
             grid=grid,
             step_count=jnp.array(0),
             agents=agents,
             key=jax.random.PRNGKey(0),
+            action_mask=action_mask,
         )
 
     def __call__(self, key: chex.PRNGKey) -> State:

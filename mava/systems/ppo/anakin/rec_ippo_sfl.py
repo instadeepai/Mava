@@ -31,6 +31,17 @@ from jumanji.environments.routing.connector.generator import (
     RandomWalkGenerator,
     UniformRandomGenerator,
 )
+from jumanji.environments.routing.connector.generator.random_walk_generator import (
+    StochasticRandomWalkGenerator,
+)
+from jumanji.environments.routing.connector.reward import (
+    DenseRewardFn,
+    RewardFn,
+    SharedDenseRewardFn,
+    SharedSparseRewardFn,
+    SparseRewardFn,
+)
+from jumanji.environments.routing.connector.types import State
 from omegaconf import DictConfig, OmegaConf
 
 from mava.evaluator import (
@@ -71,22 +82,48 @@ from mava.wrappers.episode_metrics import RecordEpisodeMetrics, get_final_step_m
 from mava.wrappers.jumanji import VectorConnectorWrapper
 
 
+class CompleteSparseRewardFn(RewardFn):
+    def __call__(self, state: State, action: chex.Array, next_state: State) -> float:
+        all_connected = jnp.all(next_state.agents.connected) & ~jnp.all(state.agents.connected)
+        num_agents = state.agents.id.shape[0]
+        return all_connected.repeat(num_agents) * 1.0
+
+
 def make_jumanji_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
     # Config generator and select the wrapper.
     if config.env.generator == "random_walk":
         train_generator = RandomWalkGenerator(**config.env.scenario.task_config)
     elif config.env.generator == "uniform":
         train_generator = UniformRandomGenerator(**config.env.scenario.task_config)
+    elif config.env.generator == "stochastic":
+        train_generator = StochasticRandomWalkGenerator(**config.env.scenario.task_config)
     else:
         raise ValueError(f"Generator {config.env.generator} not supported.")
+
+    if config.env.reward_fn == "shared_dense":
+        reward_fn = SharedDenseRewardFn()
+    elif config.env.reward_fn == "dense":
+        reward_fn = DenseRewardFn()
+    elif config.env.reward_fn == "shared_sparse":
+        reward_fn = SharedSparseRewardFn()
+    elif config.env.reward_fn == "sparse":
+        reward_fn = SparseRewardFn()
+    elif config.env.reward_fn == "complete_sparse":
+        reward_fn = CompleteSparseRewardFn()
+    else:
+        raise ValueError(f"Reward function {config.env.reward_fn} not supported.")
 
     eval_generator = RandomWalkGenerator(**config.env.scenario.task_config)
     wrapper = _jumanji_registry[config.env.env_name]["wrapper"]
 
     # Create envs.
     env_config = {**config.env.kwargs, **config.env.scenario.env_kwargs}
-    train_env = jumanji.make(config.env.scenario.name, generator=train_generator, **env_config)
-    eval_env = jumanji.make(config.env.scenario.name, generator=eval_generator, **env_config)
+    train_env = jumanji.make(
+        config.env.scenario.name, generator=train_generator, reward_fn=reward_fn, **env_config
+    )
+    eval_env = jumanji.make(
+        config.env.scenario.name, generator=eval_generator, reward_fn=reward_fn, **env_config
+    )
     train_env = wrapper(train_env, add_global_state=add_global_state)
     eval_env = wrapper(eval_env, add_global_state=add_global_state)
     return train_env, eval_env
@@ -972,7 +1009,7 @@ def get_learnability_set(
         perfect_regret = 1 - success_by_env_0
         # print("learnability_by_env", learnability_by_env)
         # jax.debug.breakpoint()
-        return None, (success_by_env_0, perfect_regret, env_state)
+        return None, (success_by_env_0, learnability_by_env_0, env_state)
 
     print("Starting get_learnability_set")
 

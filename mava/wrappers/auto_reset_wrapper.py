@@ -21,6 +21,7 @@ import chex
 import jax
 from jumanji.env import State
 from jumanji.environments.routing.connector.types import Observation as ConnectorObservation
+from jumanji.environments.routing.connector.utils import get_action_masks
 from jumanji.types import TimeStep
 from jumanji.wrappers import Observation, Wrapper
 
@@ -126,7 +127,7 @@ class DeterministicAutoResetWrapper(Wrapper):
     ) -> Tuple[State, TimeStep[Observation]]:
         """Step the environment, with automatic resetting if the episode terminates."""
         state_st, timestep_st = self._env.step(state, action)
-        reset_observation = connector_init_state_to_observation(self._env, state_re)
+        reset_observation = connector_init_state_to_observation(state_re)
         reset_timestep_raw = timestep_st.replace(
             observation=reset_observation, extras=timestep_st.extras["env_metrics"]
         )
@@ -143,8 +144,8 @@ class DeterministicAutoResetWrapper(Wrapper):
         return state, timestep
 
 
-def connector_init_state_to_observation(env, state: State) -> ConnectorObservation:
-    action_mask = jax.vmap(env._get_action_mask, (0, None))(state.agents, state.grid)
+def connector_init_state_to_observation(state: State) -> ConnectorObservation:
+    action_mask = get_action_masks(state.agents, state.grid)
     observation = ConnectorObservation(
         grid=state.grid,
         action_mask=action_mask,
