@@ -705,7 +705,8 @@ def run_experiment(_config: DictConfig) -> float:
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
     eval_act_fn = make_rec_eval_act_fn(actor_network.apply, config)
-    evaluator = get_singleton_eval_fn(eval_envs, eval_act_fn, config, absolute_metric=False)
+    id_evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
+    ood_evaluator = get_singleton_eval_fn(eval_envs, eval_act_fn, config, absolute_metric=False)
 
     # Calculate total timesteps.
     config = check_total_timesteps(config)
@@ -796,7 +797,10 @@ def run_experiment(_config: DictConfig) -> float:
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
         # Evaluate.
-        eval_metrics = evaluator(trained_params, eval_keys)
+        eval_metrics = id_evaluator(trained_params, eval_keys, {"hidden_state": eval_hs})
+        # ood_eval_metrics = ood_evaluator(trained_params, eval_keys)
+        # eval_metrics_log = {"id": eval_metrics, "ood": ood_eval_metrics}
+        eval_metrics_log = {"id": eval_metrics}
         logger.log(
             eval_metrics, eval_step * config.system.num_updates_per_eval, eval_step, LogEvent.EVAL
         )
