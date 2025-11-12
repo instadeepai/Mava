@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import copy
+import os
+import tempfile
 import time
 from functools import partial
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import chex
 import flax
@@ -23,6 +25,8 @@ import hydra
 import jax
 import jax.numpy as jnp
 import jumanji
+import matplotlib.animation as animation
+import matplotlib.container
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
@@ -42,11 +46,14 @@ from jumanji.environments.routing.connector.reward import (
     SparseRewardFn,
 )
 from jumanji.environments.routing.connector.types import State
+from matplotlib import pyplot as plt
+from neptune.types import File
 from omegaconf import DictConfig, OmegaConf
 
 from mava.evaluator import (
     get_eval_fn,
     get_num_eval_envs,
+    get_sampled_eval_fn,
     get_singleton_eval_fn,
     make_rec_eval_act_fn,
 )
@@ -72,7 +79,7 @@ from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
 from mava.utils.connector_eval import get_eval_envs
 from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
-from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.logger import LogEvent, MavaLogger, NeptuneLogger
 from mava.utils.make_env import _jumanji_registry
 from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
@@ -87,6 +94,15 @@ class CompleteSparseRewardFn(RewardFn):
         all_connected = jnp.all(next_state.agents.connected) & ~jnp.all(state.agents.connected)
         num_agents = state.agents.id.shape[0]
         return all_connected.repeat(num_agents) * 1.0
+
+
+def get_env_metrics(state: State) -> Metrics:
+    mean_manhatten_distance = jnp.mean(
+        jnp.sum(jnp.abs(state.agents.start - state.agents.target), axis=-1)
+    )
+    return {
+        "manhatten_distance": mean_manhatten_distance,
+    }
 
 
 def make_jumanji_env(config: DictConfig, add_global_state: bool = False) -> Tuple[MarlEnv, MarlEnv]:
@@ -669,6 +685,16 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
+def log_success_rate_distribution(
+    flat_success: chex.Array, neptune_run, step: int, fig, ax: plt.Axes
+) -> matplotlib.container.Container:
+    _, _, container = ax.hist(flat_success, bins=50, range=(0, 1), density=True, color="blue")
+    if neptune_run:
+        neptune_run[f"train/success_rate_distribution_{step}"].upload(fig, step=step)
+
+    return container
+
+
 def run_experiment(_config: DictConfig) -> float:
     """Runs experiment."""
     _config.logger.system_name = "rec_ippo"
@@ -692,8 +718,8 @@ def run_experiment(_config: DictConfig) -> float:
     env, eval_env, eval_envs = make_env(config)
 
     # PRNG keys.
-    key, key_e, actor_net_key, critic_net_key = jax.random.split(
-        jax.random.PRNGKey(config.system.seed), num=4
+    key, key_e, key_e_sampled, actor_net_key, critic_net_key = jax.random.split(
+        jax.random.PRNGKey(config.system.seed), num=5
     )
 
     # Setup learner.
@@ -705,6 +731,11 @@ def run_experiment(_config: DictConfig) -> float:
     # One key per device for evaluation.
     eval_keys = jax.random.split(key_e, n_devices)
     eval_act_fn = make_rec_eval_act_fn(actor_network.apply, config)
+
+    sampled_eval_keys = jax.random.split(key_e_sampled, config.arch.num_eval_instances)
+    sampled_evaluator = get_sampled_eval_fn(
+        eval_env, sampled_eval_keys, eval_act_fn, config, absolute_metric=False
+    )
     id_evaluator = get_eval_fn(eval_env, eval_act_fn, config, absolute_metric=False)
     ood_evaluator = get_singleton_eval_fn(eval_envs, eval_act_fn, config, absolute_metric=False)
 
@@ -731,6 +762,13 @@ def run_experiment(_config: DictConfig) -> float:
     logger = MavaLogger(config)
     logger.log_config(OmegaConf.to_container(config, resolve=True))
 
+    neptune_run_l = [l.logger for l in logger.logger.loggers if isinstance(l, NeptuneLogger)]
+    if len(neptune_run_l) > 0:
+        neptune_run = neptune_run_l[0]
+    else:
+        neptune_run = None
+        print("No Neptune logger found")
+
     # Set up checkpointer
     save_checkpoint = config.logger.checkpointing.save_model
     if save_checkpoint:
@@ -741,7 +779,7 @@ def run_experiment(_config: DictConfig) -> float:
         )
 
     # Create an initial hidden state used for resetting memory for evaluation
-    eval_batch_size = get_num_eval_envs(config, absolute_metric=False)
+    eval_batch_size = config.arch.num_eval_parallel_per_device
     eval_hs = ScannedRNN.initialize_carry(
         (n_devices, eval_batch_size, config.system.num_agents),
         config.network.hidden_state_dim,
@@ -750,19 +788,28 @@ def run_experiment(_config: DictConfig) -> float:
     # Run experiment for a total number of evaluations.
     max_episode_return = -jnp.inf
     best_params = None
+
+    fig, ax = plt.subplots()
+    distribution_histograms = []
     for eval_step in range(config.arch.num_evaluation):
         # Train.
         start_time = time.time()
 
         key, learnable_key = jax.random.split(key)
         # print("Getting Learnable Instances")
-        success_scores, learnability_scores, learnable_instances = get_learnability_set(
-            learnable_key,
-            unreplicate_n_dims(learner_state.params.actor_params),
-            actor_network.apply,
-            config,
-            env,
+        success_scores, learnability_scores, learnable_instances, all_success_scores = (
+            get_learnability_set(
+                learnable_key,
+                unreplicate_n_dims(learner_state.params.actor_params),
+                actor_network.apply,
+                config,
+                env,
+            )
         )
+
+        hist = log_success_rate_distribution(all_success_scores, neptune_run, eval_step, fig, ax)
+        distribution_histograms.append(hist)
+
         # print("Finished Getting Learnable Instances")
         broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
         replicate_learnable_instances = tree.map(broadcast, learnable_instances)
@@ -789,6 +836,7 @@ def run_experiment(_config: DictConfig) -> float:
         train_metrics = learner_output.train_metrics
         train_metrics["learnability"] = learnability_scores
         train_metrics["learnability_win_rate"] = success_scores
+        train_metrics.update(get_env_metrics(learnable_instances.env_state))
         logger.log(train_metrics, num_updates, eval_step, LogEvent.TRAIN)
 
         # Prepare for evaluation.
@@ -797,7 +845,7 @@ def run_experiment(_config: DictConfig) -> float:
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
         # Evaluate.
-        eval_metrics = id_evaluator(trained_params, eval_keys, {"hidden_state": eval_hs})
+        eval_metrics = sampled_evaluator(trained_params, eval_keys, {"hidden_state": eval_hs})
         # ood_eval_metrics = ood_evaluator(trained_params, eval_keys)
         # eval_metrics_log = {"id": eval_metrics, "ood": ood_eval_metrics}
         eval_metrics_log = {"id": eval_metrics}
@@ -820,6 +868,17 @@ def run_experiment(_config: DictConfig) -> float:
 
         # Update runner state to continue training.
         learner_state = learner_output.learner_state
+
+    ani = animation.ArtistAnimation(fig, distribution_histograms, interval=400)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = os.path.join(temp_dir, "distribution_histogram.gif")
+        ani.save(temp_path)
+        if neptune_run:
+            neptune_run["train/success_rate_distribution_video"].upload(
+                File(temp_path), step=eval_step
+            )
+        else:
+            plt.show()
 
     # Record the performance for the final evaluation run.
     eval_performance = float(jnp.mean(eval_metrics[config.env.eval_metric]))
@@ -950,7 +1009,7 @@ def test_calc_outcomes_by_agent():
 
 def get_learnability_set(
     rng, actor_params, actor_apply_fn, config, env: Any
-) -> Tuple[chex.Array, chex.Array, Any]:
+) -> Tuple[chex.Array, chex.Array, Any, Dict[str, chex.Array]]:
     def _batch_step(_, rng):
         def _env_step(runner_state, _: Any):
             """Step the environment."""
@@ -1025,13 +1084,14 @@ def get_learnability_set(
     flat_env_state = jax.tree.map(lambda x: x.reshape((-1,) + x.shape[2:]), env_state)
     learnability = learnability.flatten()
     flat_success = success.reshape((-1,) + success.shape[2:])
+
     top_k = jnp.argsort(learnability)[-config.ued.num_to_save :]
     # print("top 1000", top_1000)
 
     top_k_states = jax.tree.map(lambda x: x.at[top_k].get(), flat_env_state)
     # print("top 1000 instances", top_1000_env_state_ts)
     print("Finished get_learnability_set")
-    return flat_success.at[top_k].get(), learnability.at[top_k].get(), top_k_states
+    return flat_success.at[top_k].get(), learnability.at[top_k].get(), top_k_states, flat_success
 
 
 def test_get_learnability_set(_config: DictConfig) -> None:
@@ -1053,7 +1113,7 @@ def test_get_learnability_set(_config: DictConfig) -> None:
     )
 
     single_actor_params = unreplicate_n_dims(learner_state.params.actor_params)
-    success, learnability, top_instances = get_learnability_set(
+    success, learnability, top_instances, success_rate_stats = get_learnability_set(
         key, single_actor_params, actor_network.apply, config, env
     )
 

@@ -279,6 +279,110 @@ def get_singleton_eval_fn(
     return timed_eval_fn
 
 
+def get_sampled_eval_fn(
+    env: MarlEnv,
+    env_keys: PRNGKey,
+    act_fn: EvalActFn,
+    config,
+    absolute_metric: bool,
+) -> EvalFn:
+    """Creates a function that can be used to evaluate agents on a given environment.
+
+    Args:
+    ----
+        env: an environment that conforms to the mava environment spec.
+        act_fn: a function that takes in params, timestep, key and optionally a state
+                and returns actions and optionally a state (see `EvalActFn`).
+        config: the system config.
+        absolute_metric: whether or not this evaluator calculates the absolute_metric.
+                This determines how many evaluation episodes it does.
+    """
+    n_devices = jax.device_count()
+    n_episodes_per_instance = (
+        config.arch.num_absolute_metric_eval_episodes
+        if absolute_metric
+        else config.arch.num_eval_episodes
+    )
+    n_parallel_per_device = config.arch.num_eval_parallel_per_device
+    n_instances = env_keys.shape[0]
+    num_rollouts = n_instances * n_episodes_per_instance
+
+    episode_loops = math.ceil(num_rollouts / (n_devices * n_parallel_per_device))
+
+    repeated_env_keys = jnp.repeat(env_keys, n_episodes_per_instance, axis=0)
+    batched_env_keys = jnp.reshape(
+        repeated_env_keys, (n_devices, episode_loops, n_parallel_per_device, env_keys.shape[1])
+    )
+
+    def eval_fn(
+        params: FrozenDict, key: PRNGKey, init_act_state: ActorState, env_keys: PRNGKey
+    ) -> Metrics:
+        def _env_step(eval_state: _EvalEnvStepState, _: Any) -> Tuple[_EvalEnvStepState, TimeStep]:
+            """Performs a single environment step"""
+            env_state, ts, key, actor_state = eval_state
+
+            key, act_key = jax.random.split(key)
+            action, actor_state = act_fn(params, ts, act_key, actor_state)
+            env_state, ts = jax.vmap(env.step)(env_state, action)
+
+            return (env_state, ts, key, actor_state), ts
+
+        def _episode(_: PRNGKey, reset_keys: Any) -> Tuple[PRNGKey, Metrics]:
+            """Simulates `num_envs` episodes."""
+            env_state, ts = jax.vmap(env.reset)(reset_keys)
+
+            step_state = env_state, ts, key, init_act_state
+            _, timesteps = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit + 1))
+
+            metrics = timesteps.extras["episode_metrics"] | timesteps.extras["env_metrics"]
+
+            # find the first instance of done to get the metrics at that timestep, we don't
+            # care about subsequent steps because we only the results from the first episode
+            done_idx = jnp.argmax(timesteps.last(), axis=0)
+            metrics = tree.map(lambda m: m[done_idx, jnp.arange(n_parallel_per_device)], metrics)
+
+            return None, metrics
+
+        # This loop is important because we don't want too many parallel envs.
+        # So in evaluation we have num_envs parallel envs and loop enough times
+        # so that we do at least `eval_episodes` number of episodes.
+        _, metrics = jax.lax.scan(_episode, None, xs=env_keys, length=episode_loops)
+        metrics = tree.map(lambda x: x.reshape(-1), metrics)  # flatten metrics
+        return metrics
+
+    def timed_eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:
+        """Wrapper around eval function to time it and add in steps per second metric."""
+        start_time = time.time()
+
+        metrics: dict = jax.pmap(eval_fn)(params, key, init_act_state, batched_env_keys)
+        metrics = jax.block_until_ready(metrics)
+
+        end_time = time.time()
+
+        metrics_by_instance = jax.tree.map(
+            lambda x: x.reshape(n_instances, n_episodes_per_instance).mean(axis=1), metrics
+        )
+
+        total_timesteps = jnp.sum(metrics["episode_length"])
+        metrics["steps_per_second"] = total_timesteps / (end_time - start_time)
+
+        sorted_wr_by_instance = jnp.sort(metrics_by_instance["won_episode"])
+        cvar_levels = [0.01, 0.05, 0.1, 0.25, 0.5]
+        cvar_values = [
+            jnp.mean(sorted_wr_by_instance[: int(level * n_instances)]) for level in cvar_levels
+        ]
+        metrics.update(
+            {
+                f"cvar_{int(level*100)}": cvar_value
+                for level, cvar_value in zip(cvar_levels, cvar_values, strict=False)
+            }
+        )
+
+        return metrics
+
+    return timed_eval_fn
+
+
 def make_ff_eval_act_fn(actor_apply_fn: ActorApply, config: DictConfig) -> EvalActFn:
     """Makes an act function that conforms to the evaluator API given a standard
     feed forward mava actor network."""
