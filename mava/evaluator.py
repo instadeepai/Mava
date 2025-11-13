@@ -327,11 +327,12 @@ def get_sampled_eval_fn(
 
             return (env_state, ts, key, actor_state), ts
 
-        def _episode(_: PRNGKey, reset_keys: Any) -> Tuple[PRNGKey, Metrics]:
+        def _episode(step_key: PRNGKey, reset_keys: Any) -> Tuple[PRNGKey, Metrics]:
             """Simulates `num_envs` episodes."""
+            step_key, next_key = jax.random.split(step_key)
             env_state, ts = jax.vmap(env.reset)(reset_keys)
 
-            step_state = env_state, ts, key, init_act_state
+            step_state = env_state, ts, step_key, init_act_state
             _, timesteps = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit + 1))
 
             metrics = timesteps.extras["episode_metrics"] | timesteps.extras["env_metrics"]
@@ -341,12 +342,12 @@ def get_sampled_eval_fn(
             done_idx = jnp.argmax(timesteps.last(), axis=0)
             metrics = tree.map(lambda m: m[done_idx, jnp.arange(n_parallel_per_device)], metrics)
 
-            return None, metrics
+            return next_key, metrics
 
         # This loop is important because we don't want too many parallel envs.
         # So in evaluation we have num_envs parallel envs and loop enough times
         # so that we do at least `eval_episodes` number of episodes.
-        _, metrics = jax.lax.scan(_episode, None, xs=env_keys, length=episode_loops)
+        _, metrics = jax.lax.scan(_episode, key, xs=env_keys, length=episode_loops)
         metrics = tree.map(lambda x: x.reshape(-1), metrics)  # flatten metrics
         return metrics
 
@@ -378,7 +379,10 @@ def get_sampled_eval_fn(
             }
         )
 
-        return metrics
+        lowest_wr_idxes = jnp.argsort(metrics_by_instance["won_episode"])[:5]
+        lowest_wr_keys = env_keys[lowest_wr_idxes]
+
+        return metrics, lowest_wr_keys
 
     return timed_eval_fn
 

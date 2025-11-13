@@ -13,8 +13,6 @@
 # limitations under the License.
 
 import copy
-import os
-import tempfile
 import time
 from functools import partial
 from typing import Any, Callable, Dict, Tuple
@@ -25,8 +23,6 @@ import hydra
 import jax
 import jax.numpy as jnp
 import jumanji
-import matplotlib.animation as animation
-import matplotlib.container
 import optax
 from colorama import Fore, Style
 from flax.core.frozen_dict import FrozenDict
@@ -46,8 +42,8 @@ from jumanji.environments.routing.connector.reward import (
     SparseRewardFn,
 )
 from jumanji.environments.routing.connector.types import State
+from jumanji.environments.routing.connector.viewer import ConnectorViewer
 from matplotlib import pyplot as plt
-from neptune.types import File
 from omegaconf import DictConfig, OmegaConf
 
 from mava.evaluator import (
@@ -132,13 +128,25 @@ def make_jumanji_env(config: DictConfig, add_global_state: bool = False) -> Tupl
     eval_generator = RandomWalkGenerator(**config.env.scenario.task_config)
     wrapper = _jumanji_registry[config.env.env_name]["wrapper"]
 
+    viewer = ConnectorViewer(
+        "Connector", config.env.scenario.task_config["num_agents"], render_mode="rgb_array"
+    )
+
     # Create envs.
     env_config = {**config.env.kwargs, **config.env.scenario.env_kwargs}
     train_env = jumanji.make(
-        config.env.scenario.name, generator=train_generator, reward_fn=reward_fn, **env_config
+        config.env.scenario.name,
+        generator=train_generator,
+        reward_fn=reward_fn,
+        viewer=viewer,
+        **env_config,
     )
     eval_env = jumanji.make(
-        config.env.scenario.name, generator=eval_generator, reward_fn=reward_fn, **env_config
+        config.env.scenario.name,
+        generator=eval_generator,
+        reward_fn=reward_fn,
+        viewer=viewer,
+        **env_config,
     )
     train_env = wrapper(train_env, add_global_state=add_global_state)
     eval_env = wrapper(eval_env, add_global_state=add_global_state)
@@ -685,14 +693,26 @@ def learner_setup(
     return learn, actor_network, init_learner_state
 
 
-def log_success_rate_distribution(
-    flat_success: chex.Array, neptune_run, step: int, fig, ax: plt.Axes
-) -> matplotlib.container.Container:
+def log_success_rate_distribution(flat_success: chex.Array, neptune_run, step: int) -> None:
+    fig, ax = plt.subplots()
     _, _, container = ax.hist(flat_success, bins=50, range=(0, 1), density=True, color="blue")
     if neptune_run:
         neptune_run[f"train/success_rate_distribution_{step}"].upload(fig, step=step)
+    else:
+        plt.show()
 
-    return container
+
+def log_hardest_instances(env, lowest_wr_keys: chex.Array, neptune_run):
+    env_states, timesteps = jax.vmap(env.reset, in_axes=(0))(lowest_wr_keys)
+    for i in range(lowest_wr_keys.shape[0]):
+        fig, ax = plt.subplots()
+        env_state = jax.tree.map(lambda x: x[i], env_states)
+        image = env.render(env_state.env_state)
+        ax.imshow(image)
+        if neptune_run:
+            neptune_run[f"train/hardest_instances_{i}"].upload(fig)
+        else:
+            plt.show()
 
 
 def run_experiment(_config: DictConfig) -> float:
@@ -789,8 +809,6 @@ def run_experiment(_config: DictConfig) -> float:
     max_episode_return = -jnp.inf
     best_params = None
 
-    fig, ax = plt.subplots()
-    distribution_histograms = []
     for eval_step in range(config.arch.num_evaluation):
         # Train.
         start_time = time.time()
@@ -807,8 +825,7 @@ def run_experiment(_config: DictConfig) -> float:
             )
         )
 
-        hist = log_success_rate_distribution(all_success_scores, neptune_run, eval_step, fig, ax)
-        distribution_histograms.append(hist)
+        log_success_rate_distribution(all_success_scores, neptune_run, eval_step)
 
         # print("Finished Getting Learnable Instances")
         broadcast = lambda x: jnp.broadcast_to(x, (config.system.update_batch_size, *x.shape))
@@ -845,7 +862,9 @@ def run_experiment(_config: DictConfig) -> float:
         eval_keys = jnp.stack(eval_keys)
         eval_keys = eval_keys.reshape(n_devices, -1)
         # Evaluate.
-        eval_metrics = sampled_evaluator(trained_params, eval_keys, {"hidden_state": eval_hs})
+        eval_metrics, lowest_wr_keys = sampled_evaluator(
+            trained_params, eval_keys, {"hidden_state": eval_hs}
+        )
         # ood_eval_metrics = ood_evaluator(trained_params, eval_keys)
         # eval_metrics_log = {"id": eval_metrics, "ood": ood_eval_metrics}
         eval_metrics_log = {"id": eval_metrics}
@@ -869,16 +888,7 @@ def run_experiment(_config: DictConfig) -> float:
         # Update runner state to continue training.
         learner_state = learner_output.learner_state
 
-    ani = animation.ArtistAnimation(fig, distribution_histograms, interval=400)
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_path = os.path.join(temp_dir, "distribution_histogram.gif")
-        ani.save(temp_path)
-        if neptune_run:
-            neptune_run["train/success_rate_distribution_video"].upload(
-                File(temp_path), step=eval_step
-            )
-        else:
-            plt.show()
+    log_hardest_instances(env, lowest_wr_keys, neptune_run)
 
     # Record the performance for the final evaluation run.
     eval_performance = float(jnp.mean(eval_metrics[config.env.eval_metric]))
