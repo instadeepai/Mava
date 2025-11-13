@@ -888,7 +888,7 @@ def run_experiment(_config: DictConfig) -> float:
         # Update runner state to continue training.
         learner_state = learner_output.learner_state
 
-    log_hardest_instances(env, lowest_wr_keys, neptune_run)
+    log_hardest_instances(eval_env, lowest_wr_keys, neptune_run)
 
     # Record the performance for the final evaluation run.
     eval_performance = float(jnp.mean(eval_metrics[config.env.eval_metric]))
