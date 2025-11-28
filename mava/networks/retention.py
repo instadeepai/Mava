@@ -20,7 +20,7 @@ import jax.numpy as jnp
 from chex import Array
 from omegaconf import DictConfig
 
-from mava.networks.utils.sable import PositionalEncoding
+from mava.networks.utils.sable import XPOSPositionalEncoding
 
 # General shapes legend:
 # B: batch size
@@ -62,9 +62,10 @@ class SimpleRetention(nn.Module):
             nn.initializers.normal(stddev=1 / self.embed_dim),
             (self.embed_dim, self.head_size),
         )
+        self.pe = XPOSPositionalEncoding(self.head_size)
 
     def __call__(
-        self, key: Array, query: Array, value: Array, hstate: Array, dones: Array
+        self, key: Array, query: Array, value: Array, hstate: Array, dones: Array, step_count: Array
     ) -> Tuple[Array, Array]:
         """Chunkwise (default) representation of the retention mechanism."""
         B, C, _ = value.shape
@@ -73,6 +74,14 @@ class SimpleRetention(nn.Module):
         q_proj = query @ self.w_q
         k_proj = key @ self.w_k
         v_proj = value @ self.w_v
+
+        # Apply scaling for numerical stability (standard attention practice)
+        scale = 1.0 / jnp.sqrt(self.head_size)
+        q_proj = q_proj * scale
+
+        if self.memory_config.timestep_positional_encoding:
+            q_proj, k_proj, v_proj = self.pe(q_proj, k_proj, v_proj, step_count)
+
         k_proj = k_proj.transpose(0, -1, -2)
 
         # Compute next hidden state
@@ -85,7 +94,9 @@ class SimpleRetention(nn.Module):
         else:
             decay_matrix = self.get_decay_matrix(dones)
             xi = self.get_xi(dones)
-            chunk_decay = self.decay_kappa ** (C // self.n_agents)
+            # Use log-space for numerical stability (prevents underflow)
+            log_decay = jnp.log(self.decay_kappa)
+            chunk_decay = jnp.exp(log_decay * (C // self.n_agents))
             delta = ~jnp.any(dones[:, :: self.n_agents], axis=1)[:, jnp.newaxis, jnp.newaxis]
             next_hstate = (
                 k_proj @ (v_proj * decay_matrix[:, -1].reshape((B, C, 1)))
@@ -100,13 +111,20 @@ class SimpleRetention(nn.Module):
         return ret, next_hstate
 
     def recurrent(
-        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array
+        self, key_n: Array, query_n: Array, value_n: Array, hstate: Array, step_count: Array
     ) -> Tuple[Array, Array]:
         """Recurrent representation of the retention mechanism."""
         # Apply projection to q_proj, k_proj, v_proj
         q_proj = query_n @ self.w_q
         k_proj = key_n @ self.w_k
         v_proj = value_n @ self.w_v
+
+        # Apply scaling for numerical stability (standard attention practice)
+        scale = 1.0 / jnp.sqrt(self.head_size)
+        q_proj = q_proj * scale
+
+        if self.memory_config.timestep_positional_encoding:
+            q_proj, k_proj, v_proj = self.pe(q_proj, k_proj, v_proj, step_count)
 
         # Apply the retention mechanism and update the hidden state
         updated_hstate = hstate + (k_proj.transpose(0, -1, -2) @ v_proj)
@@ -177,7 +195,9 @@ class SimpleRetention(nn.Module):
         m = jnp.arange(T)[jnp.newaxis, ...]
 
         # Decay based on difference in timestep indices.
-        decay_matrix = (self.decay_kappa ** (n - m)) * (n >= m)
+        # Use log-space to prevent underflow for large (n - m)
+        log_decay = jnp.log(self.decay_kappa)
+        decay_matrix = jnp.exp(log_decay * (n - m)) * (n >= m)
         # Replace NaN values with 0
         decay_matrix = jnp.nan_to_num(decay_matrix)
 
@@ -200,12 +220,13 @@ class SimpleRetention(nn.Module):
             jnp.argmax(timestep_dones, axis=1, keepdims=True),
         )
 
-        xi = jnp.zeros((B, T, 1))
-        # Fill 'xi' with decaying values up until the first done step
-        for i in range(T):
-            before_first_done = i < first_dones
-            xi_i = (self.decay_kappa ** (i + 1)) * before_first_done
-            xi = xi.at[:, i, :].set(xi_i)
+        # Vectorized computation (no Python loop)
+        positions = jnp.arange(T)[None, :, None]  # [1, T, 1]
+        before_first_done = positions < first_dones[:, :, None]  # [B, T, 1]
+
+        # Use log-space for numerical stability (prevents underflow)
+        log_decay = jnp.log(self.decay_kappa)
+        xi = jnp.exp(log_decay * (positions + 1)) * before_first_done
 
         # Repeat the decay matrix 'xi' for all agents
         xi = jnp.repeat(xi, self.n_agents, axis=1)
@@ -259,9 +280,6 @@ class MultiScaleRetention(nn.Module):
             for decay_kappa in self.decay_kappas
         ]
 
-        # Create an instance of the positional encoding
-        self.pe = PositionalEncoding(self.embed_dim)
-
     def __call__(
         self,
         key: Array,
@@ -274,13 +292,11 @@ class MultiScaleRetention(nn.Module):
         """Chunkwise (default) representation of the multi-scale retention mechanism"""
         B, C, _ = value.shape
 
-        # Positional encoding of the current step
-        if self.memory_config.timestep_positional_encoding:
-            key, query, value = self.pe(key, query, value, step_count)
-
         ret_output = jnp.zeros((B, C, self.embed_dim), dtype=value.dtype)
         for head in range(self.n_head):
-            y, new_hs = self.retention_heads[head](key, query, value, hstate[:, head], dones)
+            y, new_hs = self.retention_heads[head](
+                key, query, value, hstate[:, head], dones, step_count
+            )
             ret_output = ret_output.at[
                 :, :, self.head_size * head : self.head_size * (head + 1)
             ].set(y)
@@ -300,14 +316,10 @@ class MultiScaleRetention(nn.Module):
         """Recurrent representation of the multi-scale retention mechanism"""
         B, S, _ = value_n.shape
 
-        # Positional encoding of the current step if enabled
-        if self.memory_config.timestep_positional_encoding:
-            key_n, query_n, value_n = self.pe(key_n, query_n, value_n, step_count)
-
         ret_output = jnp.zeros((B, S, self.embed_dim), dtype=value_n.dtype)
         for head in range(self.n_head):
             y, new_hs = self.retention_heads[head].recurrent(
-                key_n, query_n, value_n, hstate[:, head]
+                key_n, query_n, value_n, hstate[:, head], step_count
             )
             ret_output = ret_output.at[
                 :, :, self.head_size * head : self.head_size * (head + 1)

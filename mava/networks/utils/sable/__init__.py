@@ -24,4 +24,4 @@ from mava.networks.utils.sable.encode import (
     train_encoder_fn,
 )
 from mava.networks.utils.sable.get_init_hstates import get_init_hidden_state
-from mava.networks.utils.sable.positional_encoding import PositionalEncoding
+from mava.networks.utils.sable.positional_encoding import PositionalEncoding, XPOSPositionalEncoding
