@@ -87,11 +87,19 @@ class SwiGLU(nn.Module):
 
     def setup(self) -> None:
         self.W_linear = self.param(
-            "W_linear", nn.initializers.zeros, (self.embed_dim, self.hidden_dim)
+            "W_linear",
+            nn.initializers.normal(stddev=1 / self.embed_dim),
+            (self.embed_dim, self.hidden_dim),
         )
-        self.W_gate = self.param("W_gate", nn.initializers.zeros, (self.embed_dim, self.hidden_dim))
+        self.W_gate = self.param(
+            "W_gate",
+            nn.initializers.normal(stddev=1 / self.embed_dim),
+            (self.embed_dim, self.hidden_dim),
+        )
         self.W_output = self.param(
-            "W_output", nn.initializers.zeros, (self.hidden_dim, self.embed_dim)
+            "W_output",
+            nn.initializers.normal(stddev=1 / self.embed_dim),
+            (self.hidden_dim, self.embed_dim),
         )
 
     def __call__(self, x: chex.Array) -> chex.Array:

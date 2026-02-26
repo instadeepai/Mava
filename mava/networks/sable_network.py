@@ -363,10 +363,17 @@ class SableNetwork(nn.Module):
         ), "Decay scaling factor should be between 0 and 1"
 
         # Decay kappa for each head
+        # self.decay_kappas = 1 - jnp.exp(
+        #     jnp.linspace(jnp.log(1 / 32), jnp.log(1 / 512), self.net_config.n_head)
+        # )
+        # self.decay_kappas = self.decay_kappas * self.memory_config.decay_scaling_factor
         self.decay_kappas = 1 - jnp.exp(
-            jnp.linspace(jnp.log(1 / 32), jnp.log(1 / 512), self.net_config.n_head)
+            jnp.linspace(
+                jnp.log(1.0 / 4.0),  # Start: Horizon 4 (Kappa = 0.75)
+                jnp.log(1.0 / 1000.0),  # End:   Horizon 1000 (Kappa = 0.999)
+                self.net_config.n_head,
+            )
         )
-        self.decay_kappas = self.decay_kappas * self.memory_config.decay_scaling_factor
         self.decay_kappas = self.decay_kappas[None, :, None, None, None]
 
         self.encoder = Encoder(

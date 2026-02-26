@@ -60,7 +60,7 @@ class PositionalEncoding(nn.Module):
         return pe
 
 
-class XPOSPositionalEncoding(nn.Module):
+class _XPOSPositionalEncoding(nn.Module):
     """XPOS rotary positional encoding.
 
     Assumes inputs are already-projected [batch, seq_len, d_model] matrices.
@@ -156,4 +156,65 @@ class XPOSPositionalEncoding(nn.Module):
         key_rot = merge_even_odd(k_even_rot, k_odd_rot)
 
         # Value is left unchanged
+        return query_rot, key_rot, value
+
+
+class XPOSPositionalEncoding(nn.Module):
+    """
+    Pure RoPE for RetNet.
+
+    The exponential decay (XPOS magnitude) is NOT applied here
+    because RetNet handles decay via the Gamma matrix/recurrent weight.
+    """
+
+    d_model: int
+    base: float = 10_000.0
+
+    def setup(self) -> None:
+        assert self.d_model % 2 == 0, "d_model must be even for RoPE."
+
+        # Calculate RoPE frequencies
+        dim = jnp.arange(0, self.d_model, 2, dtype=jnp.float32)
+        self.inv_freq = 1.0 / (self.base ** (dim / self.d_model))
+
+    def __call__(
+        self,
+        query: chex.Array,  # [batch, seq_len, d_model]
+        key: chex.Array,  # [batch, seq_len, d_model]
+        value: chex.Array,  # [batch, seq_len, d_model]
+        position: chex.Array,  # [batch, seq_len]
+    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
+        b, t, d = query.shape
+
+        # --- Prepare Positions ---
+        if position.ndim == 1:
+            pos = jnp.broadcast_to(position[None, :], (b, t))
+        else:
+            pos = position
+        pos_f = pos.astype(jnp.float32)
+
+        # --- Calculate Angles ---
+        # freqs: [b, t, d_model//2]
+        freqs = pos_f[..., None] * self.inv_freq
+        cos = jnp.cos(freqs)
+        sin = jnp.sin(freqs)
+
+        # --- Apply Rotation ---
+        def rotate_half(x: chex.Array) -> chex.Array:
+            """Rotates half the hidden dims of the input."""
+            x_even = x[..., 0::2]
+            x_odd = x[..., 1::2]
+
+            # Standard RoPE rotation
+            x_even_rot = x_even * cos - x_odd * sin
+            x_odd_rot = x_even * sin + x_odd * cos
+
+            # Interleave back: [even, odd, even, odd...]
+            x_rot = jnp.stack([x_even_rot, x_odd_rot], axis=-1)
+            return x_rot.reshape(b, t, d)
+
+        query_rot = rotate_half(query)
+        key_rot = rotate_half(key)
+
+        # Value is passed through unchanged
         return query_rot, key_rot, value
