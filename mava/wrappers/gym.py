@@ -19,7 +19,7 @@ from dataclasses import field
 from enum import IntEnum
 from multiprocessing import Queue
 from multiprocessing.connection import Connection
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Union
 
 import gymnasium
 import gymnasium.vector.async_vector_env
@@ -65,126 +65,6 @@ class TimeStep:
 
     def last(self) -> NDArray:
         return self.step_type == StepType.LAST
-
-
-class UoeWrapper(gymnasium.Wrapper):
-    """A base wrapper for multi-agent environments developed by the University of Edinburgh.
-    This wrapper is compatible with the RobotWarehouse and Level-Based Foraging environments.
-    """
-
-    def __init__(
-        self,
-        env: gymnasium.Env,
-        use_shared_rewards: bool = True,
-        add_global_state: bool = False,
-    ):
-        """Initialize the gym wrapper
-        Args:
-            env (gymnasium.env): gymnasium env instance.
-            use_shared_rewards (bool, optional): Use individual or shared rewards.
-            Defaults to False.
-            add_global_state (bool, optional) : Add global state information
-            to observations.
-        """
-        super().__init__(env)
-        self._env = env
-        self.use_shared_rewards = use_shared_rewards
-        self.add_global_state = add_global_state
-        self.num_agents = len(self._env.action_space)
-        self.num_actions = self._env.action_space[0].n
-        self.step_count = 0
-
-        # Tuple(Box(...) * N) --> Box(N, ...)
-        single_obs = self.observation_space[0]  # type: ignore
-        shape = (self.num_agents, *single_obs.shape)
-        low = np.tile(single_obs.low, (self.num_agents, 1))
-        high = np.tile(single_obs.high, (self.num_agents, 1))
-        local_observation_space = spaces.Box(
-            low=low, high=high, shape=shape, dtype=single_obs.dtype
-        )
-        self.observation_space = spaces.Dict({"agents_view": local_observation_space})
-
-        if add_global_state:
-            shape = (self.num_agents, single_obs.shape[0] * self.num_agents)
-            low = np.tile(single_obs.low, (self.num_agents, self.num_agents))
-            high = np.tile(single_obs.high, (self.num_agents, self.num_agents))
-            global_observation_space = spaces.Box(
-                low=low, high=high, shape=shape, dtype=single_obs.dtype
-            )
-            self.observation_space["global_state"] = global_observation_space
-
-        # Tuple(Discrete(...) * N) --> MultiDiscrete(... * N)
-        self.action_space = spaces.MultiDiscrete([self.num_actions] * self.num_agents)
-
-    def reset(
-        self, seed: Optional[int] = None, options: Optional[dict] = None
-    ) -> Tuple[Dict, Dict]:
-        if seed is not None:
-            self.env.unwrapped.seed(seed)
-
-        agents_view, info = self._env.reset()
-
-        info["action_mask"] = self.get_action_mask(info)
-
-        obs = {"agents_view": agents_view}
-
-        if self.add_global_state:
-            obs["global_state"] = self.get_global_obs(agents_view)
-
-        self.step_count = 0
-        info["step_count"] = self.step_count
-
-        return obs, info
-
-    def step(self, actions: List) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
-        agents_view, reward, terminated, truncated, info = self._env.step(actions)
-
-        info["action_mask"] = self.get_action_mask(info)
-
-        if self.use_shared_rewards:
-            reward = np.array([np.array(reward).sum()] * self.num_agents)
-        else:
-            reward = np.array(reward)
-
-        obs = {"agents_view": agents_view}
-        if self.add_global_state:
-            obs["global_state"] = self.get_global_obs(agents_view)
-
-        self.step_count += 1
-        info["step_count"] = self.step_count
-        return obs, reward, terminated, truncated, info
-
-    def get_action_mask(self, info: Dict) -> NDArray:
-        if "action_mask" in info:
-            return np.array(info["action_mask"])
-        return np.ones((self.num_agents, self.num_actions), dtype=np.float32)
-
-    def get_global_obs(self, obs: NDArray) -> NDArray:
-        global_obs = np.concatenate(obs, axis=0)
-        return np.tile(global_obs, (self.num_agents, 1))
-
-
-class SmacWrapper(UoeWrapper):
-    """A wrapper that converts actions to integers."""
-
-    def reset(
-        self, seed: Optional[int] = None, options: Optional[dict] = None
-    ) -> Tuple[NDArray, Dict]:
-        agents_view, info = super().reset()
-        info["won_episode"] = info["battle_won"]
-        return agents_view, info
-
-    def step(self, actions: List) -> Tuple[NDArray, NDArray, NDArray, NDArray, Dict]:
-        # Convert actions to integers before passing them to the environment
-        actions = [int(action) for action in actions]
-
-        agents_view, reward, terminated, truncated, info = super().step(actions)
-        info["won_episode"] = info["battle_won"]
-
-        return agents_view, reward, terminated, truncated, info
-
-    def get_action_mask(self, info: Dict) -> NDArray:
-        return np.array(self._env.unwrapped.get_avail_actions())
 
 
 class GymRecordEpisodeMetrics(gymnasium.Wrapper):

@@ -42,24 +42,19 @@ dependencies = [
   "flax>=0.8.1,<0.10.4",
   "gymnasium==1.0.0",
   "hydra-core==1.3.2",
-  "id-marl-eval @ git+https://github.com/instadeepai/marl-eval",
   "jax>=0.5.0,<0.7.0",
   "jaxlib>=0.5.0,<0.7.0",
   "jumanji>= 1.1.0",
-  "lbforaging",
-  "matrax>= 0.0.5",
-  "neptune",
   "numpy==1.26.4",
   "omegaconf",
   "optax",
+  "pandas>=2.3.3",
   "protobuf~=3.20",
-  "rware",
+  "requests>=2.33.1",
   "scipy==1.12.0",
   "setuptools",
-  "smaclite @ git+https://github.com/uoe-agents/smaclite.git",
   "tensorboard_logger",
   "tensorflow_probability",
-  "type_enforced",                                               # needed because gigastep is missing this dependency
 ]
 
 [dependency-groups]

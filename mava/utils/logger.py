@@ -15,7 +15,6 @@
 import abc
 import logging
 import os
-import zipfile
 from datetime import datetime
 from enum import Enum
 from os import PathLike
@@ -23,14 +22,11 @@ from typing import Callable, ClassVar, Dict, List, Union
 
 import hydra
 import jax
-import neptune
 import numpy as np
 from colorama import Fore, Style
 from etils.epath import Path
 from jax import tree
 from jax.typing import ArrayLike
-from marl_eval.json_tools import JsonLogger as MarlEvalJsonLogger
-from neptune.utils import stringify_unsupported
 from omegaconf import DictConfig, OmegaConf
 from pandas.io.json._normalize import _simple_json_normalize as flatten_dict
 from rich.pretty import pprint
@@ -209,83 +205,6 @@ class MultiLogger(BaseLogger):
             logger.stop()
 
 
-class NeptuneLogger(BaseLogger):
-    def __init__(
-        self,
-        base_exp_path: PathLike,
-        unique_token: str,
-        system_name: str,
-        project: str,
-        tag: list[str],
-        group_tag: list[str],
-        detailed_logging: bool,
-        architecture_name: str,
-        upload_json_data: bool,
-        run_id: str | None = None,
-    ) -> None:
-        """
-        Initialize neptune.ai logger for experiment tracking.
-
-        Args:
-            base_exp_path: Base path where all logs are stored.
-            unique_token: Unique identifier string for this run.
-            system_name: Name of the system/algorithm being logged.
-            project: neptune.ai project name.
-            tag: List of tags for the neptune.ai experiment.
-            group_tag: List of group tags - useful for keeping track of a group of experiments.
-            detailed_logging: Whether to log detailed metrics (incl. std/min/max).
-            architecture_name: Name of the architecture [anakin | sebulba].
-            upload_json_data: Whether to upload JSON data to neptune.ai.
-            run_id: ID of the run you wish to resume - None if you don't want to resume the run.
-                Note this will overwrite the run if you restart the step from 0.
-        """
-        # async logging leads to deadlocks in sebulba
-        mode = "async" if architecture_name == "anakin" else "sync"
-
-        if run_id is not None:
-            self.logger = neptune.init_run(with_id=run_id, project=project, mode=mode)
-        else:
-            self.logger = neptune.init_run(project=project, tags=list(tag), mode=mode)
-            self.logger["sys/group_tags"].add(list(group_tag))
-
-        self.detailed_logging = detailed_logging
-        self.upload_json_data = upload_json_data
-
-        # Store json path for uploading json data to Neptune.
-        json_exp_path = get_logger_path(system_name, "json")
-        self.json_file_path = Path(base_exp_path, json_exp_path, unique_token, "metrics.json")
-        self.unique_token = unique_token
-
-    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
-        # Main metric if it's the mean of a list of metrics (ends with '/mean')
-        # or it's a single metric doesn't contain a '/'.
-        is_main_metric = "/" not in key or key.endswith("/mean")
-        # If we're not detailed logging (logging everything) then make sure it's a main metric.
-        if not self.detailed_logging and not is_main_metric:
-            return
-
-        value = value.item() if isinstance(value, (jax.Array, np.ndarray)) else value
-        self.logger[f"{event.value}/{key}"].log(value, step=step)
-
-    def log_config(self, config: Dict) -> None:
-        self.logger["config"] = stringify_unsupported(config)
-
-    def stop(self) -> None:
-        if self.upload_json_data:
-            self._zip_and_upload_json()
-        self.logger.stop()
-
-    def _zip_and_upload_json(self) -> None:
-        # Create the zip file path by replacing '.json' with '.zip'
-        zip_file_path = self.json_file_path.with_suffix(".zip").as_posix()
-
-        # Create a zip file containing the specified JSON file
-        with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-            zipf.write(self.json_file_path)
-
-        self.logger[f"metrics/metrics_{self.unique_token}"].upload(zip_file_path)
-
-
 class TensorboardLogger(BaseLogger):
     def __init__(self, base_exp_path: PathLike, unique_token: str, system_name: str) -> None:
         """
@@ -305,67 +224,6 @@ class TensorboardLogger(BaseLogger):
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         t = step if event != LogEvent.EVAL else eval_step
         self.log(f"{event.value}/{key}", value, t)
-
-    def log_config(self, config: Dict) -> None: ...
-
-
-class JsonLogger(BaseLogger):
-    # These are the only metrics that marl-eval needs to plot.
-    _METRICS_TO_LOG: ClassVar[List[str]] = ["episode_return/mean", "win_rate", "steps_per_second"]
-
-    def __init__(
-        self,
-        base_exp_path: PathLike,
-        unique_token: str,
-        system_name: str,
-        path: PathLike | None,
-        task_name: str,
-        env_name: str,
-        seed: int,
-    ) -> None:
-        """
-        Initialize JSON logger for marl-eval compatibility.
-
-        Args:
-            base_exp_path: Base path where all logs are stored.
-            unique_token: Unique identifier string for this run.
-            system_name: Name of the system/algorithm being logged.
-            path: Optional custom path for JSON logs (if None, uses default).
-            task_name: Name of the scenario/task being evaluated.
-            env_name: Name of the environment.
-            seed: Random seed used in the experiment.
-        """
-        json_exp_path = get_logger_path(system_name, "json")
-        json_logs_path = Path(base_exp_path, json_exp_path, unique_token, "metrics.json")
-        # if a custom path is specified, use that instead
-        if path is not None:
-            json_logs_path = Path(base_exp_path, "json", path)
-
-        self.logger = MarlEvalJsonLogger(
-            path=json_logs_path,
-            algorithm_name=system_name,
-            task_name=task_name,
-            environment_name=env_name,
-            seed=seed,
-        )
-
-    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
-        # Only write key if it's in the list of metrics to log.
-
-        if key not in self._METRICS_TO_LOG:
-            return
-
-        # The key is in the format <metric_name>/<aggregation_fn> so we need to change it to:
-        # <agg fn>_<metric_name>
-        if "/" in key:
-            key = "_".join(reversed(key.split("/")))
-
-        # JsonWriter can't serialize jax arrays
-        value = value.item() if isinstance(value, jax.Array) else value
-
-        # We only want to log evaluation metrics to the json logger
-        if event == LogEvent.ABSOLUTE or event == LogEvent.EVAL:
-            self.logger.write(step, key, value, eval_step, event == LogEvent.ABSOLUTE)
 
     def log_config(self, config: Dict) -> None: ...
 
@@ -437,19 +295,6 @@ def _make_multi_logger(cfg: DictConfig) -> MultiLogger:
     """Instantiate only enabled loggers and remove the 'enabled' flag."""
     unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 
-    if (
-        cfg.logger.loggers.neptune.enabled
-        and cfg.logger.loggers.json.enabled
-        and cfg.logger.loggers.neptune.upload_json_data
-        and cfg.logger.loggers.json.path
-    ):
-        raise ValueError(
-            "Cannot upload json data to Neptune when `json_path` is set in the base logger config. "
-            "This is because each subsequent run will create a larger json file which will use "
-            "unnecessary storage. Either set `upload_json_data: false` if you don't want to "
-            "upload your json data but store a large file locally or set `json_path: ~` in "
-            "the base logger config."
-        )
     loggers: List[BaseLogger] = []
     for _logger_config in cfg.logger.loggers.values():
         logger_config = dict(_logger_config)  # Create a copy to avoid modifying the original

@@ -4,7 +4,7 @@ defaults:
   - arch: anakin
   - system: q_learning/rec_qmix
   - network: qmix_rnn
-  - env: smax
+  - env: rware
 
 hydra:
   searchpath:
