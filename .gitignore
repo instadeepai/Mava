@@ -173,7 +173,7 @@ results/
 # Hydra logs
 outputs/
 multirun/
-.neptune
+mlruns/
 
 # AI
 .aider**

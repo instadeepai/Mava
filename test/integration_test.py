@@ -48,9 +48,9 @@ def _run_system(system_name: str, cfg: DictConfig) -> float:
     """Runs a system."""
     OmegaConf.set_struct(cfg, False)
     # we never want to log these tests anywhere
-    cfg.logger.use_neptune = False
-    cfg.logger.use_tb = False
-    cfg.logger.use_json = False
+    cfg.logger.loggers.mlflow.enabled = False
+    cfg.logger.loggers.tensorboard.enabled = False
+    cfg.logger.loggers.json.enabled = False
 
     system = importlib.import_module(f"mava.systems.{system_name}")
     eval_perf = system.run_experiment(cfg)
