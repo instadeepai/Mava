@@ -66,6 +66,7 @@ dependencies = [
   "tensorboard_logger",
   "tensorflow_probability",
   "type_enforced", # needed because gigastep is missing this dependency
+  "wandb",
 ]
 
 [project.optional-dependencies]

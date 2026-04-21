@@ -2,9 +2,12 @@ version = 1
 revision = 3
 requires-python = ">=3.10, <3.13"
 resolution-markers = [
-    "python_full_version >= '3.12'",
-    "python_full_version == '3.11.*'",
-    "python_full_version < '3.11'",
+    "python_full_version >= '3.12' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and sys_platform != 'linux'",
+    "python_full_version == '3.11.*' and sys_platform == 'linux'",
+    "python_full_version == '3.11.*' and sys_platform != 'linux'",
+    "python_full_version < '3.11' and sys_platform == 'linux'",
+    "python_full_version < '3.11' and sys_platform != 'linux'",
 ]
 
 [[package]]
@@ -558,7 +561,8 @@ name = "cryptography"
 version = "45.0.7"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.11'",
+    "python_full_version < '3.11' and sys_platform == 'linux'",
+    "python_full_version < '3.11' and sys_platform != 'linux'",
 ]
 dependencies = [
     { name = "cffi", marker = "python_full_version < '3.11' and platform_python_implementation != 'PyPy'" },
@@ -608,8 +612,10 @@ name = "cryptography"
 version = "46.0.7"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12'",
-    "python_full_version == '3.11.*'",
+    "python_full_version >= '3.12' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and sys_platform != 'linux'",
+    "python_full_version == '3.11.*' and sys_platform == 'linux'",
+    "python_full_version == '3.11.*' and sys_platform != 'linux'",
 ]
 dependencies = [
     { name = "cffi", marker = "python_full_version >= '3.11' and platform_python_implementation != 'PyPy'" },
@@ -1390,6 +1396,7 @@ dependencies = [
     { name = "tensorboard-logger" },
     { name = "tensorflow-probability" },
     { name = "type-enforced" },
+    { name = "wandb" },
 ]
 
 [package.optional-dependencies]
@@ -1441,6 +1448,7 @@ requires-dist = [
     { name = "tensorboard-logger" },
     { name = "tensorflow-probability" },
     { name = "type-enforced" },
+    { name = "wandb" },
 ]
 provides-extras = ["cuda12", "tpu"]
 
@@ -2941,7 +2949,8 @@ name = "pydantic"
 version = "2.11.10"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.11'",
+    "python_full_version < '3.11' and sys_platform == 'linux'",
+    "python_full_version < '3.11' and sys_platform != 'linux'",
 ]
 dependencies = [
     { name = "annotated-types", marker = "python_full_version < '3.11'" },
@@ -2959,8 +2968,10 @@ name = "pydantic"
 version = "2.13.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12'",
-    "python_full_version == '3.11.*'",
+    "python_full_version >= '3.12' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and sys_platform != 'linux'",
+    "python_full_version == '3.11.*' and sys_platform == 'linux'",
+    "python_full_version == '3.11.*' and sys_platform != 'linux'",
 ]
 dependencies = [
     { name = "annotated-types", marker = "python_full_version >= '3.11'" },
@@ -2978,7 +2989,8 @@ name = "pydantic-core"
 version = "2.33.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.11'",
+    "python_full_version < '3.11' and sys_platform == 'linux'",
+    "python_full_version < '3.11' and sys_platform != 'linux'",
 ]
 dependencies = [
     { name = "typing-extensions", version = "4.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -3051,8 +3063,10 @@ name = "pydantic-core"
 version = "2.46.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12'",
-    "python_full_version == '3.11.*'",
+    "python_full_version >= '3.12' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and sys_platform != 'linux'",
+    "python_full_version == '3.11.*' and sys_platform == 'linux'",
+    "python_full_version == '3.11.*' and sys_platform != 'linux'",
 ]
 dependencies = [
     { name = "typing-extensions", version = "4.15.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -3603,6 +3617,19 @@ wheels = [
 ]
 
 [[package]]
+name = "sentry-sdk"
+version = "2.58.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/26/b3/fb8291170d0e844173164709fc0fa0c221ed75a5da740c8746f2a83b4eb1/sentry_sdk-2.58.0.tar.gz", hash = "sha256:c1144d947352d54e5b7daa63596d9f848adf684989c06c4f5a659f0c85a18f6f", size = 438764, upload-time = "2026-04-13T17:23:26.265Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fa/eb/d875669993b762556ae8b2efd86219943b4c0864d22204d622a9aee3052b/sentry_sdk-2.58.0-py2.py3-none-any.whl", hash = "sha256:688d1c704ddecf382ea3326f21a67453d4caa95592d722b7c780a36a9d23109e", size = 460919, upload-time = "2026-04-13T17:23:24.675Z" },
+]
+
+[[package]]
 name = "setuptools"
 version = "78.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4006,7 +4033,8 @@ name = "typing-extensions"
 version = "4.13.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.11'",
+    "python_full_version < '3.11' and sys_platform == 'linux'",
+    "python_full_version < '3.11' and sys_platform != 'linux'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/ad/cd3e3465232ec2416ae9b983f27b9e94dc8171d56ac99b345319a9475967/typing_extensions-4.13.1.tar.gz", hash = "sha256:98795af00fb9640edec5b8e31fc647597b4691f099ad75f469a2616be1a76dff", size = 106633, upload-time = "2025-04-03T16:11:20.955Z" }
 wheels = [
@@ -4018,8 +4046,10 @@ name = "typing-extensions"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12'",
-    "python_full_version == '3.11.*'",
+    "python_full_version >= '3.12' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and sys_platform != 'linux'",
+    "python_full_version == '3.11.*' and sys_platform == 'linux'",
+    "python_full_version == '3.11.*' and sys_platform != 'linux'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/72/94/1a15dd82efb362ac84269196e94cf00f187f7ed21c242792a923cdb1c61f/typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466", size = 109391, upload-time = "2025-08-25T13:49:26.313Z" }
 wheels = [
@@ -4101,6 +4131,37 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/bf/cb/04ddb054f45faa306a230769e868c28b8065ea196891f09004ebace5b184/waitress-3.0.2.tar.gz", hash = "sha256:682aaaf2af0c44ada4abfb70ded36393f0e307f4ab9456a215ce0020baefc31f", size = 179901, upload-time = "2024-11-16T20:02:35.195Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8d/57/a27182528c90ef38d82b636a11f606b0cbb0e17588ed205435f8affe3368/waitress-3.0.2-py3-none-any.whl", hash = "sha256:c56d67fd6e87c2ee598b76abdd4e96cfad1f24cacdea5078d382b1f9d7b5ed2e", size = 56232, upload-time = "2024-11-16T20:02:33.858Z" },
+]
+
+[[package]]
+name = "wandb"
+version = "0.25.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "gitpython" },
+    { name = "packaging" },
+    { name = "platformdirs" },
+    { name = "protobuf" },
+    { name = "pydantic", version = "2.11.10", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pydantic", version = "2.13.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "sentry-sdk" },
+    { name = "typing-extensions", version = "4.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions", version = "4.15.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fd/60/d94952549920469524b689479c864c692ca47eca4b8c2fe3389b64a58778/wandb-0.25.0.tar.gz", hash = "sha256:45840495a288e34245d69d07b5a0b449220fbc5b032e6b51c4f92ec9026d2ad1", size = 43951335, upload-time = "2026-02-13T00:17:45.515Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c1/7d/0c131db3ec9deaabbd32263d90863cbfbe07659527e11c35a5c738cecdc5/wandb-0.25.0-py3-none-macosx_12_0_arm64.whl", hash = "sha256:5eecb3c7b5e60d1acfa4b056bfbaa0b79a482566a9db58c9f99724b3862bc8e5", size = 23287536, upload-time = "2026-02-13T00:17:20.265Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/95/31bb7f76a966ec87495e5a72ac7570685be162494c41757ac871768dbc4f/wandb-0.25.0-py3-none-macosx_12_0_x86_64.whl", hash = "sha256:daeedaadb183dc466e634fba90ab2bab1d4e93000912be0dee95065a0624a3fd", size = 25196062, upload-time = "2026-02-13T00:17:23.356Z" },
+    { url = "https://files.pythonhosted.org/packages/d9/a1/258cdedbf30cebc692198a774cf0ef945b7ed98ee64bdaf62621281c95d8/wandb-0.25.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:5e0127dbcef13eea48f4b84268da7004d34d3120ebc7b2fa9cefb72b49dbb825", size = 22799744, upload-time = "2026-02-13T00:17:26.437Z" },
+    { url = "https://files.pythonhosted.org/packages/de/91/ec9465d014cfd199c5b2083d271d31b3c2aedeae66f3d8a0712f7f54bdf3/wandb-0.25.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:6c4c38077836f9b7569a35b0e1dcf1f0c43616fcd936d182f475edbfea063665", size = 25262839, upload-time = "2026-02-13T00:17:28.8Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/95/cb2d1c7143f534544147fb53fe87944508b8cb9a058bc5b6f8a94adbee15/wandb-0.25.0-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:6edd8948d305cb73745bf564b807bd73da2ccbd47c548196b8a362f7df40aed8", size = 22853714, upload-time = "2026-02-13T00:17:31.68Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/94/68163f70c1669edcf130822aaaea782d8198b5df74443eca0085ec596774/wandb-0.25.0-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:ada6f08629bb014ad6e0a19d5dec478cdaa116431baa3f0a4bf4ab8d9893611f", size = 25358037, upload-time = "2026-02-13T00:17:34.676Z" },
+    { url = "https://files.pythonhosted.org/packages/cc/fb/9578eed2c01b2fc6c8b693da110aa9c73a33d7bb556480f5cfc42e48c94e/wandb-0.25.0-py3-none-win32.whl", hash = "sha256:020b42ca4d76e347709d65f59b30d4623a115edc28f462af1c92681cb17eae7c", size = 24604118, upload-time = "2026-02-13T00:17:37.641Z" },
+    { url = "https://files.pythonhosted.org/packages/25/97/460f6cb738aaa39b4eb2e6b4c630b2ae4321cdd70a79d5955ea75a878981/wandb-0.25.0-py3-none-win_amd64.whl", hash = "sha256:78307ac0b328f2dc334c8607bec772851215584b62c439eb320c4af4fb077a00", size = 24604122, upload-time = "2026-02-13T00:17:39.991Z" },
+    { url = "https://files.pythonhosted.org/packages/27/6c/5847b4dda1dfd52630dac08711d4348c69ed657f0698fc2d949c7f7a6622/wandb-0.25.0-py3-none-win_arm64.whl", hash = "sha256:c6174401fd6fb726295e98d57b4231c100eca96bd17de51bfc64038a57230aaf", size = 21785298, upload-time = "2026-02-13T00:17:42.475Z" },
 ]
 
 [[package]]

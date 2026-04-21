@@ -49,6 +49,7 @@ def _run_system(system_name: str, cfg: DictConfig) -> float:
     OmegaConf.set_struct(cfg, False)
     # we never want to log these tests anywhere
     cfg.logger.loggers.mlflow.enabled = False
+    cfg.logger.loggers.wandb.enabled = False
     cfg.logger.loggers.tensorboard.enabled = False
     cfg.logger.loggers.json.enabled = False
 

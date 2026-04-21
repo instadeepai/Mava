@@ -25,6 +25,7 @@ import hydra
 import jax
 import mlflow
 import numpy as np
+import wandb
 from colorama import Fore, Style
 from etils.epath import Path
 from jax import tree
@@ -296,6 +297,88 @@ class MLflowLogger(BaseLogger):
         mlflow.log_artifact(zip_file_path, artifact_path=f"metrics/metrics_{self.unique_token}")
 
 
+class WandBLogger(BaseLogger):
+    def __init__(
+        self,
+        base_exp_path: PathLike,
+        unique_token: str,
+        system_name: str,
+        project: str,
+        tags: list[str],
+        detailed_logging: bool,
+        upload_json_data: bool,
+        run_id: str | None = None,
+        entity: str | None = None,
+    ) -> None:
+        """
+        Initialize WandB logger for experiment tracking.
+
+        Args:
+            base_exp_path: Base path where all logs are stored.
+            unique_token: Unique identifier string for this run.
+            system_name: Name of the system/algorithm being logged.
+            project: WandB project name.
+            tags: List of tags for the WandB run.
+            detailed_logging: Whether to log detailed metrics (incl. std/min/max).
+            upload_json_data: Whether to upload JSON data to WandB.
+            run_id: ID of the run you wish to resume - None if you don't want to resume the run.
+                Note this will overwrite the run unless you set the timestep correctly.
+            entity: WandB entity (user or team). None uses the default from the env.
+        """
+        if run_id is not None:
+            self.logger = wandb.init(
+                project=project, entity=entity, id=run_id, resume="allow"
+            )
+        else:
+            self.logger = wandb.init(project=project, entity=entity, tags=list(tags))
+
+        self.detailed_logging = detailed_logging
+        self.upload_json_data = upload_json_data
+
+        # Store json path for uploading json data to WandB.
+        json_exp_path = get_logger_path(system_name, "json")
+        self.json_file_path = Path(base_exp_path, json_exp_path, unique_token, "metrics.json")
+        self.unique_token = unique_token
+
+    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
+        is_main_metric = "/" not in key or key.endswith("/mean")
+        if not self.detailed_logging and not is_main_metric:
+            return
+
+        value = value.item() if isinstance(value, (jax.Array, np.ndarray)) else value
+        wandb.log({f"{event.value}/{key}": value}, step=step)
+
+    def log_dict(self, data: Metrics, step: int, eval_step: int, event: LogEvent) -> None:
+        flat = flatten_dict(data, sep="/")
+        batch: dict[str, float] = {}
+        for key, value in flat.items():
+            is_main_metric = "/" not in key or key.endswith("/mean")
+            if not self.detailed_logging and not is_main_metric:
+                continue
+            value = value.item() if isinstance(value, (jax.Array, np.ndarray)) else value
+            batch[f"{event.value}/{key}"] = value
+        if batch:
+            wandb.log(batch, step=step)
+
+    def log_config(self, config: Dict) -> None:
+        wandb.config.update(config)
+
+    def stop(self) -> None:
+        if self.upload_json_data:
+            self._zip_and_upload_json()
+        wandb.finish()
+
+    def _zip_and_upload_json(self) -> None:
+        # Create the zip file path by replacing '.json' with '.zip'
+        zip_file_path = self.json_file_path.with_suffix(".zip").as_posix()
+
+        # Create a zip file containing the specified JSON file
+        with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(self.json_file_path, arcname=self.json_file_path.name)
+
+        wandb.save(zip_file_path, policy="now")
+
+
 class TensorboardLogger(BaseLogger):
     def __init__(self, base_exp_path: PathLike, unique_token: str, system_name: str) -> None:
         """
@@ -447,19 +530,17 @@ def _make_multi_logger(cfg: DictConfig) -> MultiLogger:
     """Instantiate only enabled loggers and remove the 'enabled' flag."""
     unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 
-    if (
-        cfg.logger.loggers.mlflow.enabled
-        and cfg.logger.loggers.json.enabled
-        and cfg.logger.loggers.mlflow.upload_json_data
-        and cfg.logger.loggers.json.path
-    ):
-        raise ValueError(
-            "Cannot upload json data to MLflow when `json_path` is set in the base logger config. "
-            "This is because each subsequent run will create a larger json file which will use "
-            "unnecessary storage. Either set `upload_json_data: false` if you don't want to "
-            "upload your json data but store a large file locally or set `json_path: ~` in "
-            "the base logger config."
-        )
+    if cfg.logger.loggers.json.enabled and cfg.logger.loggers.json.path:
+        for name in ("mlflow", "wandb"):
+            remote_cfg = cfg.logger.loggers[name]
+            if remote_cfg.enabled and remote_cfg.upload_json_data:
+                raise ValueError(
+                    f"Cannot upload json data to {name} when `json.path` is set in the base "
+                    "logger config. This is because each subsequent run will create a larger "
+                    "json file which will use unnecessary storage. Either set "
+                    "`upload_json_data: false` if you don't want to upload your json data but "
+                    "store a large file locally or set `json.path: ~` in the base logger config."
+                )
     loggers: List[BaseLogger] = []
     for _logger_config in cfg.logger.loggers.values():
         logger_config = dict(_logger_config)  # Create a copy to avoid modifying the original
