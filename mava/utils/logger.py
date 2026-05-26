@@ -14,7 +14,6 @@
 
 import abc
 import logging
-import os
 from datetime import datetime
 from enum import Enum
 from os import PathLike
@@ -30,7 +29,6 @@ from jax.typing import ArrayLike
 from omegaconf import DictConfig, OmegaConf
 from pandas.io.json._normalize import _simple_json_normalize as flatten_dict
 from rich.pretty import pprint
-from tensorboard_logger import configure, log_value
 
 from mava.types import Metrics
 
@@ -203,29 +201,6 @@ class MultiLogger(BaseLogger):
     def stop(self) -> None:
         for logger in self.loggers:
             logger.stop()
-
-
-class TensorboardLogger(BaseLogger):
-    def __init__(self, base_exp_path: PathLike, unique_token: str, system_name: str) -> None:
-        """
-        Initialize TensorBoard logger for visualization.
-
-        Args:
-            base_exp_path: Base path where logs will be stored
-            unique_token: Unique identifier string for this run
-            system_name: Name of the system/algorithm being logged
-        """
-        tb_exp_path = get_logger_path(system_name, "tensorboard")
-        tb_logs_path = os.path.join(base_exp_path, Path(tb_exp_path, unique_token))
-
-        configure(tb_logs_path)
-        self.log = log_value
-
-    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
-        t = step if event != LogEvent.EVAL else eval_step
-        self.log(f"{event.value}/{key}", value, t)
-
-    def log_config(self, config: Dict) -> None: ...
 
 
 class ConsoleLogger(BaseLogger):

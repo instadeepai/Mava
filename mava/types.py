@@ -20,8 +20,11 @@ import jax
 import jumanji.specs as specs
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
-from tensorflow_probability.substrates.jax.distributions import Distribution
 from typing_extensions import NamedTuple, TypeAlias
+
+# Distribution was previously imported from tensorflow_probability; this dep was removed
+# along with mava/networks/. Callers only use it as an opaque return type, so Any suffices.
+Distribution: TypeAlias = Any
 
 Action: TypeAlias = chex.Array
 Value: TypeAlias = chex.Array
