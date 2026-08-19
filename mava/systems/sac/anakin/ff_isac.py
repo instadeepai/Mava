@@ -397,7 +397,9 @@ def make_update_fns(
 
         losses = q_loss_info | act_loss_info
 
-        return (buffer_state, params, opt_states, t, key), losses
+        # `t` counts gradient steps within this call so the TD3 delayed-update
+        # condition above advances once per epoch; increment it by 1 each step.
+        return (buffer_state, params, opt_states, t + 1, key), losses
 
     # Acting
     def step(
@@ -457,8 +459,11 @@ def make_update_fns(
         act_state = (params.actor, obs, env_state, buffer_state, act_key)
         (_, next_obs, env_state, buffer_state, _), metrics = scanned_act(act_state)
 
-        # Sample and learn
-        learn_state = (buffer_state, params, opt_states, t, learn_key)
+        # Sample and learn. Seed the train scan's gradient-step counter at 0 (it is
+        # local to this call and discarded below) so the TD3 delayed policy update
+        # fires every `policy_update_delay` gradient steps rather than being gated on
+        # the environment-step counter `t`, which is constant across the scan.
+        learn_state = (buffer_state, params, opt_states, 0, learn_key)
         (buffer_state, params, opt_states, _, _), losses = scanned_train(learn_state)
 
         t += cfg.arch.num_envs * cfg.system.rollout_length
