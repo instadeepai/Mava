@@ -372,7 +372,7 @@ def make_update_fns(
         carry: Tuple[BufferState, SacParams, OptStates, int, chex.PRNGKey], _: Any
     ) -> Tuple[Tuple[BufferState, SacParams, OptStates, int, chex.PRNGKey], Metrics]:
         """Update the Q function and optionally policy/alpha with TD3 delayed update."""
-        buffer_state, params, opt_states, t, key = carry
+        buffer_state, params, opt_states, q_grad_steps, key = carry
         key, buff_key, q_key, actor_key = jax.random.split(key, 4)
 
         # sample
@@ -381,7 +381,7 @@ def make_update_fns(
         # learn
         params, opt_states, q_loss_info = update_q(params, opt_states, data, q_key)
         params, opt_states, act_loss_info = lax.cond(
-            t % cfg.system.policy_update_delay == 0,  # TD 3 Delayed update support
+            q_grad_steps % cfg.system.policy_update_delay == 0,  # TD3 delayed update
             update_actor_and_alpha,
             # just return same params and opt_states and 0 for losses
             lambda params, opt_states, *_: (
@@ -397,9 +397,7 @@ def make_update_fns(
 
         losses = q_loss_info | act_loss_info
 
-        # `t` counts gradient steps within this call so the TD3 delayed-update
-        # condition above advances once per epoch; increment it by 1 each step.
-        return (buffer_state, params, opt_states, t + 1, key), losses
+        return (buffer_state, params, opt_states, q_grad_steps + 1, key), losses
 
     # Acting
     def step(
@@ -459,10 +457,7 @@ def make_update_fns(
         act_state = (params.actor, obs, env_state, buffer_state, act_key)
         (_, next_obs, env_state, buffer_state, _), metrics = scanned_act(act_state)
 
-        # Sample and learn. Seed the train scan's gradient-step counter at 0 (it is
-        # local to this call and discarded below) so the TD3 delayed policy update
-        # fires every `policy_update_delay` gradient steps rather than being gated on
-        # the environment-step counter `t`, which is constant across the scan.
+        # Sample and learn. Start grad steps counter at 0.
         learn_state = (buffer_state, params, opt_states, 0, learn_key)
         (buffer_state, params, opt_states, _, _), losses = scanned_train(learn_state)
 
