@@ -48,6 +48,7 @@ from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
 from mava.utils.jax_utils import (
+    add_batch_dim,
     switch_leading_axes,
     unreplicate_batch_dim,
     unreplicate_n_dims,
@@ -251,8 +252,8 @@ def make_update_fns(
             cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
         )
 
-        obs = tree.map(lambda x: x[jnp.newaxis, ...], obs)
-        term_or_trunc = tree.map(lambda x: x[jnp.newaxis, ...], term_or_trunc)
+        obs = add_batch_dim(obs)
+        term_or_trunc = add_batch_dim(term_or_trunc)
 
         next_hidden_state, eps_greedy_dist = q_net.apply(
             params, hidden_state, (obs, term_or_trunc), eps
@@ -577,7 +578,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
         term_or_trunc = timestep.last()
         net_input = (timestep.observation, term_or_trunc[..., jnp.newaxis])
-        net_input = tree.map(lambda x: x[jnp.newaxis], net_input)  # add batch dim to obs
+        net_input = add_batch_dim(net_input)
         next_hidden_state, eps_greedy_dist = q_net.apply(params, hidden_state, net_input)
         action = eps_greedy_dist.sample(seed=key).squeeze(0)
         return action, {"hidden_state": next_hidden_state}

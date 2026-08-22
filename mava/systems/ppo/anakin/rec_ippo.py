@@ -49,7 +49,7 @@ from mava.types import (
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
-from mava.utils.jax_utils import unreplicate_batch_dim, unreplicate_n_dims
+from mava.utils.jax_utils import add_batch_dim, unreplicate_batch_dim, unreplicate_n_dims
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
@@ -106,7 +106,7 @@ def get_learner_fn(
             key, policy_key = jax.random.split(key)
 
             # Add a batch dimension to the observation.
-            batched_observation = tree.map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
+            batched_observation = add_batch_dim(last_timestep.observation)
             ac_in = (batched_observation, last_done[jnp.newaxis, :])
 
             # Run the network.
@@ -151,7 +151,7 @@ def get_learner_fn(
         params, opt_states, key, env_state, last_timestep, last_done, hstates = learner_state
 
         # Add a batch dimension to the observation.
-        batched_last_observation = tree.map(lambda x: x[jnp.newaxis, :], last_timestep.observation)
+        batched_last_observation = add_batch_dim(last_timestep.observation)
         ac_in = (batched_last_observation, last_done[jnp.newaxis, :])
 
         # Run the network.
@@ -444,7 +444,7 @@ def learner_setup(
         lambda x: jnp.repeat(x[jnp.newaxis, ...], config.arch.num_envs, axis=0),
         init_obs,
     )
-    init_obs = tree.map(lambda x: x[jnp.newaxis, ...], init_obs)
+    init_obs = add_batch_dim(init_obs)
     init_done = jnp.zeros((1, config.arch.num_envs, num_agents), dtype=bool)
     init_x = (init_obs, init_done)
 
