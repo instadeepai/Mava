@@ -504,6 +504,8 @@ def run_experiment(cfg: DictConfig) -> float:
     anakin_act_steps = anakin_steps * cfg.arch.num_envs * cfg.system.rollout_length
     # Number of steps to do in the scanned update method (how many anakin steps).
     cfg.system.scan_steps = int(steps_per_rollout / anakin_act_steps)
+    # Number of gradient steps performed between evaluations.
+    learn_steps_per_rollout = anakin_steps * cfg.system.epochs * cfg.system.scan_steps
 
     # Initialize system and make learning functions.
     (env, eval_env), networks, optims, rb, learner_state, target_entropy, logger, key = init(cfg)
@@ -549,12 +551,11 @@ def run_experiment(cfg: DictConfig) -> float:
         t += steps_per_rollout  # Completed rollout so add to step count.
 
         # Log:
-        # Add learn steps here because anakin steps per second is learn + act steps
-        # But we also want to make sure we're counting env steps correctly so
-        # learn steps is not included in the loop counter.
         elapsed_time = time.time() - start_time
         final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
-        final_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        final_metrics["steps_per_second"] = (
+            steps_per_rollout + learn_steps_per_rollout
+        ) / elapsed_time
         loss_metrics = losses | {"log_alpha": learner_state.params.log_alpha}
 
         logger.log({"timestep": t}, t, eval_idx, LogEvent.MISC)
