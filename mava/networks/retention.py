@@ -17,7 +17,7 @@ from typing import Tuple
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
-from chex import Array
+from jax import Array
 from omegaconf import DictConfig
 
 from mava.networks.utils.sable import PositionalEncoding

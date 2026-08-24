@@ -41,14 +41,14 @@ def tree_at_set(old_tree: chex.ArrayTree, i: Indexer, new_tree: chex.ArrayTree) 
     return tree.map(lambda old, new: old.at[i].set(new), old_tree, new_tree)
 
 
-def ndim_at_least(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
+def ndim_at_least(x: jax.Array, num_dims: chex.Numeric) -> jax.Array:
     """Check if the number of dimensions of `x` is at least `num_dims`."""
     if not (isinstance(x, jax.Array) or isinstance(x, np.ndarray)):
         x = jnp.asarray(x)
     return x.ndim >= num_dims
 
 
-def merge_leading_dims(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
+def merge_leading_dims(x: jax.Array, num_dims: chex.Numeric) -> jax.Array:
     """Merge leading dimensions.
 
     Note:
@@ -67,7 +67,7 @@ def merge_leading_dims(x: chex.Array, num_dims: chex.Numeric) -> chex.Array:
     return x.reshape(new_shape)
 
 
-def concat_time_and_agents(x: chex.Array) -> chex.Array:
+def concat_time_and_agents(x: jax.Array) -> jax.Array:
     """Concatenates the time and agent dimensions in the input tensor.
 
     Args:
@@ -76,7 +76,7 @@ def concat_time_and_agents(x: chex.Array) -> chex.Array:
 
     Returns:
     -------
-        chex.Array: Tensor of shape (Batch, Time x Agents, ...).
+        jax.Array: Tensor of shape (Batch, Time x Agents, ...).
     """
     x = jnp.moveaxis(x, 0, 1)
     x = jnp.reshape(x, (x.shape[0], x.shape[1] * x.shape[2], *x.shape[3:]))
@@ -103,6 +103,6 @@ def unreplicate_batch_dim(x: Any) -> Any:
     return tree.map(lambda x: x[:, 0, ...], x)  # type: ignore
 
 
-def switch_leading_axes(arr: chex.Array) -> chex.Array:
+def switch_leading_axes(arr: jax.Array) -> jax.Array:
     """Switches the first two axes, generally used for BT -> TB."""
     return tree.map(lambda x: x.swapaxes(0, 1), arr)

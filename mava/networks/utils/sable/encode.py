@@ -14,7 +14,7 @@
 
 from typing import Tuple
 
-import chex
+import jax
 import jax.numpy as jnp
 from flax import linen as nn
 
@@ -26,12 +26,12 @@ from flax import linen as nn
 
 def train_encoder_fn(
     encoder: nn.Module,
-    obs: chex.Array,
-    hstate: chex.Array,
-    dones: chex.Array,
-    step_count: chex.Array,
+    obs: jax.Array,
+    hstate: jax.Array,
+    dones: jax.Array,
+    step_count: jax.Array,
     chunk_size: int,
-) -> Tuple[chex.Array, chex.Array, chex.Array]:
+) -> Tuple[jax.Array, jax.Array, jax.Array]:
     """Chunkwise encoding for discrete action spaces."""
     B, S = obs.shape[:2]
     v_loc = jnp.zeros((B, S, 1))
@@ -57,11 +57,11 @@ def train_encoder_fn(
 
 def act_encoder_fn(
     encoder: nn.Module,
-    obs: chex.Array,
-    decayed_hstate: chex.Array,
-    step_count: chex.Array,
+    obs: jax.Array,
+    decayed_hstate: jax.Array,
+    step_count: jax.Array,
     chunk_size: int,
-) -> Tuple[chex.Array, chex.Array, chex.Array]:
+) -> Tuple[jax.Array, jax.Array, jax.Array]:
     """Chunkwise encoding for ff-Sable and for discrete action spaces."""
     B, C = obs.shape[:2]
     v_loc = jnp.zeros((B, C, 1))

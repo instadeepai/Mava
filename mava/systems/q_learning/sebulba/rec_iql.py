@@ -214,7 +214,7 @@ def get_learner_step_fn(
             traj_batch: Batch of transitions for training.
         """
 
-        def prep_inputs_to_scannedrnn(obs: Observation, term_or_trunc: chex.Array) -> chex.Array:
+        def prep_inputs_to_scannedrnn(obs: Observation, term_or_trunc: jax.Array) -> jax.Array:
             """Prepares inputs for the ScannedRNN network.
 
             Switches leading axes of observations and termination/truncation flags to match the

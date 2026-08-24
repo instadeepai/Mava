@@ -106,7 +106,7 @@ def rollout(
     def act_fn(
         params: Params,
         observation: Observation,
-        hstates: chex.Array,
+        hstates: jax.Array,
         key: chex.PRNGKey,
     ) -> Tuple:
         """Get action and value."""
@@ -244,8 +244,8 @@ def get_learner_step_fn(
                 def _loss_fn(
                     params: Params,
                     traj_batch: Transition,
-                    gae: chex.Array,
-                    value_targets: chex.Array,
+                    gae: jax.Array,
+                    value_targets: jax.Array,
                     initial_hstate: HiddenStates,
                     rng_key: chex.PRNGKey,
                 ) -> Tuple:

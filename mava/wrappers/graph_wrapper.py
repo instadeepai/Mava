@@ -101,7 +101,7 @@ class GraphWrapper(Wrapper):
         return state, timestep
 
     def step(
-        self, state: State, action: chex.Array
+        self, state: State, action: jax.Array
     ) -> Tuple[State, TimeStep[Union[Observation, ObservationGlobalState]]]:
         """Step the environment and add the graph representation to the observation."""
         state, timestep = self._env.step(state, action)

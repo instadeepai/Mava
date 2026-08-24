@@ -16,6 +16,7 @@ from functools import partial
 from typing import Optional, Tuple
 
 import chex
+import jax
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
@@ -60,8 +61,8 @@ class EncodeBlock(nn.Module):
         self.ffn = SwiGLU(self.net_config.embed_dim, self.net_config.embed_dim)
 
     def __call__(
-        self, x: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array
-    ) -> chex.Array:
+        self, x: jax.Array, hstate: jax.Array, dones: jax.Array, step_count: jax.Array
+    ) -> jax.Array:
         """Applies Chunkwise MultiScaleRetention."""
         ret, updated_hstate = self.retn(
             key=x, query=x, value=x, hstate=hstate, dones=dones, step_count=step_count
@@ -70,7 +71,7 @@ class EncodeBlock(nn.Module):
         output = self.ln2(x + self.ffn(x))
         return output, updated_hstate
 
-    def recurrent(self, x: chex.Array, hstate: chex.Array, step_count: chex.Array) -> chex.Array:
+    def recurrent(self, x: jax.Array, hstate: jax.Array, step_count: jax.Array) -> jax.Array:
         """Applies Recurrent MultiScaleRetention."""
         ret, updated_hstate = self.retn.recurrent(
             key_n=x, query_n=x, value_n=x, hstate=hstate, step_count=step_count
@@ -119,8 +120,8 @@ class Encoder(nn.Module):
         ]
 
     def __call__(
-        self, obs: chex.Array, hstate: chex.Array, dones: chex.Array, step_count: chex.Array
-    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
+        self, obs: jax.Array, hstate: jax.Array, dones: jax.Array, step_count: jax.Array
+    ) -> Tuple[jax.Array, jax.Array, jax.Array]:
         """Apply chunkwise encoding."""
         updated_hstate = jnp.zeros_like(hstate)
         obs_rep = self.obs_encoder(obs)
@@ -137,8 +138,8 @@ class Encoder(nn.Module):
         return value, obs_rep, updated_hstate
 
     def recurrent(
-        self, obs: chex.Array, hstate: chex.Array, step_count: chex.Array
-    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
+        self, obs: jax.Array, hstate: jax.Array, step_count: jax.Array
+    ) -> Tuple[jax.Array, jax.Array, jax.Array]:
         """Apply recurrent encoding."""
         updated_hstate = jnp.zeros_like(hstate)
         obs_rep = self.obs_encoder(obs)
@@ -187,12 +188,12 @@ class DecodeBlock(nn.Module):
 
     def __call__(
         self,
-        x: chex.Array,
-        obs_rep: chex.Array,
-        hstates: Tuple[chex.Array, chex.Array],
-        dones: chex.Array,
-        step_count: chex.Array,
-    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
+        x: jax.Array,
+        obs_rep: jax.Array,
+        hstates: Tuple[jax.Array, jax.Array],
+        dones: jax.Array,
+        step_count: jax.Array,
+    ) -> Tuple[jax.Array, Tuple[jax.Array, jax.Array]]:
         """Applies Chunkwise MultiScaleRetention."""
         hs1, hs2 = hstates
 
@@ -218,11 +219,11 @@ class DecodeBlock(nn.Module):
 
     def recurrent(
         self,
-        x: chex.Array,
-        obs_rep: chex.Array,
-        hstates: Tuple[chex.Array, chex.Array],
-        step_count: chex.Array,
-    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
+        x: jax.Array,
+        obs_rep: jax.Array,
+        hstates: Tuple[jax.Array, jax.Array],
+        step_count: jax.Array,
+    ) -> Tuple[jax.Array, Tuple[jax.Array, jax.Array]]:
         """Applies Recurrent MultiScaleRetention."""
         hs1, hs2 = hstates
 
@@ -295,12 +296,12 @@ class Decoder(nn.Module):
 
     def __call__(
         self,
-        action: chex.Array,
-        obs_rep: chex.Array,
-        hstates: Tuple[chex.Array, chex.Array],
-        dones: chex.Array,
-        step_count: chex.Array,
-    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
+        action: jax.Array,
+        obs_rep: jax.Array,
+        hstates: Tuple[jax.Array, jax.Array],
+        dones: jax.Array,
+        step_count: jax.Array,
+    ) -> Tuple[jax.Array, Tuple[jax.Array, jax.Array]]:
         """Apply chunkwise decoding."""
         updated_hstates = tree.map(jnp.zeros_like, hstates)
         action_embeddings = self.action_encoder(action)
@@ -320,11 +321,11 @@ class Decoder(nn.Module):
 
     def recurrent(
         self,
-        action: chex.Array,
-        obs_rep: chex.Array,
-        hstates: Tuple[chex.Array, chex.Array],
-        step_count: chex.Array,
-    ) -> Tuple[chex.Array, Tuple[chex.Array, chex.Array]]:
+        action: jax.Array,
+        obs_rep: jax.Array,
+        hstates: Tuple[jax.Array, jax.Array],
+        step_count: jax.Array,
+    ) -> Tuple[jax.Array, Tuple[jax.Array, jax.Array]]:
         """Apply recurrent decoding."""
         updated_hstates = tree.map(jnp.zeros_like, hstates)
         action_embeddings = self.action_encoder(action)
@@ -412,11 +413,11 @@ class SableNetwork(nn.Module):
     def __call__(
         self,
         observation: Observation,
-        action: chex.Array,
+        action: jax.Array,
         hstates: HiddenStates,
-        dones: chex.Array,
+        dones: jax.Array,
         rng_key: Optional[chex.PRNGKey] = None,
-    ) -> Tuple[chex.Array, chex.Array, chex.Array, chex.Array]:
+    ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
         """Training phase."""
         obs, legal_actions, step_count = (
             observation.agents_view,
@@ -445,7 +446,7 @@ class SableNetwork(nn.Module):
         observation: Observation,
         hstates: HiddenStates,
         key: chex.PRNGKey,
-    ) -> Tuple[chex.Array, chex.Array, chex.Array, HiddenStates]:
+    ) -> Tuple[jax.Array, jax.Array, jax.Array, HiddenStates]:
         """Inference phase."""
         obs, legal_actions, step_count = (
             observation.agents_view,

@@ -16,9 +16,10 @@ from typing import Dict, Tuple, Union
 
 import flax.linen as nn
 import optax
-from chex import Array, PRNGKey
+from chex import PRNGKey
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flax.core.scope import FrozenVariableDict
+from jax import Array
 from typing_extensions import NamedTuple, TypeAlias
 
 from mava.types import Observation, ObservationGlobalState, State

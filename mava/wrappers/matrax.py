@@ -16,6 +16,7 @@ from functools import cached_property
 from typing import Any, Dict, Tuple, Union
 
 import chex
+import jax
 import jax.numpy as jnp
 from jumanji import specs
 from jumanji.env import Environment
@@ -63,7 +64,7 @@ class MatraxWrapper(Wrapper):
         state, timestep = self._env.reset(key)
         return state, self.modify_timestep(timestep)
 
-    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
+    def step(self, state: State, action: jax.Array) -> Tuple[State, TimeStep]:
         """Step the environment."""
         state, timestep = self._env.step(state, action)
         return state, self.modify_timestep(timestep)

@@ -120,8 +120,8 @@ def get_learner_fn(
         )
 
         def _calculate_gae(
-            traj_batch: PPOTransition, last_val: chex.Array
-        ) -> Tuple[chex.Array, chex.Array]:
+            traj_batch: PPOTransition, last_val: jax.Array
+        ) -> Tuple[jax.Array, jax.Array]:
             """Calculate the GAE."""
 
             def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
@@ -159,8 +159,8 @@ def get_learner_fn(
                 def _loss_fn(
                     params: FrozenDict,
                     traj_batch: PPOTransition,
-                    gae: chex.Array,
-                    value_targets: chex.Array,
+                    gae: jax.Array,
+                    value_targets: jax.Array,
                     entropy_key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
@@ -308,7 +308,7 @@ def get_learner_fn(
 
 
 def learner_setup(
-    env: MarlEnv, keys: chex.Array, config: DictConfig
+    env: MarlEnv, keys: jax.Array, config: DictConfig
 ) -> Tuple[LearnerFn[LearnerState], Any, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
@@ -427,7 +427,7 @@ def run_experiment(_config: DictConfig) -> float:
         timestep: TimeStep,
         key: chex.PRNGKey,
         actor_state: ActorState,
-    ) -> Tuple[chex.Array, ActorState]:
+    ) -> Tuple[jax.Array, ActorState]:
         """The acting function that get's passed to the evaluator.
         Given that the MAT network has a `get_actions` method we define this eval_act_fn
         accordingly.

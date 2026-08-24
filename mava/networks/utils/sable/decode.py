@@ -35,16 +35,16 @@ _MIN_SCALE = 1e-3
 
 def discrete_train_decoder_fn(
     decoder: nn.Module,
-    obs_rep: chex.Array,
-    action: chex.Array,
-    legal_actions: chex.Array,
-    hstates: chex.Array,
-    dones: chex.Array,
-    step_count: chex.Array,
+    obs_rep: jax.Array,
+    action: jax.Array,
+    legal_actions: jax.Array,
+    hstates: jax.Array,
+    dones: jax.Array,
+    step_count: jax.Array,
     n_agents: int,
     chunk_size: int,
     rng_key: Optional[chex.PRNGKey] = None,
-) -> Tuple[chex.Array, chex.Array, chex.Array]:
+) -> Tuple[jax.Array, jax.Array, jax.Array]:
     """Parallel action sampling for discrete action spaces."""
     # Delete `rng_key` since it is not used in discrete action space
     del rng_key
@@ -84,8 +84,8 @@ def discrete_train_decoder_fn(
 
 
 def get_shifted_discrete_actions(
-    action: chex.Array, legal_actions: chex.Array, n_agents: int
-) -> chex.Array:
+    action: jax.Array, legal_actions: jax.Array, n_agents: int
+) -> jax.Array:
     """Get the shifted discrete action sequence for predicting the next action."""
     B, S, A = legal_actions.shape
 
@@ -110,12 +110,12 @@ def get_shifted_discrete_actions(
 
 def discrete_autoregressive_act(
     decoder: nn.Module,
-    obs_rep: chex.Array,
-    hstates: chex.Array,
-    legal_actions: chex.Array,
-    step_count: chex.Array,
+    obs_rep: jax.Array,
+    hstates: jax.Array,
+    legal_actions: jax.Array,
+    step_count: jax.Array,
     key: chex.PRNGKey,
-) -> Tuple[chex.Array, chex.Array, chex.Array]:
+) -> Tuple[jax.Array, jax.Array, jax.Array]:
     B, N, A = legal_actions.shape
 
     shifted_actions = jnp.zeros((B, N, A + 1))
@@ -155,17 +155,17 @@ def discrete_autoregressive_act(
 
 def continuous_train_decoder_fn(
     decoder: nn.Module,
-    obs_rep: chex.Array,
-    action: chex.Array,
-    legal_actions: chex.Array,
-    hstates: chex.Array,
-    dones: chex.Array,
-    step_count: chex.Array,
+    obs_rep: jax.Array,
+    action: jax.Array,
+    legal_actions: jax.Array,
+    hstates: jax.Array,
+    dones: jax.Array,
+    step_count: jax.Array,
     n_agents: int,
     chunk_size: int,
     action_dim: int,
     rng_key: Optional[chex.PRNGKey] = None,
-) -> Tuple[chex.Array, chex.Array, chex.Array]:
+) -> Tuple[jax.Array, jax.Array, jax.Array]:
     """Parallel action sampling for discrete action spaces."""
     # Delete `legal_actions` since it is not used in continuous action space
     del legal_actions
@@ -207,9 +207,7 @@ def continuous_train_decoder_fn(
     return action_log_prob, entropy, distribution
 
 
-def get_shifted_continuous_actions(
-    action: chex.Array, action_dim: int, n_agents: int
-) -> chex.Array:
+def get_shifted_continuous_actions(action: jax.Array, action_dim: int, n_agents: int) -> jax.Array:
     """Get the shifted continuous action sequence for predicting the next action."""
     B, S, _ = action.shape
 
@@ -223,13 +221,13 @@ def get_shifted_continuous_actions(
 
 def continuous_autoregressive_act(
     decoder: nn.Module,
-    obs_rep: chex.Array,
-    hstates: chex.Array,
-    legal_actions: chex.Array,
-    step_count: chex.Array,
+    obs_rep: jax.Array,
+    hstates: jax.Array,
+    legal_actions: jax.Array,
+    step_count: jax.Array,
     action_dim: int,
     key: chex.PRNGKey,
-) -> Tuple[chex.Array, chex.Array, chex.Array]:
+) -> Tuple[jax.Array, jax.Array, jax.Array]:
     # Delete `legal_actions` since it is not used in continuous action space
     del legal_actions
 

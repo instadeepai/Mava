@@ -62,7 +62,7 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
             self.distribution.log_survival_function(inverse_threshold) - log_epsilon
         )
 
-    def log_prob(self, event: chex.Array) -> chex.Array:
+    def log_prob(self, event: jax.Array) -> jax.Array:
         """Computes the log probability of the event under the transformed distribution."""
         # Without this clip, there would be NaNs in the internal tf.where.
         event = jnp.clip(event, -self._threshold, self._threshold)
@@ -74,11 +74,11 @@ class TanhTransformedDistribution(tfd.TransformedDistribution):
             jnp.where(event >= self._threshold, self._log_prob_right, super().log_prob(event)),
         )
 
-    def mode(self) -> chex.Array:
+    def mode(self) -> jax.Array:
         """Returns the mode of the distribution."""
         return self.bijector.forward(self.distribution.mode())
 
-    def entropy(self, seed: chex.PRNGKey = None) -> chex.Array:
+    def entropy(self, seed: chex.PRNGKey = None) -> jax.Array:
         """Computes an estimation of the entropy using a sample of the log_det_jacobian."""
         return self.distribution.entropy() + self.bijector.forward_log_det_jacobian(
             self.distribution.sample(seed=seed), event_ndims=0
@@ -104,7 +104,7 @@ class MaskedEpsGreedyDistribution(tfd.Categorical):
     greedy strategy, and sampled normally using sample() for an epsilon-greedy strategy.
     """
 
-    def __init__(self, q_values: chex.Array, epsilon: float, mask: chex.Array):
+    def __init__(self, q_values: jax.Array, epsilon: float, mask: jax.Array):
         # keep q values available if we need to use them to learn with later
         self.q_values = q_values
 
@@ -154,7 +154,7 @@ class IdentityTransformation(tfd.TransformedDistribution):
         """Initialises the IdentityTransformation."""
         super().__init__(distribution=distribution, bijector=tfb.Identity())
 
-    def entropy(self, seed: chex.PRNGKey = None) -> chex.Array:
+    def entropy(self, seed: chex.PRNGKey = None) -> jax.Array:
         """Computes the entropy of the distribution."""
         return self.distribution.entropy()
 

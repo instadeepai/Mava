@@ -15,7 +15,6 @@
 import functools
 from typing import Sequence, Tuple, Union
 
-import chex
 import jax
 import jax.numpy as jnp
 import tensorflow_probability.substrates.jax.distributions as tfd
@@ -67,7 +66,7 @@ class FeedForwardValueNet(nn.Module):
     def __call__(
         self,
         observation: Union[Observation, ObservationGlobalState, GraphObservation[MavaObservation]],
-    ) -> chex.Array:
+    ) -> jax.Array:
         """Forward pass."""
 
         if is_graph_observation(observation):
@@ -100,8 +99,8 @@ class FeedForwardQNet(nn.Module):
     def __call__(
         self,
         observation: Union[Observation, ObservationGlobalState],
-        action: chex.Array,
-    ) -> chex.Array:
+        action: jax.Array,
+    ) -> jax.Array:
         if self.centralised_critic:
             if not isinstance(observation, ObservationGlobalState):
                 raise ValueError("Global state must be provided to the centralised critic.")
@@ -129,7 +128,7 @@ class ScannedRNN(nn.Module):
         split_rngs={"params": False},
     )
     @nn.compact
-    def __call__(self, carry: chex.Array, x: chex.Array) -> Tuple[chex.Array, chex.Array]:
+    def __call__(self, carry: jax.Array, x: jax.Array) -> Tuple[jax.Array, jax.Array]:
         """Applies the module."""
         rnn_state = carry
         ins, resets = x
@@ -142,7 +141,7 @@ class ScannedRNN(nn.Module):
         return new_rnn_state, y
 
     @staticmethod
-    def initialize_carry(batch_size: Sequence[int], hidden_size: int) -> chex.Array:
+    def initialize_carry(batch_size: Sequence[int], hidden_size: int) -> jax.Array:
         """Initializes the carry state."""
         # Use a dummy key since the default state init fn is just zeros.
         cell = nn.GRUCell(features=hidden_size)
@@ -160,9 +159,9 @@ class RecurrentActor(nn.Module):
     @nn.compact
     def __call__(
         self,
-        policy_hidden_state: chex.Array,
+        policy_hidden_state: jax.Array,
         observation_done: RNNObservation,
-    ) -> Tuple[chex.Array, tfd.Distribution]:
+    ) -> Tuple[jax.Array, tfd.Distribution]:
         """Forward pass."""
         observation, done = observation_done
 
@@ -195,9 +194,9 @@ class RecurrentValueNet(nn.Module):
     @nn.compact
     def __call__(
         self,
-        value_net_hidden_state: Tuple[chex.Array, chex.Array],
+        value_net_hidden_state: Tuple[jax.Array, jax.Array],
         observation_done: Union[RNNObservation, RNNGlobalObservation],
-    ) -> Tuple[chex.Array, chex.Array]:
+    ) -> Tuple[jax.Array, jax.Array]:
         """Forward pass."""
         observation, done = observation_done
 
@@ -237,9 +236,9 @@ class RecQNetwork(nn.Module):
     @nn.compact
     def get_q_values(
         self,
-        hidden_state: chex.Array,
+        hidden_state: jax.Array,
         observations_resets: RNNObservation,
-    ) -> chex.Array:
+    ) -> jax.Array:
         """Forward pass to obtain q values."""
         obs, resets = observations_resets
 
@@ -258,10 +257,10 @@ class RecQNetwork(nn.Module):
 
     def __call__(
         self,
-        hidden_state: chex.Array,
+        hidden_state: jax.Array,
         observations_resets: RNNObservation,
         eps: float = 0,
-    ) -> chex.Array:
+    ) -> jax.Array:
         """Forward pass with additional construction of epsilon-greedy distribution.
         When epsilon is not specified, we assume a greedy approach.
         """
@@ -306,9 +305,9 @@ class QMixingNetwork(nn.Module):
     @nn.compact
     def __call__(
         self,
-        agent_qs: chex.Array,
-        env_global_state: chex.Array,
-    ) -> chex.Array:
+        agent_qs: jax.Array,
+        env_global_state: jax.Array,
+    ) -> jax.Array:
         B, T = agent_qs.shape[:2]  # batch size
 
         agent_qs = jnp.reshape(agent_qs, (B, T, 1, self.num_agents))

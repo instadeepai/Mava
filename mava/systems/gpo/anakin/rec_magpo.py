@@ -61,7 +61,7 @@ def forward_reshape(
     batch_tree: Any,  # PyTree of arrays
     num_agents: int,
 ) -> Any:
-    def reshape(x: chex.Array) -> chex.Array:
+    def reshape(x: jax.Array) -> jax.Array:
         """
         Convert (N, T*A, ...) → (T, N, A, ...)
         """
@@ -76,7 +76,7 @@ def forward_reshape(
 
 
 def backward_reshape(batch_tree: Any) -> Any:
-    def reshape(x: chex.Array) -> chex.Array:
+    def reshape(x: jax.Array) -> jax.Array:
         """
         Convert (T, N, A, ...) → (N, T*A, ...)
         """
@@ -208,8 +208,8 @@ def get_learner_fn(
                     guider_params: Param,
                     actor_params: Param,
                     traj_batch: Transition,
-                    gae: chex.Array,
-                    value_targets: chex.Array,
+                    gae: jax.Array,
+                    value_targets: jax.Array,
                     prev_hstates: SableHiddenStates,
                     rng_key: chex.PRNGKey,
                 ) -> Tuple:
@@ -299,7 +299,7 @@ def get_learner_fn(
                     actor_params: Param,
                     guider_params: Param,
                     traj_batch: Transition,
-                    gae: chex.Array,
+                    gae: jax.Array,
                     rng_key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate Sable loss."""
@@ -516,7 +516,7 @@ def get_learner_fn(
 
 
 def learner_setup(
-    env: MarlEnv, keys: chex.Array, config: DictConfig
+    env: MarlEnv, keys: jax.Array, config: DictConfig
 ) -> Tuple[LearnerFn[LearnerState], Actor, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.

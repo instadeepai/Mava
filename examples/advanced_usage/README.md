@@ -69,13 +69,13 @@ Because of the Anakin architecture set-up, our trajectories are stored in the in
 # NE: Number of environments
 
 @jax.jit
-def _reshape_experience(experience: Dict[str, chex.Array]) -> Dict[str, chex.Array]:
+def _reshape_experience(experience: Dict[str, jax.Array]) -> Dict[str, jax.Array]:
     """Reshape experience to match buffer."""
 
     # Swap the T and NE axes (D, NU, UB, T, NE, ...) -> (D, NU, UB, NE, T, ...)
-    experience: Dict[str, chex.Array] = jax.tree.map(lambda x: x.swapaxes(3, 4), experience)
+    experience: Dict[str, jax.Array] = jax.tree.map(lambda x: x.swapaxes(3, 4), experience)
     # Merge 4 leading dimensions into 1. (D, NU, UB, NE, T ...) -> (D * NU * UB * NE, T, ...)
-    experience: Dict[str, chex.Array] = jax.tree.map(
+    experience: Dict[str, jax.Array] = jax.tree.map(
         lambda x: x.reshape(-1, *x.shape[4:]), experience
     )
     return experience

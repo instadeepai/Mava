@@ -15,6 +15,7 @@
 from typing import Tuple
 
 import chex
+import jax
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
@@ -61,7 +62,7 @@ class EncodeBlock(nn.Module):
 
         self.mlp = _make_mlp(self.net_config.embed_dim, self.net_config.use_swiglu)
 
-    def __call__(self, x: chex.Array) -> chex.Array:
+    def __call__(self, x: jax.Array) -> jax.Array:
         x = self.ln1(x + self.attn(x, x, x))
         x = self.ln2(x + self.mlp(x))
         return x
@@ -101,7 +102,7 @@ class Encoder(nn.Module):
             ],
         )
 
-    def __call__(self, obs: chex.Array) -> Tuple[chex.Array, chex.Array]:
+    def __call__(self, obs: jax.Array) -> Tuple[jax.Array, jax.Array]:
         obs_embeddings = self.obs_encoder(obs)
         x = obs_embeddings
 
@@ -131,7 +132,7 @@ class DecodeBlock(nn.Module):
 
         self.mlp = _make_mlp(self.net_config.embed_dim, self.net_config.use_swiglu)
 
-    def __call__(self, x: chex.Array, rep_enc: chex.Array) -> chex.Array:
+    def __call__(self, x: jax.Array, rep_enc: jax.Array) -> jax.Array:
         x = self.ln1(x + self.attn1(x, x, x))
         x = self.ln2(rep_enc + self.attn2(key=x, value=x, query=rep_enc))
         x = self.ln3(x + self.mlp(x))
@@ -192,7 +193,7 @@ class Decoder(nn.Module):
             ],
         )
 
-    def __call__(self, action: chex.Array, obs_rep: chex.Array) -> chex.Array:
+    def __call__(self, action: jax.Array, obs_rep: jax.Array) -> jax.Array:
         action_embeddings = self.action_encoder(action)
         x = self.ln(action_embeddings)
 
@@ -247,9 +248,9 @@ class MultiAgentTransformer(nn.Module):
     def __call__(
         self,
         observation: MavaObservation,  # (B, N, ...)
-        action: chex.Array,  # (B, N, A)
+        action: jax.Array,  # (B, N, A)
         key: chex.PRNGKey,
-    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
+    ) -> Tuple[jax.Array, jax.Array, jax.Array]:
         value, obs_rep = self.encoder(observation.agents_view)
 
         action_log, entropy = self.train_function(
@@ -267,7 +268,7 @@ class MultiAgentTransformer(nn.Module):
         self,
         observation: MavaObservation,  # (B, N, ...)
         key: chex.PRNGKey,
-    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
+    ) -> Tuple[jax.Array, jax.Array, jax.Array]:
         value, obs_rep = self.encoder(observation.agents_view)
         output_action, output_action_log = self.act_function(
             decoder=self.decoder,
