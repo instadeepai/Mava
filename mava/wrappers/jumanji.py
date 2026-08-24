@@ -33,6 +33,10 @@ from jumanji.environments.routing.connector.constants import (
     TARGET,
 )
 from jumanji.environments.routing.lbf import LevelBasedForaging
+from jumanji.environments.routing.multi_cvrp import MultiCVRP
+from jumanji.environments.routing.multi_cvrp.types import (
+    Observation as MultiCvrpObservation,
+)
 from jumanji.environments.routing.robot_warehouse import RobotWarehouse
 from jumanji.types import TimeStep
 from jumanji.wrappers import Wrapper
@@ -54,7 +58,7 @@ class JumanjiMarlWrapper(Wrapper, ABC):
         self.time_limit = self._env.time_limit
 
     @abstractmethod
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         """Modify the timestep for `step` and `reset`."""
         pass
 
@@ -69,7 +73,7 @@ class JumanjiMarlWrapper(Wrapper, ABC):
     def reset(self, key: chex.PRNGKey) -> Tuple[State, TimeStep]:
         """Reset the environment."""
         state, timestep = self._env.reset(key)
-        timestep = self.modify_timestep(timestep)
+        timestep = self.modify_timestep(timestep, state)
         if self.add_global_state:
             global_state = self.get_global_state(timestep.observation)
             observation = ObservationGlobalState(
@@ -85,7 +89,7 @@ class JumanjiMarlWrapper(Wrapper, ABC):
     def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
         """Step the environment."""
         state, timestep = self._env.step(state, action)
-        timestep = self.modify_timestep(timestep)
+        timestep = self.modify_timestep(timestep, state)
         if self.add_global_state:
             global_state = self.get_global_state(timestep.observation)
             observation = ObservationGlobalState(
@@ -141,7 +145,7 @@ class RwareWrapper(JumanjiMarlWrapper):
         super().__init__(env, add_global_state)
         self._env: RobotWarehouse
 
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         """Modify the timestep for the Robotic Warehouse environment."""
         observation = Observation(
             agents_view=timestep.observation.agents_view.astype(float),
@@ -189,7 +193,7 @@ class LbfWrapper(JumanjiMarlWrapper):
         self._env: LevelBasedForaging
         self._aggregate_rewards = aggregate_rewards
 
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         """Modify the timestep for Level-Based Foraging environment and update
         the reward based on the specified reward handling strategy.
         """
@@ -255,7 +259,7 @@ class ConnectorWrapper(JumanjiMarlWrapper):
         self._aggregate_rewards = aggregate_rewards
         self.agent_ids = jnp.arange(self.num_agents)
 
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         """Modify the timestep for the Connector environment."""
 
         # TARGET = 3 = The number of different types of items on the grid.
@@ -382,7 +386,7 @@ class VectorConnectorWrapper(JumanjiMarlWrapper):
         self._aggregate_rewards = aggregate_rewards
         self.agent_ids = jnp.arange(self.num_agents)
 
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         """Modify the timestep for the Connector environment."""
 
         # TARGET = 3 = The number of different types of items on the grid.
@@ -503,7 +507,7 @@ class CleanerWrapper(JumanjiMarlWrapper):
         super().__init__(env, add_global_state)
         self._env: Cleaner
 
-    def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
+    def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
         """Modify the timestep for the Cleaner environment."""
 
         def create_agents_view(grid: chex.Array, agents_locations: chex.Array) -> chex.Array:
@@ -603,3 +607,101 @@ class CleanerWrapper(JumanjiMarlWrapper):
             return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
 
         return specs.Spec(Observation, "ObservationSpec", **obs_data)
+
+
+class MultiCVRPWrapper(JumanjiMarlWrapper):
+    """Multi-agent wrapper for the MultiCVRP environment."""
+
+    def __init__(self, env: MultiCVRP, add_global_state: bool = False):
+        self.num_customers = env._num_customers
+        env.num_agents = env._num_vehicles
+        env.time_limit = 2 * self.num_customers
+        super().__init__(env, add_global_state)
+        self._env: MultiCVRP
+
+    def modify_timestep(self, timestep: TimeStep, state: State) -> TimeStep[Observation]:
+        """Convert MultiCVRP observations to Mava's shared observation format."""
+        observation = Observation(
+            agents_view=self._flatten_observation(timestep.observation),
+            action_mask=timestep.observation.action_mask,
+            step_count=jnp.repeat(state.step_count - 1, self.num_agents),
+        )
+        reward = jnp.repeat(timestep.reward, self.num_agents)
+        discount = jnp.repeat(timestep.discount, self.num_agents)
+        metrics: Dict[str, Any] = {"env_metrics": {}}
+        return timestep.replace(
+            observation=observation, reward=reward, discount=discount, extras=metrics
+        )
+
+    def _flatten_observation(self, observation: MultiCvrpObservation) -> jax.Array:
+        """Give each vehicle its own state and the shared customer state."""
+        node_features = jnp.concatenate(
+            (
+                observation.nodes.coordinates,
+                observation.nodes.demands[:, None],
+                observation.windows.start[:, None],
+                observation.windows.end[:, None],
+                observation.coeffs.early[:, None],
+                observation.coeffs.late[:, None],
+            ),
+            axis=-1,
+        ).ravel()
+        vehicle_features = jnp.concatenate(
+            (
+                observation.vehicles.coordinates,
+                observation.vehicles.local_times[:, None],
+                observation.vehicles.capacities[:, None],
+            ),
+            axis=-1,
+        )
+        shared_node_features = jnp.tile(node_features, (self.num_agents, 1))
+        return jnp.concatenate((vehicle_features, shared_node_features), axis=-1)
+
+    def get_global_state(self, obs: Observation) -> jax.Array:
+        """Combine all vehicle states with one copy of the shared customer state."""
+        vehicle_features = obs.agents_view[:, :4].ravel()
+        node_features = obs.agents_view[0, 4:]
+        global_state = jnp.concatenate((vehicle_features, node_features))
+        return jnp.tile(global_state, (self.num_agents, 1))
+
+    @cached_property
+    def observation_spec(self) -> specs.Spec[Union[Observation, ObservationGlobalState]]:
+        """Specification of the wrapped MultiCVRP observation."""
+        num_node_features = (self.num_customers + 1) * 7
+        agents_view = specs.Array(
+            (self.num_agents, num_node_features + 4), jnp.float32, "agents_view"
+        )
+        step_count = specs.BoundedArray(
+            (self.num_agents,),
+            jnp.int16,
+            jnp.zeros(self.num_agents, dtype=jnp.int16),
+            jnp.repeat(self.time_limit, self.num_agents),
+            "step_count",
+        )
+        obs_data = {
+            "agents_view": agents_view,
+            "action_mask": self._env.observation_spec.action_mask,
+            "step_count": step_count,
+        }
+        if self.add_global_state:
+            obs_data["global_state"] = specs.Array(
+                (self.num_agents, num_node_features + 4 * self.num_agents),
+                jnp.float32,
+                "global_state",
+            )
+            return specs.Spec(ObservationGlobalState, "ObservationSpec", **obs_data)
+
+        return specs.Spec(Observation, "ObservationSpec", **obs_data)
+
+    @cached_property
+    def action_dim(self) -> jax.Array:
+        """Get the number of customer choices, including the depot."""
+        return self.num_customers + 1
+
+    @cached_property
+    def action_spec(self) -> specs.MultiDiscreteArray:
+        """Represent each vehicle's node choice as a discrete action."""
+        return specs.MultiDiscreteArray(
+            num_values=jnp.full(self.num_agents, self.action_dim, dtype=jnp.int32),
+            name="actions",
+        )

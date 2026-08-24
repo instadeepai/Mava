@@ -29,6 +29,7 @@ from mava.wrappers.jumanji import (
     CleanerWrapper,
     ConnectorWrapper,
     LbfWrapper,
+    MultiCVRPWrapper,
     RwareWrapper,
     VectorConnectorWrapper,
 )

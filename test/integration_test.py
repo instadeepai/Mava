@@ -39,7 +39,7 @@ q_learning_systems = ["q_learning.anakin.rec_iql", "q_learning.anakin.rec_qmix"]
 transformer_systems = ["mat.anakin.mat"]
 sable_systems = ["sable.anakin.ff_sable", "sable.anakin.rec_sable"]
 
-discrete_envs = ["gigastep", "lbf", "matrax", "rware", "smax", "vector-connector"]
+discrete_envs = ["gigastep", "lbf", "matrax", "multicvrp", "rware", "smax", "vector-connector"]
 cnn_envs = ["cleaner", "connector"]
 continuous_envs = ["mabrax", "mpe"]
 
