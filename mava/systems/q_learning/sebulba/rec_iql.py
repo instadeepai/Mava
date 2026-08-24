@@ -263,6 +263,7 @@ def get_learner_step_fn(
                 )
                 q_error = jnp.square(q_online - target)
                 q_loss = jnp.mean(q_error)  # mse
+                total_q_loss = lax.pmean(q_loss, axis_name="learner_devices")
 
                 # pack metrics for logging
                 loss_info = {
@@ -271,7 +272,7 @@ def get_learner_step_fn(
                     "mean_target": jnp.mean(target),
                 }
 
-                return q_loss, loss_info
+                return total_q_loss, loss_info
 
             params, opt_states, t_train, traj_batch = update_state
 

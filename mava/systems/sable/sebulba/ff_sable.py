@@ -195,7 +195,12 @@ def get_learner_step_fn(
             num_learner_envs, -1
         )
         advantages, targets = calculate_gae(
-            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+            traj_batch,
+            last_val,
+            last_done,
+            config.system.gamma,
+            config.system.gae_lambda,
+            axis_name="learner_devices",
         )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
@@ -255,6 +260,7 @@ def get_learner_step_fn(
                         - config.system.ent_coef * entropy
                         + config.system.vf_coef * value_loss
                     )
+                    total_loss = jax.lax.pmean(total_loss, axis_name="learner_devices")
                     return total_loss, (actor_loss, entropy, value_loss)
 
                 # CALCULATE ACTOR LOSS
