@@ -42,7 +42,12 @@ from mava.types import (
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
-from mava.utils.jax_utils import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
+from mava.utils.jax_utils import (
+    add_batch_dim,
+    merge_leading_dims,
+    unreplicate_batch_dim,
+    unreplicate_n_dims,
+)
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
@@ -322,7 +327,7 @@ def learner_setup(
 
     # Initialise observation: Obs for all agents.
     init_x = env.observation_spec.generate_value()
-    init_x = tree.map(lambda x: x[None, ...], init_x)
+    init_x = add_batch_dim(init_x)
 
     _, action_space_type = get_action_head(env.action_spec)
 

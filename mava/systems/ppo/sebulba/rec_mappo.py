@@ -61,7 +61,7 @@ from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
 from mava.utils.config import ppo_sebulba_checks as check_sebulba_config
-from mava.utils.jax_utils import switch_leading_axes
+from mava.utils.jax_utils import add_batch_dim, switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
@@ -112,7 +112,7 @@ def rollout(
     ) -> Tuple:
         """Get action and value."""
 
-        batched_observation = tree.map(lambda x: x[jnp.newaxis, :], observation)
+        batched_observation = add_batch_dim(observation)
         ac_in = (batched_observation, dones[jnp.newaxis, :])
         policy_hidden_state, actor_policy = actor_apply_fn(
             params.actor_params, hstates.policy_hidden_state, ac_in
@@ -225,9 +225,7 @@ def get_learner_step_fn(
         # Add a batch dimension to the observation.
         (params, opt_states, key, env_state, final_timestep, final_done, hstates) = learner_state
 
-        batched_final_observation = tree.map(
-            lambda x: x[jnp.newaxis, :], final_timestep.observation
-        )
+        batched_final_observation = add_batch_dim(final_timestep.observation)
         ac_in = (batched_final_observation, final_done[jnp.newaxis, :])
 
         # Run the network.
