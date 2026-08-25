@@ -58,7 +58,7 @@ from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
 from mava.utils.config import ppo_sebulba_checks as check_sebulba_config
-from mava.utils.jax_utils import concat_time_and_agents, switch_leading_axes
+from mava.utils.jax_utils import add_batch_dim, concat_time_and_agents, switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
@@ -527,7 +527,7 @@ def learner_setup(
     init_action_mask = jnp.ones((config.system.num_agents, config.system.num_actions))
     step_count = jnp.zeros((config.system.num_agents))
     init_x = Observation(init_obs, init_action_mask, step_count)
-    init_x = tree.map(lambda x: x[jnp.newaxis, ...], init_x)  # Add batch dim
+    init_x = add_batch_dim(init_x)
 
     init_hs = get_init_hidden_state(config.network.net_config, config.arch.num_envs)
     init_hs = tree.map(lambda x: x[0, jnp.newaxis], init_hs)

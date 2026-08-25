@@ -46,7 +46,7 @@ from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import base_sebulba_checks as check_sebulba_config
 from mava.utils.config import check_total_timesteps
-from mava.utils.jax_utils import switch_leading_axes
+from mava.utils.jax_utils import add_batch_dim, switch_leading_axes
 from mava.utils.logger import LogEvent, MavaLogger
 from mava.utils.sebulba.pipelines import OffPolicyPipeline as Pipeline
 from mava.utils.sebulba.rate_limiters import BlockingRatioLimiter, RateLimiter, SampleToInsertRatio
@@ -113,8 +113,8 @@ def rollout(
             config.system.eps_min, 1 - (t / config.system.eps_decay) * (1 - config.system.eps_min)
         )
 
-        obs = tree.map(lambda x: x[jnp.newaxis, ...], obs)
-        term_or_trunc = tree.map(lambda x: x[jnp.newaxis, ...], term_or_trunc)
+        obs = add_batch_dim(obs)
+        term_or_trunc = add_batch_dim(term_or_trunc)
 
         next_hidden_state, eps_greedy_dist = q_net.apply(
             params, hidden_state, (obs, term_or_trunc), eps
