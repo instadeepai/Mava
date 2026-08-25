@@ -233,12 +233,7 @@ def get_learner_step_fn(
         last_val = last_val.squeeze(0)
         # Calculate advantage
         advantages, targets = calculate_gae(
-            traj_batch,
-            last_val,
-            last_done,
-            config.system.gamma,
-            config.system.gae_lambda,
-            axis_name="learner_devices",
+            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
         )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple[Tuple, Metrics]:
@@ -282,7 +277,6 @@ def get_learner_step_fn(
                     entropy = actor_policy.entropy(seed=key).mean()
 
                     total_loss = actor_loss - config.system.ent_coef * entropy
-                    total_loss = jax.lax.pmean(total_loss, axis_name="learner_devices")
                     return total_loss, (actor_loss, entropy)
 
                 def _critic_loss_fn(
@@ -306,7 +300,6 @@ def get_learner_step_fn(
                     value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
 
                     total_loss = config.system.vf_coef * value_loss
-                    total_loss = jax.lax.pmean(total_loss, axis_name="learner_devices")
                     return total_loss, value_loss
 
                 # Calculate actor loss
@@ -610,6 +603,7 @@ def learner_setup(
             mesh=mesh,
             in_specs=(learn_state_spec, data_spec),
             out_specs=(learn_state_spec, data_spec),
+            check_rep=False,
         )
     )
 

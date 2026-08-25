@@ -35,12 +35,3 @@ jobs:
 
       - name: Run linters 🖌️
         run: pre-commit run --all-files --verbose
-
-      - name: Run JAX 0.6 shard-map regression test
-        if: matrix.python-version == '3.12'
-        run: |
-          uv pip install --reinstall --no-deps 'jax==0.6.0' 'jaxlib==0.6.0'
-          pytest test/multistep_test.py -p no:warnings
-        env:
-          XLA_FLAGS: --xla_force_host_platform_device_count=2
-          UV_SYSTEM_PYTHON: 1

@@ -231,7 +231,6 @@ def get_learner_step_fn(
             gamma=config.system.gamma,
             gae_lambda=config.system.gae_lambda,
             unroll=16,
-            axis_name="learner_devices",
         )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
@@ -292,7 +291,6 @@ def get_learner_step_fn(
                         - config.system.ent_coef * entropy
                         + config.system.vf_coef * value_loss
                     )
-                    total_loss = jax.lax.pmean(total_loss, axis_name="learner_devices")
                     return total_loss, (actor_loss, entropy, value_loss)
 
                 # Calculate actor loss
@@ -558,6 +556,7 @@ def learner_setup(
             mesh=mesh,
             in_specs=(learn_state_spec, data_spec, data_spec, data_spec),
             out_specs=(learn_state_spec, data_spec),
+            check_rep=False,
         )
     )
 

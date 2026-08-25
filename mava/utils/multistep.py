@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Tuple, Union
+from typing import Tuple, Union
 
 import chex
 import jax
@@ -28,7 +28,6 @@ def calculate_gae(
     gamma: float,
     gae_lambda: float,
     unroll: int = 16,
-    axis_name: Optional[str] = None,
 ) -> Tuple[chex.Array, chex.Array]:
     """Computes truncated generalized advantage estimates.
 
@@ -45,7 +44,6 @@ def calculate_gae(
         gamma (float): discount factor.
         gae_lambda (float): GAE mixing parameter.
         unroll (int): how much XLA should unroll the scan used to calculate GAE.
-        axis_name (str): manual mesh axis over which GAE values vary, if any.
 
     Returns Tuple[(B, T, N), (B, T, N)]: advantages and target values.
     """
@@ -60,14 +58,9 @@ def calculate_gae(
         gae = delta + gamma * gae_lambda * (1 - next_done) * gae
         return (gae, value, done), gae
 
-    initial_gae = jnp.zeros_like(last_val)
-    pvary = getattr(jax.lax, "pvary", None)
-    if axis_name is not None and pvary is not None:
-        initial_gae = pvary(initial_gae, (axis_name,))
-
     _, advantages = jax.lax.scan(
         _get_advantages,
-        (initial_gae, last_val, last_done),
+        (jnp.zeros_like(last_val), last_val, last_done),
         traj_batch,
         reverse=True,
         unroll=unroll,
