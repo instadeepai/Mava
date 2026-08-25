@@ -572,10 +572,11 @@ def run_experiment(cfg: DictConfig) -> float:
         # Log:
         elapsed_time = time.time() - start_time
         final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
-        final_metrics["steps_per_second"] = (
-            steps_per_rollout + learn_steps_per_rollout
-        ) / elapsed_time
-        loss_metrics = losses | {"log_alpha": learner_state.params.log_alpha}
+        final_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
+        loss_metrics = losses | {
+            "log_alpha": learner_state.params.log_alpha,
+            "learner_updates_per_second": learn_steps_per_rollout / elapsed_time,
+        }
 
         logger.log({"timestep": t}, t, eval_idx, LogEvent.MISC)
         if ep_completed:
