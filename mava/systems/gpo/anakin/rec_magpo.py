@@ -158,7 +158,7 @@ def get_learner_fn(
                 lambda hs: jnp.where(done, jnp.zeros_like(hs), hs), sable_hstates
             )
 
-            curr_done = done.repeat(env.num_agents).reshape(config.arch.num_envs, -1)
+            done = done.repeat(env.num_agents).reshape(config.arch.num_envs, -1)
             prev_done = prev_timestep.last().repeat(env.num_agents).reshape(num_envs, -1)
             transition = Transition(
                 prev_done,
@@ -171,7 +171,7 @@ def get_learner_fn(
             )
             hstates = HiddenStates(sable_hstates, prev_hstates.policy_hidden_state)
             learner_state = LearnerState(
-                params, opt_states, key, env_state, timestep, curr_done, hstates
+                params, opt_states, key, env_state, timestep, done, hstates
             )
             metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
             return learner_state, (transition, metrics)

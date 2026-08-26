@@ -150,14 +150,14 @@ def rollout(
                     params = params_source.get()  # Get the latest parameters from the learner
 
                 prev_obs = move_to_device(timestep.observation)
-                prev_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
-                prev_dones = move_to_device(prev_dones)
+                prev_done = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
+                prev_done = move_to_device(prev_done)
 
                 # Sample action from the policy.
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
                     action, log_prob, value, hstates = act_fn(
-                        params, prev_obs, prev_dones, prev_hstates, act_key
+                        params, prev_obs, prev_done, prev_hstates, act_key
                     )
                     cpu_action = jax.device_get(action)
 
@@ -168,7 +168,7 @@ def rollout(
                 # Append data to storage
                 traj.append(
                     RNNPPOTransition(
-                        prev_dones,
+                        prev_done,
                         action,
                         value,
                         timestep.reward,

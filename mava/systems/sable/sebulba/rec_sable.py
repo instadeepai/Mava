@@ -139,7 +139,7 @@ def rollout(
 
                 obs_tpu = tree.map(move_to_device, timestep.observation)
 
-                prev_dones = np.repeat(timestep.last(), config.system.num_agents).reshape(
+                prev_done = np.repeat(timestep.last(), config.system.num_agents).reshape(
                     config.arch.num_envs, -1
                 )
 
@@ -162,7 +162,7 @@ def rollout(
 
                 # Append data to storage
                 traj.append(
-                    Transition(prev_dones, action, value, timestep.reward, log_prob, obs_tpu)
+                    Transition(prev_done, action, value, timestep.reward, log_prob, obs_tpu)
                 )
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
