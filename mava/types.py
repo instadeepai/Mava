@@ -30,6 +30,7 @@ import jax
 import jumanji.specs as specs
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
+from numpy.typing import NDArray
 from tensorflow_probability.substrates.jax.distributions import Distribution
 from typing_extensions import NamedTuple, TypeAlias
 
@@ -131,9 +132,9 @@ class Observation(NamedTuple):
     step_count: the number of steps elapsed since the beginning of the episode.
     """
 
-    agents_view: jax.Array  # (num_agents, num_obs_features)
-    action_mask: jax.Array  # (num_agents, num_actions)
-    step_count: Optional[jax.Array] = None  # (num_agents, )
+    agents_view: jax.Array | NDArray  # (num_agents, num_obs_features)
+    action_mask: jax.Array | NDArray  # (num_agents, num_actions)
+    step_count: Optional[jax.Array | NDArray] = None  # (num_agents, )
 
 
 class ObservationGlobalState(NamedTuple):
@@ -143,10 +144,10 @@ class ObservationGlobalState(NamedTuple):
     global_state: The global state of the environment, often a concatenation of agents' views.
     """
 
-    agents_view: jax.Array  # (num_agents, num_obs_features)
-    action_mask: jax.Array  # (num_agents, num_actions)
-    global_state: jax.Array  # (num_agents, num_agents * num_obs_features)
-    step_count: Optional[jax.Array] = None  # (num_agents, )
+    agents_view: jax.Array | NDArray  # (num_agents, num_obs_features)
+    action_mask: jax.Array | NDArray  # (num_agents, num_actions)
+    global_state: jax.Array | NDArray  # (num_agents, num_agents * num_obs_features)
+    step_count: Optional[jax.Array | NDArray] = None  # (num_agents, )
 
 
 RNNObservation: TypeAlias = Tuple[Union[Observation, "GraphObservation[Observation]"], Done]
