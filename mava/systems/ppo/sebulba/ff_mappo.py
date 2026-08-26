@@ -488,6 +488,7 @@ def learner_setup(
             mesh=mesh,
             in_specs=(learn_state_spec, data_spec),
             out_specs=(learn_state_spec, data_spec),
+            check_rep=False,
         )
     )
 
