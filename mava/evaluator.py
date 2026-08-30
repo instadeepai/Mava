@@ -15,7 +15,7 @@
 import math
 import time
 import warnings
-from typing import Any, Callable, Dict, Protocol, Tuple, Union
+from typing import Any, Callable, Dict, Protocol, Tuple, Union, cast
 
 import jax
 import jax.numpy as jnp
@@ -121,7 +121,9 @@ def get_eval_fn(
             stacklevel=2,
         )
 
-    def eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:
+    def eval_fn(
+        params: FrozenDict, key: PRNGKey, init_act_state: ActorState
+    ) -> Union[Metrics, Tuple[Metrics, State]]:
         """Evaluates the given params on an environment and returns relevent metrics.
 
         Metrics are collected by the `RecordEpisodeMetrics` wrapper: episode return and length,
@@ -207,7 +209,7 @@ def get_eval_fn(
                 for index in range(episode_length + 1)
             ]
             state_sequence = [state.env_state for state in state_sequence]
-            metrics[_EVAL_VIDEO_KEY] = env.animate(state_sequence)
+            metrics[_EVAL_VIDEO_KEY] = cast(Any, env).animate(state_sequence)
 
         return metrics
 
