@@ -47,6 +47,8 @@ _EvalEnvStepState: TypeAlias = Tuple[State, TimeStep, PRNGKey, ActorState]
 # The function signature for the mava evaluation function (returned by `get_eval_fn`).
 EvalFn: TypeAlias = Callable[[FrozenDict, PRNGKey, ActorState], Metrics]
 
+_EVAL_VIDEO_KEY = "__eval_video__"
+
 
 class EvalActFn(Protocol):
     """The API for the acting function that is passed to the `EvalFn`.
@@ -103,6 +105,12 @@ def get_eval_fn(
     n_vmapped_envs = get_num_eval_envs(config, absolute_metric)
     n_parallel_envs = n_vmapped_envs * n_devices
     episode_loops = math.ceil(eval_episodes / n_parallel_envs)
+    record_video = (
+        not absolute_metric
+        and config.logger.loggers.tensorboard.enabled
+        and config.logger.loggers.tensorboard.record_video
+        and hasattr(env, "animate")
+    )
 
     # Warnings if num eval episodes is not divisible by num parallel envs.
     if eval_episodes % n_parallel_envs != 0:
@@ -122,7 +130,7 @@ def get_eval_fn(
         Returns: Dict[str, Array] - dictionary of metric name to metric values for each episode.
         """
 
-        def _env_step(eval_state: _EvalEnvStepState, _: Any) -> Tuple[_EvalEnvStepState, TimeStep]:
+        def _env_step(eval_state: _EvalEnvStepState, _: Any) -> Tuple[_EvalEnvStepState, Any]:
             """Performs a single environment step"""
             env_state, ts, key, actor_state = eval_state
 
@@ -130,16 +138,21 @@ def get_eval_fn(
             action, actor_state = act_fn(params, ts, act_key, actor_state)
             env_state, ts = jax.vmap(env.step)(env_state, action)
 
-            return (env_state, ts, key, actor_state), ts
+            output = (env_state, ts) if record_video else ts
+            return (env_state, ts, key, actor_state), output
 
-        def _episode(key: PRNGKey, _: Any) -> Tuple[PRNGKey, Metrics]:
+        def _episode(key: PRNGKey, _: Any) -> Tuple[PRNGKey, Any]:
             """Simulates `num_envs` episodes."""
             key, reset_key = jax.random.split(key)
             reset_keys = jax.random.split(reset_key, n_vmapped_envs)
             env_state, ts = jax.vmap(env.reset)(reset_keys)
 
             step_state = env_state, ts, key, init_act_state
-            _, timesteps = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit + 1))
+            _, scan_output = jax.lax.scan(_env_step, step_state, jnp.arange(env.time_limit + 1))
+            if record_video:
+                states, timesteps = scan_output
+            else:
+                timesteps = scan_output
 
             metrics = timesteps.extras["episode_metrics"] | timesteps.extras["env_metrics"]
 
@@ -148,25 +161,54 @@ def get_eval_fn(
             done_idx = jnp.argmax(timesteps.last(), axis=0)
             metrics = tree.map(lambda m: m[done_idx, jnp.arange(n_vmapped_envs)], metrics)
 
+            if record_video:
+                states = tree.map(
+                    lambda initial, subsequent: jnp.concatenate(
+                        (initial[jnp.newaxis], subsequent), axis=0
+                    ),
+                    env_state,
+                    states,
+                )
+                return key, (metrics, states)
+
             return key, metrics
 
         # This loop is important because we don't want too many parallel envs.
         # So in evaluation we have num_envs parallel envs and loop enough times
         # so that we do at least `eval_episodes` number of episodes.
-        _, metrics = jax.lax.scan(_episode, key, xs=None, length=episode_loops)
+        _, eval_output = jax.lax.scan(_episode, key, xs=None, length=episode_loops)
+        if record_video:
+            metrics, states = eval_output
+        else:
+            metrics = eval_output
         metrics = tree.map(lambda x: x.reshape(-1), metrics)  # flatten metrics
-        return metrics
+        return (metrics, states) if record_video else metrics
 
     def timed_eval_fn(params: FrozenDict, key: PRNGKey, init_act_state: ActorState) -> Metrics:
         """Wrapper around eval function to time it and add in steps per second metric."""
         start_time = time.time()
 
-        metrics = jax.pmap(eval_fn)(params, key, init_act_state)
-        metrics = jax.block_until_ready(metrics)
+        eval_output = jax.pmap(eval_fn)(params, key, init_act_state)
+        eval_output = jax.block_until_ready(eval_output)
+        if record_video:
+            metrics, states = eval_output
+        else:
+            metrics = eval_output
 
         end_time = time.time()
         total_timesteps = jnp.sum(metrics["episode_length"])
         metrics["steps_per_second"] = total_timesteps / (end_time - start_time)
+
+        if record_video:
+            episode_length = int(metrics["episode_length"][0, 0])
+            episode_states = tree.map(lambda x: x[0, 0, : episode_length + 1, 0], states)
+            state_sequence = [
+                tree.map(lambda x, index=index: x[index], episode_states)
+                for index in range(episode_length + 1)
+            ]
+            state_sequence = [state.env_state for state in state_sequence]
+            metrics[_EVAL_VIDEO_KEY] = env.animate(state_sequence)
+
         return metrics
 
     return timed_eval_fn

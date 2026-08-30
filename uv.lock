@@ -858,7 +858,7 @@ dependencies = [
     { name = "scipy" },
     { name = "setuptools" },
     { name = "smaclite" },
-    { name = "tensorboard-logger" },
+    { name = "tensorboardx" },
     { name = "tensorflow-probability" },
     { name = "type-enforced" },
 ]
@@ -909,7 +909,7 @@ requires-dist = [
     { name = "scipy", specifier = "==1.12.0" },
     { name = "setuptools" },
     { name = "smaclite", git = "https://github.com/uoe-agents/smaclite.git" },
-    { name = "tensorboard-logger" },
+    { name = "tensorboardx" },
     { name = "tensorflow-probability" },
     { name = "type-enforced" },
 ]
@@ -2649,22 +2649,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e7/e9/d0a4a1e4ed6b4b805d5465affaeaa2d91ae08a8aae966f4bb7402e23ee37/swagger_spec_validator-3.0.4.tar.gz", hash = "sha256:637ac6d865270bfcd07df24605548e6e1f1d9c39adcfd855da37fa3fdebfed4b", size = 22355, upload-time = "2024-06-27T17:43:05.155Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f4/ac/31ba87a959b19e640ebc18851438b82b5b66cef02ad31da7468d1d8bd625/swagger_spec_validator-3.0.4-py2.py3-none-any.whl", hash = "sha256:1a2a4f4f7076479ae7835d892dd53952ccca9414efa172c440c775cf0ac01f48", size = 28473, upload-time = "2024-06-27T17:43:00.546Z" },
-]
-
-[[package]]
-name = "tensorboard-logger"
-version = "0.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "pillow" },
-    { name = "protobuf" },
-    { name = "scipy" },
-    { name = "six" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/91/a7/8b7223a30cde2e04f2d7a902600f765fe91e2db68541f147ac7b8733feae/tensorboard_logger-0.1.0.tar.gz", hash = "sha256:614eaf9b68f7ca9e5db5972f241034a24ea593b938fc8a7e5544444099edeae5", size = 16783, upload-time = "2018-02-08T07:28:51.568Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/87/7a/ec0fd26dba69191f82eb8f38f5b401c124f45a207490a7ade6ea9717ecdb/tensorboard_logger-0.1.0-py2.py3-none-any.whl", hash = "sha256:f514f2bc62954a2bef1b0d7c2794ae762b663c7898e13661889645b6ae53ecd7", size = 17061, upload-time = "2018-02-08T07:31:34.287Z" },
 ]
 
 [[package]]
