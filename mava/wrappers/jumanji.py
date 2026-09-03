@@ -148,8 +148,8 @@ class RwareWrapper(JumanjiMarlWrapper):
             action_mask=timestep.observation.action_mask,
             step_count=jnp.repeat(timestep.observation.step_count, self.num_agents),
         )
-        reward = jnp.repeat(timestep.reward, self.num_agents)
-        discount = jnp.repeat(timestep.discount, self.num_agents)
+        reward = jnp.expand_dims(timestep.reward, axis=0)
+        discount = jnp.expand_dims(timestep.discount, axis=0)
         metrics: Dict[str, Any] = {"env_metrics": {}}
         return timestep.replace(
             observation=observation, reward=reward, discount=discount, extras=metrics
@@ -166,6 +166,14 @@ class RwareWrapper(JumanjiMarlWrapper):
             spec = spec.replace(global_state=inner_spec.global_state.replace(dtype=float))
 
         return spec
+
+    @cached_property
+    def reward_spec(self) -> specs.Array:
+        return self._env.reward_spec.replace(shape=(1,))
+
+    @cached_property
+    def discount_spec(self) -> specs.BoundedArray:
+        return self._env.discount_spec.replace(shape=(1,))
 
 
 class LbfWrapper(JumanjiMarlWrapper):
