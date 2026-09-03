@@ -48,6 +48,7 @@ from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
 from mava.utils.jax_utils import (
+    add_batch_dim,
     switch_leading_axes,
     unreplicate_batch_dim,
     unreplicate_n_dims,
@@ -217,8 +218,8 @@ def make_update_fns(
             cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
         )
 
-        obs = tree.map(lambda x: x[jnp.newaxis, ...], obs)
-        term_or_trunc = tree.map(lambda x: x[jnp.newaxis, ...], term_or_trunc)
+        obs = add_batch_dim(obs)
+        term_or_trunc = add_batch_dim(term_or_trunc)
 
         next_hidden_state, eps_greedy_dist = q_net.apply(
             params, hidden_state, (obs, term_or_trunc), eps
@@ -503,6 +504,8 @@ def run_experiment(cfg: DictConfig) -> float:
     anakin_act_steps = anakin_steps * cfg.arch.num_envs * cfg.system.rollout_length
     # Number of steps to do in the scanned update method (how many anakin steps).
     cfg.system.scan_steps = int(steps_per_rollout / anakin_act_steps)
+    # Number of gradient steps performed between evaluations.
+    learn_steps_per_rollout = anakin_steps * cfg.system.epochs * cfg.system.scan_steps
 
     # Initialise system and make learning/evaluation functions
     (env, eval_env), q_net, opt, rb, learner_state, logger, key = init(cfg)
@@ -523,7 +526,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
         term_or_trunc = timestep.last()
         net_input = (timestep.observation, term_or_trunc[..., jnp.newaxis])
-        net_input = tree.map(lambda x: x[jnp.newaxis], net_input)  # add batch dim to obs
+        net_input = add_batch_dim(net_input)
         next_hidden_state, eps_greedy_dist = q_net.apply(params, hidden_state, net_input)
         action = eps_greedy_dist.sample(seed=key).squeeze(0)
         return action, {"hidden_state": next_hidden_state}
@@ -557,16 +560,15 @@ def run_experiment(cfg: DictConfig) -> float:
         jax.block_until_ready(learner_state)
 
         # Log:
-        # Add learn steps here because anakin steps per second is learn + act steps
-        # But we also want to make sure we're counting env steps correctly so
-        # learn steps is not included in the loop counter.
         elapsed_time = time.time() - start_time
         eps = jnp.maximum(
             cfg.system.eps_min, 1 - (t / cfg.system.eps_decay) * (1 - cfg.system.eps_min)
         )
         final_metrics, ep_completed = episode_metrics.get_final_step_metrics(metrics)
         final_metrics["steps_per_second"] = steps_per_rollout / elapsed_time
-        loss_metrics = losses
+        loss_metrics = losses | {
+            "learner_updates_per_second": learn_steps_per_rollout / elapsed_time
+        }
 
         logger.log({"timestep": t, "epsilon": eps}, t, eval_idx, LogEvent.MISC)
         if ep_completed:

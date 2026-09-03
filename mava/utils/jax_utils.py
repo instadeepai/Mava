@@ -27,6 +27,11 @@ from typing_extensions import TypeAlias
 Indexer: TypeAlias = Union[int, slice, Tuple[slice, ...], Tuple[int, ...]]
 
 
+def add_batch_dim(pytree: chex.ArrayTree) -> chex.ArrayTree:
+    """Add a leading batch dimension to every leaf of a pytree."""
+    return tree.map(lambda x: x[jnp.newaxis, ...], pytree)
+
+
 def tree_slice(pytree: chex.ArrayTree, i: Indexer) -> chex.ArrayTree:
     """Returns: a new pytree where for each leaf: leaf[i] is returned."""
     return tree.map(lambda x: x[i], pytree)

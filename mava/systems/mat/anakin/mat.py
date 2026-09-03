@@ -42,8 +42,14 @@ from mava.types import (
 from mava.utils import make_env as environments
 from mava.utils.checkpointing import Checkpointer
 from mava.utils.config import check_total_timesteps
-from mava.utils.jax_utils import merge_leading_dims, unreplicate_batch_dim, unreplicate_n_dims
+from mava.utils.jax_utils import (
+    add_batch_dim,
+    merge_leading_dims,
+    unreplicate_batch_dim,
+    unreplicate_n_dims,
+)
 from mava.utils.logger import LogEvent, MavaLogger
+from mava.utils.multistep import calculate_gae
 from mava.utils.network_utils import get_action_head
 from mava.utils.training import make_learning_rate
 from mava.wrappers.episode_metrics import get_final_step_metrics
@@ -95,9 +101,11 @@ def get_learner_fn(
             # Step environment
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
-            done = timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
+            prev_done = (
+                last_timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
+            )
             transition = PPOTransition(
-                done, action, value, timestep.reward, log_prob, last_timestep.observation
+                prev_done, action, value, timestep.reward, log_prob, last_timestep.observation
             )
             learner_state = LearnerState(params, opt_state, key, env_state, timestep)
 
@@ -118,35 +126,10 @@ def get_learner_fn(
             last_timestep.observation,
             last_val_key,
         )
-
-        def _calculate_gae(
-            traj_batch: PPOTransition, last_val: jax.Array
-        ) -> Tuple[jax.Array, jax.Array]:
-            """Calculate the GAE."""
-
-            def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
-                """Calculate the GAE for a single transition."""
-                gae, next_value = gae_and_next_value
-                done, value, reward = (
-                    transition.done,
-                    transition.value,
-                    transition.reward,
-                )
-                gamma = config.system.gamma
-                delta = reward + gamma * next_value * (1 - done) - value
-                gae = delta + gamma * config.system.gae_lambda * (1 - done) * gae
-                return (gae, value), gae
-
-            _, advantages = jax.lax.scan(
-                _get_advantages,
-                (jnp.zeros_like(last_val), last_val),
-                traj_batch,
-                reverse=True,
-                unroll=16,
-            )
-            return advantages, advantages + traj_batch.value
-
-        advantages, targets = _calculate_gae(traj_batch, last_val)
+        last_done = last_timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
+        advantages, targets = calculate_gae(
+            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+        )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
@@ -322,7 +305,7 @@ def learner_setup(
 
     # Initialise observation: Obs for all agents.
     init_x = env.observation_spec.generate_value()
-    init_x = tree.map(lambda x: x[None, ...], init_x)
+    init_x = add_batch_dim(init_x)
 
     _, action_space_type = get_action_head(env.action_spec)
 

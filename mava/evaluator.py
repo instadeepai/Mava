@@ -37,6 +37,7 @@ from mava.types import (
     RecActorApply,
     State,
 )
+from mava.utils.jax_utils import add_batch_dim
 from mava.wrappers.gym import GymToJumanji
 
 # Optional extras that are passed out of the actor and then into the actor in the next step
@@ -199,7 +200,7 @@ def make_rec_eval_act_fn(actor_apply_fn: RecActorApply, config: DictConfig) -> E
         n_agents = timestep.observation.agents_view.shape[1]
         last_done = timestep.last()[:, jnp.newaxis].repeat(n_agents, axis=-1)
         ac_in = (timestep.observation, last_done)
-        ac_in = tree.map(lambda x: x[jnp.newaxis], ac_in)  # add batch dim to obs
+        ac_in = add_batch_dim(ac_in)
 
         hidden_state, pi = actor_apply_fn(params, hidden_state, ac_in)
         action = pi.mode() if config.arch.evaluation_greedy else pi.sample(seed=key)
