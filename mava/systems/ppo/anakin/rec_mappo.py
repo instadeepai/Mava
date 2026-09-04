@@ -82,8 +82,8 @@ def get_learner_fn(
                 - opt_states (OptStates): The current optimizer states.
                 - key (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
-                - last_timestep (TimeStep): The last timestep in the current trajectory.
-                - last_done (bool): Whether the last timestep was a terminal state.
+                - prev_timestep (TimeStep): The previous environment timestep.
+                - prev_done (bool): Whether the previous timestep was a terminal state.
                 - hstates (HiddenStates): The hidden state of the policy and critic RNN.
             _ (Any): The current metrics info.
 
@@ -98,23 +98,23 @@ def get_learner_fn(
                 opt_states,
                 key,
                 env_state,
-                last_timestep,
-                last_done,
-                last_hstates,
+                prev_timestep,
+                prev_done,
+                prev_hstates,
             ) = learner_state
 
             key, policy_key = jax.random.split(key)
 
             # Add a batch dimension to the observation.
-            batched_observation = add_batch_dim(last_timestep.observation)
-            ac_in = (batched_observation, last_done[jnp.newaxis, :])
+            batched_observation = add_batch_dim(prev_timestep.observation)
+            ac_in = (batched_observation, prev_done[jnp.newaxis, :])
 
             # Run the network.
             policy_hidden_state, actor_policy = actor_apply_fn(
-                params.actor_params, last_hstates.policy_hidden_state, ac_in
+                params.actor_params, prev_hstates.policy_hidden_state, ac_in
             )
             critic_hidden_state, value = critic_apply_fn(
-                params.critic_params, last_hstates.critic_hidden_state, ac_in
+                params.critic_params, prev_hstates.critic_hidden_state, ac_in
             )
 
             # Sample action from the policy and squeeze out the batch dimension.
@@ -129,13 +129,13 @@ def get_learner_fn(
             done = timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
             hstates = HiddenStates(policy_hidden_state, critic_hidden_state)
             transition = RNNPPOTransition(
-                last_done,
+                prev_done,
                 action,
                 value,
                 timestep.reward,
                 log_prob,
-                last_timestep.observation,
-                last_hstates,
+                prev_timestep.observation,
+                prev_hstates,
             )
             learner_state = RNNLearnerState(
                 params, opt_states, key, env_state, timestep, done, hstates
@@ -149,20 +149,20 @@ def get_learner_fn(
         )
 
         # Calculate advantage
-        params, opt_states, key, env_state, last_timestep, last_done, hstates = learner_state
+        params, opt_states, key, env_state, final_timestep, final_done, hstates = learner_state
 
         # Add a batch dimension to the observation.
-        batched_last_observation = add_batch_dim(last_timestep.observation)
-        ac_in = (batched_last_observation, last_done[jnp.newaxis, :])
+        batched_final_observation = add_batch_dim(final_timestep.observation)
+        ac_in = (batched_final_observation, final_done[jnp.newaxis, :])
 
         # Run the network.
-        _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
+        _, final_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
 
         # Squeeze out the batch dimension and mask out the value of terminal states.
-        last_val = last_val.squeeze(0)
+        final_val = final_val.squeeze(0)
 
         advantages, targets = calculate_gae(
-            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+            traj_batch, final_val, final_done, config.system.gamma, config.system.gae_lambda
         )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
@@ -355,8 +355,8 @@ def get_learner_fn(
             opt_states,
             key,
             env_state,
-            last_timestep,
-            last_done,
+            final_timestep,
+            final_done,
             hstates,
         )
         return learner_state, (episode_metrics, loss_info)

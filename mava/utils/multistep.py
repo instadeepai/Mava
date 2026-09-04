@@ -22,8 +22,8 @@ from mava.systems.ppo.types import PPOTransition, RNNPPOTransition
 
 def calculate_gae(
     traj_batch: Union[PPOTransition, RNNPPOTransition],
-    last_val: jax.Array,
-    last_done: jax.Array,
+    final_val: jax.Array,
+    final_done: jax.Array,
     gamma: float,
     gae_lambda: float,
     unroll: int = 16,
@@ -38,8 +38,8 @@ def calculate_gae(
 
     Args:
         traj_batch (B, T, N, ...): a batch of trajectories.
-        last_val  (B, N): value of the final timestep.
-        last_done (B, N): whether the last timestep was a terminated or truncated.
+        final_val  (B, N): value of the final timestep.
+        final_done (B, N): whether the final timestep was terminated or truncated.
         gamma (float): discount factor.
         gae_lambda (float): GAE mixing parameter.
         unroll (int): how much XLA should unroll the scan used to calculate GAE.
@@ -59,7 +59,7 @@ def calculate_gae(
 
     _, advantages = jax.lax.scan(
         _get_advantages,
-        (jnp.zeros_like(last_val), last_val, last_done),
+        (jnp.zeros_like(final_val), final_val, final_done),
         traj_batch,
         reverse=True,
         unroll=unroll,

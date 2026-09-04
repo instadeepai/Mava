@@ -82,7 +82,7 @@ def get_learner_fn(
                 - opt_states (OptStates): The current optimizer states.
                 - key (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
-                - last_timestep (TimeStep): The last timestep in the current trajectory.
+                - prev_timestep (TimeStep): The previous environment timestep.
             _ (Any): The current metrics info.
 
         """
@@ -91,12 +91,12 @@ def get_learner_fn(
             learner_state: LearnerState, _: Any
         ) -> Tuple[LearnerState, Tuple[PPOTransition, Metrics]]:
             """Step the environment."""
-            params, opt_states, key, env_state, last_timestep, dones = learner_state
+            params, opt_states, key, env_state, prev_timestep, dones = learner_state
 
             # SELECT ACTION
             key, policy_key = jax.random.split(key)
-            actor_policy = actor_apply_fn(params.actor_params, last_timestep.observation)
-            value = critic_apply_fn(params.critic_params, last_timestep.observation)
+            actor_policy = actor_apply_fn(params.actor_params, prev_timestep.observation)
+            value = critic_apply_fn(params.critic_params, prev_timestep.observation)
             action = actor_policy.sample(seed=policy_key)
             log_prob = actor_policy.log_prob(action)
 
@@ -112,7 +112,7 @@ def get_learner_fn(
                 value=value,
                 reward=timestep.reward,
                 log_prob=log_prob,
-                obs=last_timestep.observation,
+                obs=prev_timestep.observation,
             )
 
             learner_state = LearnerState(params, opt_states, key, env_state, timestep, done)
@@ -125,11 +125,11 @@ def get_learner_fn(
         )
 
         # CALCULATE ADVANTAGE
-        params, opt_states, key, env_state, last_timestep, dones = learner_state
-        last_val = critic_apply_fn(params.critic_params, last_timestep.observation)
+        params, opt_states, key, env_state, final_timestep, dones = learner_state
+        final_val = critic_apply_fn(params.critic_params, final_timestep.observation)
 
         def _calculate_gae(
-            traj_batch: PPOTransition, last_val: jax.Array
+            traj_batch: PPOTransition, final_val: jax.Array
         ) -> Tuple[jax.Array, jax.Array]:
             """Calculate the GAE."""
 
@@ -148,14 +148,14 @@ def get_learner_fn(
 
             _, advantages = jax.lax.scan(
                 _get_advantages,
-                (jnp.zeros_like(last_val), last_val),
+                (jnp.zeros_like(final_val), final_val),
                 traj_batch,
                 reverse=True,
                 unroll=16,
             )
             return advantages, advantages + traj_batch.value
 
-        advantages, targets = _calculate_gae(traj_batch, last_val)
+        advantages, targets = _calculate_gae(traj_batch, final_val)
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
             """Update the network for a single epoch."""
@@ -307,7 +307,7 @@ def get_learner_fn(
         )
 
         params, opt_states, traj_batch, advantages, targets, key = update_state
-        learner_state = LearnerState(params, opt_states, key, env_state, last_timestep, dones)
+        learner_state = LearnerState(params, opt_states, key, env_state, final_timestep, dones)
         return learner_state, (episode_metrics, loss_info, traj_batch)
 
     def learner_fn(

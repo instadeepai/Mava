@@ -185,17 +185,17 @@ def get_learner_step_fn(
         # Calculate advantage
         params, opt_states, key, _, final_timestep = learner_state
         key = jnp.squeeze(key, axis=0)
-        _, _, last_val, _ = sable_action_select_fn(  # type: ignore
+        _, _, final_val, _ = sable_action_select_fn(  # type: ignore
             params,
             observation=final_timestep.observation,
             key=key,
             hstates=get_init_hidden_state(config.network.net_config, num_learner_envs),
         )
-        last_done = jnp.repeat(final_timestep.last(), config.system.num_agents).reshape(
+        final_done = jnp.repeat(final_timestep.last(), config.system.num_agents).reshape(
             num_learner_envs, -1
         )
         advantages, targets = calculate_gae(
-            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+            traj_batch, final_val, final_done, config.system.gamma, config.system.gae_lambda
         )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
@@ -331,7 +331,7 @@ def get_learner_step_fn(
                 - opt_states (OptStates): The initial optimizer state.
                 - key (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
-                - timesteps (TimeStep): The last timestep of the rollout.
+                - timesteps (TimeStep): The final timestep of the rollout.
         """
         # This function is shard mapped on the batch axis, but `_update_step` needs
         # the first axis to be time

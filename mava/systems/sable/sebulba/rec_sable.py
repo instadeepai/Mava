@@ -139,7 +139,7 @@ def rollout(
 
                 obs_tpu = tree.map(move_to_device, timestep.observation)
 
-                prev_dones = np.repeat(timestep.last(), config.system.num_agents).reshape(
+                prev_done = np.repeat(timestep.last(), config.system.num_agents).reshape(
                     config.arch.num_envs, -1
                 )
 
@@ -162,7 +162,7 @@ def rollout(
 
                 # Append data to storage
                 traj.append(
-                    Transition(prev_dones, action, value, timestep.reward, log_prob, obs_tpu)
+                    Transition(prev_done, action, value, timestep.reward, log_prob, obs_tpu)
                 )
                 episode_metrics.append(timestep.extras["episode_metrics"])
 
@@ -197,7 +197,7 @@ def get_learner_step_fn(
         learner_state: LearnerState,
         traj_batch: Transition,
         initial_hstate: HiddenStates,
-        last_hstate: HiddenStates,
+        final_hstate: HiddenStates,
     ) -> Tuple[LearnerState, Metrics]:
         """A single update of the network.
         This function calculates advantages and targets based on the trajectories
@@ -206,19 +206,19 @@ def get_learner_step_fn(
             learner_state (LearnerState): contains all the items needed for learning.
             traj_batch (PPOTransition): the batch of data to learn with.
             initial_hstate (HiddenState): the hidden state from the start of the rollout.
-            last_hstate (HiddenState): the last hidden state of the rollout.
+            final_hstate (HiddenState): the final hidden state of the rollout.
         """
 
         # Calculate advantage
         params, opt_states, key, _, final_timestep = learner_state
         key = jnp.squeeze(key, axis=0)
-        _, _, last_val, _ = sable_action_select_fn(  # type: ignore
+        _, _, final_val, _ = sable_action_select_fn(  # type: ignore
             params,
             observation=final_timestep.observation,
-            hstates=last_hstate,
+            hstates=final_hstate,
             key=key,
         )
-        last_done = tree.map(
+        final_done = tree.map(
             lambda x: jnp.repeat(x, config.system.num_agents).reshape(num_learner_envs, -1),
             final_timestep.last(),
         )
@@ -226,8 +226,8 @@ def get_learner_step_fn(
         # Use the unified calculate_gae function
         advantages, targets = calculate_gae(
             traj_batch=traj_batch,
-            last_val=last_val,
-            last_done=last_done,
+            final_val=final_val,
+            final_done=final_done,
             gamma=config.system.gamma,
             gae_lambda=config.system.gae_lambda,
             unroll=16,
@@ -346,7 +346,7 @@ def get_learner_step_fn(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 batch,
             )
-            last_hs_minibatch = tree.map(
+            initial_hstate_minibatches = tree.map(
                 lambda x: jnp.reshape(x, (config.system.num_minibatches, -1, *x.shape[1:])),
                 initial_hstate,
             )
@@ -355,7 +355,7 @@ def get_learner_step_fn(
             (params, opt_states, entropy_key), loss_info = jax.lax.scan(
                 _update_minibatch,
                 (params, opt_states, entropy_key),
-                (*minibatches, last_hs_minibatch),
+                (*minibatches, initial_hstate_minibatches),
             )
 
             update_state = (
@@ -398,7 +398,7 @@ def get_learner_step_fn(
                 - opt_states (OptStates): The initial optimizer state.
                 - key (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
-                - timesteps (TimeStep): The last timestep of the rollout.
+                - timesteps (TimeStep): The final timestep of the rollout.
         """
         # This function is shard mapped on the batch axis, but `_update_step` needs
         # the first axis to be time
