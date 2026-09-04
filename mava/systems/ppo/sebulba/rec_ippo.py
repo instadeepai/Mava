@@ -135,8 +135,8 @@ def rollout(
     init_critic_hstate = ScannedRNN.initialize_carry(
         (config.arch.num_envs, num_agents), config.network.hidden_state_dim
     )
-    last_hstates = HiddenStates(init_policy_hstate, init_critic_hstate)
-    last_hstates = move_to_device(last_hstates)
+    prev_hstates = HiddenStates(init_policy_hstate, init_critic_hstate)
+    prev_hstates = move_to_device(prev_hstates)
 
     # Loop till the desired num_updates is reached.
     while not stop_event.is_set():
@@ -149,15 +149,15 @@ def rollout(
                 with RecordTimeTo(actor_timings["get_params_time"]):
                     params = params_source.get()  # Get the latest parameters from the learner
 
-                last_obs = move_to_device(timestep.observation)
-                last_dones = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
-                last_dones = move_to_device(last_dones)
+                prev_obs = move_to_device(timestep.observation)
+                prev_done = np.repeat(timestep.last(), num_agents).reshape(num_envs, -1)
+                prev_done = move_to_device(prev_done)
 
                 # Sample action from the policy.
                 with RecordTimeTo(actor_timings["compute_action_time"]):
                     key, act_key = jax.random.split(key)
                     action, log_prob, value, hstates = act_fn(
-                        params, last_obs, last_dones, last_hstates, act_key
+                        params, prev_obs, prev_done, prev_hstates, act_key
                     )
                     cpu_action = jax.device_get(action)
 
@@ -168,16 +168,16 @@ def rollout(
                 # Append data to storage
                 traj.append(
                     RNNPPOTransition(
-                        last_dones,
+                        prev_done,
                         action,
                         value,
                         timestep.reward,
                         log_prob,
-                        last_obs,
-                        last_hstates,
+                        prev_obs,
+                        prev_hstates,
                     )
                 )
-                last_hstates = hstates
+                prev_hstates = hstates
                 metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
                 episode_metrics.append(metrics)
 
@@ -222,18 +222,18 @@ def get_learner_step_fn(
         """
 
         # Add a batch dimension to the observation.
-        (params, opt_states, key, env_state, last_timestep, last_done, hstates) = learner_state
+        (params, opt_states, key, env_state, final_timestep, final_done, hstates) = learner_state
 
-        batched_last_observation = add_batch_dim(last_timestep.observation)
-        ac_in = (batched_last_observation, last_done[jnp.newaxis, :])
+        batched_final_observation = add_batch_dim(final_timestep.observation)
+        ac_in = (batched_final_observation, final_done[jnp.newaxis, :])
 
         # Run the network.
-        _, last_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
+        _, final_val = critic_apply_fn(params.critic_params, hstates.critic_hidden_state, ac_in)
         # Squeeze out the batch dimension and mask out the value of terminal states.
-        last_val = last_val.squeeze(0)
+        final_val = final_val.squeeze(0)
         # Calculate advantage
         advantages, targets = calculate_gae(
-            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+            traj_batch, final_val, final_done, config.system.gamma, config.system.gae_lambda
         )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple[Tuple, Metrics]:
@@ -412,8 +412,8 @@ def get_learner_step_fn(
             opt_states,
             key,
             env_state,
-            last_timestep,
-            last_done,
+            final_timestep,
+            final_done,
             None,  # type: ignore
         )
         return learner_state, loss_info
@@ -433,7 +433,7 @@ def get_learner_step_fn(
                 - opt_states (OptStates): The initial optimizer state.
                 - key (chex.PRNGKey): The random number generator state.
                 - env_state (LogEnvState): The environment state.
-                - timesteps (TimeStep): The last timestep of the rollout.
+                - timesteps (TimeStep): The final timestep of the rollout.
                 - dones (bool): Whether the initial timestep was a terminal state.
                 - hstateS (HiddenStates): The initial hidden states of the RNN.
         """

@@ -73,7 +73,7 @@ def get_learner_fn(
                 - opt_states (OptStates): The current optimizer states.
                 - key (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
-                - last_timestep (TimeStep): The last timestep in the current trajectory.
+                - prev_timestep (TimeStep): The previous environment timestep.
             _ (Any): The current metrics info.
 
         """
@@ -82,12 +82,12 @@ def get_learner_fn(
             learner_state: LearnerState, _: Any
         ) -> Tuple[LearnerState, Tuple[PPOTransition, Metrics]]:
             """Step the environment."""
-            params, opt_states, key, env_state, last_timestep, last_done = learner_state
+            params, opt_states, key, env_state, prev_timestep, prev_done = learner_state
 
             # Select action
             key, policy_key = jax.random.split(key)
-            actor_policy = actor_apply_fn(params.actor_params, last_timestep.observation)
-            value = critic_apply_fn(params.critic_params, last_timestep.observation)
+            actor_policy = actor_apply_fn(params.actor_params, prev_timestep.observation)
+            value = critic_apply_fn(params.critic_params, prev_timestep.observation)
             action = actor_policy.sample(seed=policy_key)
             log_prob = actor_policy.log_prob(action)
 
@@ -97,7 +97,7 @@ def get_learner_fn(
             done = timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
 
             transition = PPOTransition(
-                last_done, action, value, timestep.reward, log_prob, last_timestep.observation
+                prev_done, action, value, timestep.reward, log_prob, prev_timestep.observation
             )
             learner_state = LearnerState(params, opt_states, key, env_state, timestep, done)
             metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
@@ -109,11 +109,11 @@ def get_learner_fn(
         )
 
         # Calculate advantage
-        params, opt_states, key, env_state, last_timestep, last_done = learner_state
-        last_val = critic_apply_fn(params.critic_params, last_timestep.observation)
+        params, opt_states, key, env_state, final_timestep, final_done = learner_state
+        final_val = critic_apply_fn(params.critic_params, final_timestep.observation)
 
         advantages, targets = calculate_gae(
-            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+            traj_batch, final_val, final_done, config.system.gamma, config.system.gae_lambda
         )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
@@ -266,7 +266,7 @@ def get_learner_fn(
         )
 
         params, opt_states, traj_batch, advantages, targets, key = update_state
-        learner_state = LearnerState(params, opt_states, key, env_state, last_timestep, last_done)
+        learner_state = LearnerState(params, opt_states, key, env_state, final_timestep, final_done)
         return learner_state, (episode_metrics, loss_info)
 
     def learner_fn(learner_state: LearnerState) -> ExperimentOutput[LearnerState]:

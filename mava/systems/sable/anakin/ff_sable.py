@@ -81,7 +81,7 @@ def get_learner_fn(
                 - opt_states (OptState): The current optimizer states.
                 - key (PRNGKey): The random number generator state.
                 - env_state (State): The environment state.
-                - last_timestep (TimeStep): The last timestep in the current trajectory.
+                - prev_timestep (TimeStep): The previous environment timestep.
             _ (Any): The current metrics info.
 
         """
@@ -90,16 +90,16 @@ def get_learner_fn(
             learner_state: LearnerState, _: int
         ) -> Tuple[LearnerState, Tuple[Transition, Metrics]]:
             """Step the environment."""
-            params, opt_states, key, env_state, last_timestep = learner_state
+            params, opt_states, key, env_state, prev_timestep = learner_state
 
             # Select action
             key, policy_key = jax.random.split(key)
 
             # Apply the actor network to get the action, log_prob, value and updated hstates.
-            last_obs = last_timestep.observation
+            prev_obs = prev_timestep.observation
             action, log_prob, value, _ = sable_action_select_fn(  # type: ignore
                 params,
-                observation=last_obs,
+                observation=prev_obs,
                 key=policy_key,
             )
 
@@ -107,7 +107,7 @@ def get_learner_fn(
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             prev_done = (
-                last_timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
+                prev_timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
             )
             transition = Transition(
                 prev_done,
@@ -115,7 +115,7 @@ def get_learner_fn(
                 value,
                 timestep.reward,
                 log_prob,
-                last_timestep.observation,
+                prev_timestep.observation,
             )
             learner_state = LearnerState(params, opt_states, key, env_state, timestep)
             metrics = timestep.extras["episode_metrics"] | timestep.extras["env_metrics"]
@@ -127,16 +127,16 @@ def get_learner_fn(
         )
 
         # Calculate advantage
-        params, opt_states, key, env_state, last_timestep = learner_state
-        key, last_val_key = jax.random.split(key)
-        _, _, last_val, _ = sable_action_select_fn(  # type: ignore
+        params, opt_states, key, env_state, final_timestep = learner_state
+        key, final_val_key = jax.random.split(key)
+        _, _, final_val, _ = sable_action_select_fn(  # type: ignore
             params,
-            observation=last_timestep.observation,
-            key=last_val_key,
+            observation=final_timestep.observation,
+            key=final_val_key,
         )
-        last_done = last_timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
+        final_done = final_timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
         advantages, targets = calculate_gae(
-            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+            traj_batch, final_val, final_done, config.system.gamma, config.system.gae_lambda
         )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
@@ -266,7 +266,7 @@ def get_learner_fn(
             opt_states,
             key,
             env_state,
-            last_timestep,
+            final_timestep,
         )
         return learner_state, (episode_metrics, loss_info)
 

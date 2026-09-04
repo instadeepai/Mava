@@ -81,7 +81,7 @@ def get_learner_fn(
                 - opt_state: The current optimizer states.
                 - key: The random number generator state.
                 - env_state: The environment state.
-                - last_timestep: The last timestep in the current trajectory.
+                - prev_timestep: The previous environment timestep.
             _ (Any): The current metrics info.
         """
 
@@ -89,23 +89,23 @@ def get_learner_fn(
             learner_state: LearnerState, _: Any
         ) -> Tuple[LearnerState, Tuple[PPOTransition, Metrics]]:
             """Step the environment."""
-            params, opt_state, key, env_state, last_timestep = learner_state
+            params, opt_state, key, env_state, prev_timestep = learner_state
 
             # Select action
             key, policy_key = jax.random.split(key)
             action, log_prob, value = actor_action_select_fn(  # type: ignore
                 params,
-                last_timestep.observation,
+                prev_timestep.observation,
                 policy_key,
             )
             # Step environment
             env_state, timestep = jax.vmap(env.step, in_axes=(0, 0))(env_state, action)
 
             prev_done = (
-                last_timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
+                prev_timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
             )
             transition = PPOTransition(
-                prev_done, action, value, timestep.reward, log_prob, last_timestep.observation
+                prev_done, action, value, timestep.reward, log_prob, prev_timestep.observation
             )
             learner_state = LearnerState(params, opt_state, key, env_state, timestep)
 
@@ -118,17 +118,17 @@ def get_learner_fn(
         )
 
         # Calculate advantage
-        params, opt_state, key, env_state, last_timestep = learner_state
+        params, opt_state, key, env_state, final_timestep = learner_state
 
-        key, last_val_key = jax.random.split(key)
-        _, _, last_val = actor_action_select_fn(  # type: ignore
+        key, final_val_key = jax.random.split(key)
+        _, _, final_val = actor_action_select_fn(  # type: ignore
             params,
-            last_timestep.observation,
-            last_val_key,
+            final_timestep.observation,
+            final_val_key,
         )
-        last_done = last_timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
+        final_done = final_timestep.last().repeat(env.num_agents).reshape(config.arch.num_envs, -1)
         advantages, targets = calculate_gae(
-            traj_batch, last_val, last_done, config.system.gamma, config.system.gae_lambda
+            traj_batch, final_val, final_done, config.system.gamma, config.system.gae_lambda
         )
 
         def _update_epoch(update_state: Tuple, _: Any) -> Tuple:
@@ -256,7 +256,7 @@ def get_learner_fn(
         )
 
         params, opt_state, traj_batch, advantages, targets, key = update_state
-        learner_state = LearnerState(params, opt_state, key, env_state, last_timestep)
+        learner_state = LearnerState(params, opt_state, key, env_state, final_timestep)
 
         return learner_state, (episode_metrics, loss_info)
 
