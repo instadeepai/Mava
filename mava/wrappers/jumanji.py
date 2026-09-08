@@ -40,7 +40,7 @@ from jumanji.wrappers import Wrapper
 from mava.types import Observation, ObservationGlobalState, State
 
 
-def aggregate_rewards(reward: chex.Array, num_agents: int) -> chex.Array:
+def aggregate_rewards(reward: jax.Array, num_agents: int) -> jax.Array:
     """Aggregate individual rewards across agents."""
     team_reward = jnp.sum(reward)
     return jnp.repeat(team_reward, num_agents)
@@ -58,7 +58,7 @@ class JumanjiMarlWrapper(Wrapper, ABC):
         """Modify the timestep for `step` and `reset`."""
         pass
 
-    def get_global_state(self, obs: Observation) -> chex.Array:
+    def get_global_state(self, obs: Observation) -> jax.Array:
         """The default way to create a global state for an environment if it has no
         available global state - concatenate all observations.
         """
@@ -82,7 +82,7 @@ class JumanjiMarlWrapper(Wrapper, ABC):
 
         return state, timestep
 
-    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
+    def step(self, state: State, action: jax.Array) -> Tuple[State, TimeStep]:
         """Step the environment."""
         state, timestep = self._env.step(state, action)
         timestep = self.modify_timestep(timestep)
@@ -129,7 +129,7 @@ class JumanjiMarlWrapper(Wrapper, ABC):
         return specs.Spec(Observation, "ObservationSpec", **obs_data)
 
     @cached_property
-    def action_dim(self) -> chex.Array:
+    def action_dim(self) -> jax.Array:
         """Get the actions dim for each agent."""
         return int(self._env.action_spec.num_values[0])
 
@@ -228,7 +228,7 @@ class LbfWrapper(JumanjiMarlWrapper):
         return spec
 
 
-def switch_perspective(grid: chex.Array, agent_id: int, num_agents: int) -> chex.Array:
+def switch_perspective(grid: jax.Array, agent_id: int, num_agents: int) -> jax.Array:
     """
     Encodes the observation with respect to the current agent defined by `agent_id`.
     Each agent sees its observations as values `1, 2, 3`. Observations of other agents
@@ -267,7 +267,7 @@ class ConnectorWrapper(JumanjiMarlWrapper):
         """Modify the timestep for the Connector environment."""
 
         # TARGET = 3 = The number of different types of items on the grid.
-        def create_agents_view(grid: chex.Array) -> chex.Array:
+        def create_agents_view(grid: jax.Array) -> jax.Array:
             grid = jax.vmap(switch_perspective, in_axes=(None, 0, None))(
                 grid, self.agent_ids, self.num_agents
             )
@@ -307,7 +307,7 @@ class ConnectorWrapper(JumanjiMarlWrapper):
             reward = aggregate_rewards(reward, self.num_agents)
         return timestep.replace(observation=Observation(**obs_data), reward=reward, extras=metrics)
 
-    def get_global_state(self, obs: Observation) -> chex.Array:
+    def get_global_state(self, obs: Observation) -> jax.Array:
         """Constructs the global state from the global information
         in the agent observations (positions, targets and paths.)
         """
@@ -351,7 +351,7 @@ class ConnectorWrapper(JumanjiMarlWrapper):
         return specs.Spec(Observation, "ObservationSpec", **obs_data)
 
 
-def _slice_around(pos: chex.Array, fov: int) -> Tuple[chex.Array, chex.Array]:
+def _slice_around(pos: jax.Array, fov: int) -> Tuple[jax.Array, jax.Array]:
     """Return the start and length of a slice that when used to index a grid will
     return a 2*fov+1 x 2*fov+1 sub-grid centered around pos.
 
@@ -367,7 +367,7 @@ def _slice_around(pos: chex.Array, fov: int) -> Tuple[chex.Array, chex.Array]:
 
 
 # get location coordinates from 2D grid
-def _get_location(grid: chex.Array) -> chex.Array:
+def _get_location(grid: jax.Array) -> jax.Array:
     row_len = grid.shape[-1]
     index = jnp.argmax(grid)
     return jnp.asarray((jnp.floor(index / row_len), jnp.remainder(index, row_len)), dtype=int)
@@ -394,7 +394,7 @@ class VectorConnectorWrapper(JumanjiMarlWrapper):
         """Modify the timestep for the Connector environment."""
 
         # TARGET = 3 = The number of different types of items on the grid.
-        def create_agents_view(grid: chex.Array) -> chex.Array:
+        def create_agents_view(grid: jax.Array) -> jax.Array:
             grid = jax.vmap(switch_perspective, in_axes=(None, 0, None))(
                 grid, self.agent_ids, self.num_agents
             )
@@ -415,7 +415,7 @@ class VectorConnectorWrapper(JumanjiMarlWrapper):
             position_coords = jax.vmap(_get_location)(position_per_agent)
             target_coords = jax.vmap(_get_location)(target_per_agent)
 
-            def _create_one_agent_view(i: int) -> chex.Array:
+            def _create_one_agent_view(i: int) -> jax.Array:
                 slice_len = 2 * self.fov + 1, 2 * self.fov + 1
                 slice_x, slice_y = _slice_around(position_coords[i], self.fov)
                 padded_blockers = jnp.pad(blockers[i], self.fov, constant_values=True)
@@ -514,7 +514,7 @@ class CleanerWrapper(JumanjiMarlWrapper):
     def modify_timestep(self, timestep: TimeStep) -> TimeStep[Observation]:
         """Modify the timestep for the Cleaner environment."""
 
-        def create_agents_view(grid: chex.Array, agents_locations: chex.Array) -> chex.Array:
+        def create_agents_view(grid: jax.Array, agents_locations: jax.Array) -> jax.Array:
             """Create separate channels for dirty cells, wall cells and agent positions.
             Also add a channel that marks an agent's own position.
             """
@@ -571,7 +571,7 @@ class CleanerWrapper(JumanjiMarlWrapper):
             observation=Observation(**obs_data), reward=reward, discount=discount, extras=metrics
         )
 
-    def get_global_state(self, obs: Observation) -> chex.Array:
+    def get_global_state(self, obs: Observation) -> jax.Array:
         """Constructs the global state from the global information
         in the agent observations (dirty tiles, wall tiles and agent positions).
         """

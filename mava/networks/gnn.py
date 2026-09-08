@@ -21,7 +21,7 @@
 
 from typing import Sequence
 
-import chex
+import jax
 import jraph
 import jraph._src.models as jraph_models
 import jraph._src.utils as jraph_utils
@@ -61,7 +61,7 @@ class InforMARLNbrhdAggregationTorso(GNN):
     num_attention_layers: int
 
     @nn.compact
-    def __call__(self, graph_observation: GraphObservation) -> chex.Array:
+    def __call__(self, graph_observation: GraphObservation) -> jax.Array:
         observation = graph_observation.observation
         graph = graph_observation.graph
         obs = observation.agents_view
@@ -117,7 +117,7 @@ class InforMARLGlobalAggregationTorso(GNN):
     num_attention_layers: int
 
     @nn.compact
-    def __call__(self, graph_observation: GraphObservation) -> chex.Array:
+    def __call__(self, graph_observation: GraphObservation) -> jax.Array:
         graph = graph_observation.graph
         T, E, N, V, *_ = graph.nodes_strict.shape
         # one for timesteps, one for envs, one for agents
@@ -254,7 +254,7 @@ class GraphMultiHeadAttentionLayer(nn.Module):
 
 
 def get_ego_node_features(
-    graph: JraphGraphsTuple, ego_node_index: chex.Array, *num_nodes: Sequence[int]
-) -> chex.Array:
+    graph: JraphGraphsTuple, ego_node_index: jax.Array, *num_nodes: Sequence[int]
+) -> jax.Array:
     """Returns the ego node features from a graph."""
     return graph.nodes[ego_node_index].reshape(*num_nodes, *graph.nodes.shape[1:])

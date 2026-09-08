@@ -79,7 +79,7 @@ class RecordEpisodeMetrics(Wrapper):
     def step(
         self,
         state: RecordEpisodeMetricsState,
-        action: chex.Array,
+        action: jax.Array,
     ) -> Tuple[RecordEpisodeMetricsState, TimeStep]:
         """Step the environment."""
         env_state, timestep = self._env.step(state.env_state, action)
@@ -112,7 +112,7 @@ class RecordEpisodeMetrics(Wrapper):
         return state, timestep
 
 
-def get_final_step_metrics(metrics: Dict[str, chex.Array]) -> Tuple[Dict[str, chex.Array], bool]:
+def get_final_step_metrics(metrics: Dict[str, jax.Array]) -> Tuple[Dict[str, jax.Array], bool]:
     """Get the metrics for the final step of an episode and check if there was a final step
     within the provided metrics.
 
@@ -123,7 +123,7 @@ def get_final_step_metrics(metrics: Dict[str, chex.Array]) -> Tuple[Dict[str, ch
     is_final_ep = metrics.get("is_terminal_step", np.array([False]))
     has_final_ep_step = bool(np.any(is_final_ep))
 
-    final_metrics: Dict[str, chex.Array]
+    final_metrics: Dict[str, jax.Array]
     # If it didn't make it to the final step, return zeros.
     if not has_final_ep_step:
         final_metrics = tree.map(np.zeros_like, metrics)

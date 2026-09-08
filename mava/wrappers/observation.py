@@ -16,6 +16,7 @@ from functools import cached_property
 from typing import Tuple, Union
 
 import chex
+import jax
 import jax.numpy as jnp
 from jumanji import specs
 from jumanji.types import TimeStep
@@ -63,7 +64,7 @@ class AgentIDWrapper(Wrapper):
     def step(
         self,
         state: State,
-        action: chex.Array,
+        action: jax.Array,
     ) -> Tuple[State, TimeStep]:
         """Step the environment."""
         state, timestep = self._env.step(state, action)

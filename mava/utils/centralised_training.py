@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import jax.numpy as jnp
-from chex import Array
+from jax import Array
 
 # Shape legend:
 # B: batch size

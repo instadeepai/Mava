@@ -17,7 +17,6 @@ import copy
 import time
 from typing import Any, Callable, Dict, Tuple
 
-import chex
 import flashbax as fbx
 import flax
 import hydra
@@ -130,8 +129,8 @@ def get_learner_fn(
         final_val = critic_apply_fn(params.critic_params, final_timestep.observation)
 
         def _calculate_gae(
-            traj_batch: PPOTransition, final_val: chex.Array
-        ) -> Tuple[chex.Array, chex.Array]:
+            traj_batch: PPOTransition, final_val: jax.Array
+        ) -> Tuple[jax.Array, jax.Array]:
             """Calculate the GAE."""
 
             def _get_advantages(gae_and_next_value: Tuple, transition: PPOTransition) -> Tuple:
@@ -171,7 +170,7 @@ def get_learner_fn(
                     actor_params: FrozenDict,
                     actor_opt_state: OptState,
                     traj_batch: PPOTransition,
-                    gae: chex.Array,
+                    gae: jax.Array,
                 ) -> Tuple:
                     """Calculate the actor loss."""
                     # RERUN NETWORK
@@ -201,7 +200,7 @@ def get_learner_fn(
                     critic_params: FrozenDict,
                     critic_opt_state: OptState,
                     traj_batch: PPOTransition,
-                    targets: chex.Array,
+                    targets: jax.Array,
                 ) -> Tuple:
                     """Calculate the critic loss."""
                     # RERUN NETWORK
@@ -348,7 +347,7 @@ def get_learner_fn(
 
 
 def learner_setup(
-    env: MarlEnv, keys: chex.Array, config: DictConfig
+    env: MarlEnv, keys: jax.Array, config: DictConfig
 ) -> Tuple[StoreExpLearnerFn[LearnerState], Actor, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.
@@ -542,7 +541,7 @@ def run_experiment(_config: DictConfig) -> None:
     # NE: Number of environments
 
     @jax.jit
-    def _reshape_experience(experience: Dict[str, chex.Array]) -> Dict[str, chex.Array]:
+    def _reshape_experience(experience: Dict[str, jax.Array]) -> Dict[str, jax.Array]:
         """Reshape experience to match buffer."""
         # Swap the T and NE axes (D, NU, UB, T, NE, ...) -> (D, NU, UB, NE, T, ...)
         experience = tree.map(lambda x: x.swapaxes(3, 4), experience)

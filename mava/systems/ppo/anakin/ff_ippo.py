@@ -128,7 +128,7 @@ def get_learner_fn(
                 def _actor_loss_fn(
                     actor_params: FrozenDict,
                     traj_batch: PPOTransition,
-                    gae: chex.Array,
+                    gae: jax.Array,
                     key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
@@ -160,7 +160,7 @@ def get_learner_fn(
                 def _critic_loss_fn(
                     critic_params: FrozenDict,
                     traj_batch: PPOTransition,
-                    targets: chex.Array,
+                    targets: jax.Array,
                 ) -> Tuple:
                     """Calculate the critic loss."""
                     # Rerun network
@@ -299,7 +299,7 @@ def get_learner_fn(
 
 
 def learner_setup(
-    env: MarlEnv, keys: chex.Array, config: DictConfig
+    env: MarlEnv, keys: jax.Array, config: DictConfig
 ) -> Tuple[LearnerFn[LearnerState], Actor, LearnerState]:
     """Initialise learner_fn, network, optimiser, environment and states."""
     # Get available TPU cores.

@@ -22,8 +22,9 @@ import chex
 import jax
 import jax.numpy as jnp
 from brax.envs import State as BraxState
-from chex import Array, PRNGKey
+from chex import PRNGKey
 from gymnax.environments import spaces as gymnax_spaces
+from jax import Array
 from jaxmarl.environments import SMAX
 from jaxmarl.environments import spaces as jaxmarl_spaces
 from jaxmarl.environments.mabrax import MABraxEnv
@@ -328,13 +329,13 @@ class JaxMarlWrapper(Wrapper, ABC):
 
     @cached_property
     @abstractmethod
-    def action_dim(self) -> chex.Array:
+    def action_dim(self) -> jax.Array:
         """Get the actions dim for each agent."""
         ...
 
     @cached_property
     @abstractmethod
-    def state_size(self) -> chex.Array:
+    def state_size(self) -> jax.Array:
         """Get the sate size of the global observation"""
         ...
 
@@ -369,12 +370,12 @@ class SmaxWrapper(JaxMarlWrapper):
         return state, ts
 
     @cached_property
-    def state_size(self) -> chex.Array:
+    def state_size(self) -> jax.Array:
         """Get the sate size of the global observation"""
         return self._env.state_size
 
     @cached_property
-    def action_dim(self) -> chex.Array:
+    def action_dim(self) -> jax.Array:
         """Get the actions dim for each agent."""
         single_agent_action_space = self._env.action_space(self.agents[0])
         return single_agent_action_space.n
@@ -401,12 +402,12 @@ class MabraxWrapper(JaxMarlWrapper):
         self._env: MABraxEnv
 
     @cached_property
-    def action_dim(self) -> chex.Array:
+    def action_dim(self) -> jax.Array:
         """Get the actions dim for each agent."""
         return self._env.action_space(self.agents[0]).shape[0]
 
     @cached_property
-    def state_size(self) -> chex.Array:
+    def state_size(self) -> jax.Array:
         """Get the sate size of the global observation"""
         brax_env = self._env.env
         return brax_env.observation_size
@@ -433,7 +434,7 @@ class MPEWrapper(JaxMarlWrapper):
         self._env: SimpleSpreadMPE
 
     @cached_property
-    def action_dim(self) -> chex.Array:
+    def action_dim(self) -> jax.Array:
         "Get the actions dim for each agent."
         # Adjusted automatically based on the action_type specified in the kwargs.
         if _is_discrete(self._env.action_space(self.agents[0])):
@@ -441,7 +442,7 @@ class MPEWrapper(JaxMarlWrapper):
         return self._env.action_space(self.agents[0]).shape[0]
 
     @cached_property
-    def state_size(self) -> chex.Array:
+    def state_size(self) -> jax.Array:
         "Get the state size of the global observation"
         return self._env.observation_space(self.agents[0]).shape[0] * self.num_agents
 

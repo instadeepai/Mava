@@ -280,7 +280,7 @@ def make_update_fns(
 
     # ---- Training functions ----
 
-    def prep_inputs_to_scannedrnn(obs: MavaObservation, term_or_trunc: chex.Array) -> chex.Array:
+    def prep_inputs_to_scannedrnn(obs: MavaObservation, term_or_trunc: jax.Array) -> jax.Array:
         """Prepares the inputs to the RNN network for either getting q values or the
         eps-greedy distribution.
 
@@ -518,7 +518,7 @@ def run_experiment(cfg: DictConfig) -> float:
 
     def eval_act_fn(
         params: FrozenDict, timestep: TimeStep, key: chex.PRNGKey, actor_state: ActorState
-    ) -> Tuple[chex.Array, ActorState]:
+    ) -> Tuple[jax.Array, ActorState]:
         """The acting function that get's passed to the evaluator.
         A custom function is needed for epsilon-greedy acting.
         """

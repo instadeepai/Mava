@@ -205,7 +205,7 @@ def get_learner_step_fn(
                 def _actor_loss_fn(
                     actor_params: FrozenDict,
                     traj_batch: PPOTransition,
-                    gae: chex.Array,
+                    gae: jax.Array,
                     key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
@@ -234,7 +234,7 @@ def get_learner_step_fn(
                     return total_actor_loss, (actor_loss, entropy)
 
                 def _critic_loss_fn(
-                    critic_params: FrozenDict, traj_batch: PPOTransition, targets: chex.Array
+                    critic_params: FrozenDict, traj_batch: PPOTransition, targets: jax.Array
                 ) -> Tuple:
                     """Calculate the critic loss."""
                     # Rerun network

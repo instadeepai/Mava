@@ -14,8 +14,9 @@
 
 from typing import Callable, Tuple
 
-from chex import Array, PRNGKey
+from chex import PRNGKey
 from flax.core.frozen_dict import FrozenDict
+from jax import Array
 from jumanji.types import TimeStep
 from optax._src.base import OptState
 from tensorflow_probability.substrates.jax.distributions import Distribution

@@ -106,7 +106,7 @@ def rollout(
     def act_fn(
         params: Params,
         observation: Observation,
-        dones: chex.Array,
+        dones: jax.Array,
         hstates: HiddenStates,
         key: chex.PRNGKey,
     ) -> Tuple:
@@ -249,7 +249,7 @@ def get_learner_step_fn(
                 def _actor_loss_fn(
                     actor_params: FrozenDict,
                     traj_batch: RNNPPOTransition,
-                    gae: chex.Array,
+                    gae: jax.Array,
                     key: chex.PRNGKey,
                 ) -> Tuple:
                     """Calculate the actor loss."""
@@ -282,7 +282,7 @@ def get_learner_step_fn(
                 def _critic_loss_fn(
                     critic_params: FrozenDict,
                     traj_batch: RNNPPOTransition,
-                    targets: chex.Array,
+                    targets: jax.Array,
                 ) -> Tuple:
                     """Calculate the critic loss."""
                     obs_and_done = (traj_batch.obs, traj_batch.done)

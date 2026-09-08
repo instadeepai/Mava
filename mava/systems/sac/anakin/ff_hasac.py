@@ -77,7 +77,7 @@ def get_actions(
     num_agents: int,
     action_dim: int,
     obs: Union[Observation, ObservationGlobalState],
-) -> Tuple[chex.Array, chex.Array]:
+) -> Tuple[jax.Array, jax.Array]:
     batch_size = obs.agents_view.shape[0]
 
     actions = jnp.zeros((batch_size, num_agents, action_dim))
@@ -259,7 +259,7 @@ def make_update_fns(
     networks: Networks,
     optims: Optimisers,
     rb: TrajectoryBuffer,
-    target_entropy: chex.Array,
+    target_entropy: jax.Array,
 ) -> Tuple[
     Callable[[LearnerState], Tuple[LearnerState, Metrics]],
     Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]],

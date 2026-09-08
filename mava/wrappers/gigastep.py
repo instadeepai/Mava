@@ -17,9 +17,9 @@ from typing import TYPE_CHECKING, Dict, Tuple, Union
 
 import jax
 import jax.numpy as jnp
-from chex import Array, PRNGKey
+from chex import PRNGKey
 from gigastep.gigastep_env import GigastepEnv
-from jax import tree
+from jax import Array, tree
 from jumanji import specs
 from jumanji.types import StepType, TimeStep, restart
 from jumanji.wrappers import Wrapper

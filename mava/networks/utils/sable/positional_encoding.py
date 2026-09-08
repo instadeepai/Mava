@@ -15,7 +15,6 @@
 
 from typing import Tuple
 
-import chex
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
@@ -35,8 +34,8 @@ class PositionalEncoding(nn.Module):
         )[jnp.newaxis]
 
     def __call__(
-        self, key: chex.Array, query: chex.Array, value: chex.Array, position: chex.Array
-    ) -> Tuple[chex.Array, chex.Array, chex.Array]:
+        self, key: jax.Array, query: jax.Array, value: jax.Array, position: jax.Array
+    ) -> Tuple[jax.Array, jax.Array, jax.Array]:
         """Computes positional encoding for a given sequence of positions."""
         pe = jax.vmap(self._get_pos_encoding)(position)
 
@@ -47,7 +46,7 @@ class PositionalEncoding(nn.Module):
 
         return key, query, value
 
-    def _get_pos_encoding(self, position: chex.Array) -> chex.Array:
+    def _get_pos_encoding(self, position: jax.Array) -> jax.Array:
         """Computes positional encoding for a given the index of the token."""
         seq_len = position.shape[0]
 

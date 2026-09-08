@@ -30,13 +30,14 @@ import jax
 import jumanji.specs as specs
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
+from numpy.typing import NDArray
 from tensorflow_probability.substrates.jax.distributions import Distribution
 from typing_extensions import NamedTuple, TypeAlias
 
-Action: TypeAlias = chex.Array
-Value: TypeAlias = chex.Array
-Done: TypeAlias = chex.Array
-HiddenState: TypeAlias = chex.Array
+Action: TypeAlias = jax.Array
+Value: TypeAlias = jax.Array
+Done: TypeAlias = jax.Array
+HiddenState: TypeAlias = jax.Array
 # Can't know the exact type of State.
 State: TypeAlias = Any
 Metrics: TypeAlias = Dict[str, jax.typing.ArrayLike]
@@ -66,7 +67,7 @@ class MarlEnv(Protocol):
         """
         ...
 
-    def step(self, state: State, action: chex.Array) -> Tuple[State, TimeStep]:
+    def step(self, state: State, action: jax.Array) -> Tuple[State, TimeStep]:
         """Run one timestep of the environment's dynamics.
 
         Args:
@@ -131,9 +132,9 @@ class Observation(NamedTuple):
     step_count: the number of steps elapsed since the beginning of the episode.
     """
 
-    agents_view: chex.Array  # (num_agents, num_obs_features)
-    action_mask: chex.Array  # (num_agents, num_actions)
-    step_count: Optional[chex.Array] = None  # (num_agents, )
+    agents_view: jax.Array | NDArray  # (num_agents, num_obs_features)
+    action_mask: jax.Array | NDArray  # (num_agents, num_actions)
+    step_count: Optional[jax.Array | NDArray] = None  # (num_agents, )
 
 
 class ObservationGlobalState(NamedTuple):
@@ -143,10 +144,10 @@ class ObservationGlobalState(NamedTuple):
     global_state: The global state of the environment, often a concatenation of agents' views.
     """
 
-    agents_view: chex.Array  # (num_agents, num_obs_features)
-    action_mask: chex.Array  # (num_agents, num_actions)
-    global_state: chex.Array  # (num_agents, num_agents * num_obs_features)
-    step_count: Optional[chex.Array] = None  # (num_agents, )
+    agents_view: jax.Array | NDArray  # (num_agents, num_obs_features)
+    action_mask: jax.Array | NDArray  # (num_agents, num_actions)
+    global_state: jax.Array | NDArray  # (num_agents, num_agents * num_obs_features)
+    step_count: Optional[jax.Array | NDArray] = None  # (num_agents, )
 
 
 RNNObservation: TypeAlias = Tuple[Union[Observation, "GraphObservation[Observation]"], Done]
@@ -164,12 +165,12 @@ class GraphsTuple(NamedTuple):
 
     nodes: Optional[chex.ArrayTree]
     edges: Optional[chex.ArrayTree]
-    receivers: Optional[chex.Array]  # with integer dtype
-    senders: Optional[chex.Array]  # with integer dtype
+    receivers: Optional[jax.Array]  # with integer dtype
+    senders: Optional[jax.Array]  # with integer dtype
     globals: Optional[chex.ArrayTree]
-    n_node: chex.Array  # with integer dtype
-    n_edge: chex.Array  # with integer dtype
-    ego_node_index: chex.Array
+    n_node: jax.Array  # with integer dtype
+    n_edge: jax.Array  # with integer dtype
+    ego_node_index: jax.Array
 
     @property
     def nodes_strict(self) -> chex.ArrayTree:

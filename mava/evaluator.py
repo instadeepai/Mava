@@ -20,9 +20,9 @@ from typing import Any, Callable, Dict, Protocol, Tuple, Union
 import jax
 import jax.numpy as jnp
 import numpy as np
-from chex import Array, PRNGKey
+from chex import PRNGKey
 from flax.core.frozen_dict import FrozenDict
-from jax import tree
+from jax import Array, tree
 from jumanji.types import TimeStep
 from omegaconf import DictConfig
 from typing_extensions import TypeAlias

@@ -215,7 +215,7 @@ def make_update_fns(
     networks: Networks,
     optims: Optimisers,
     rb: TrajectoryBuffer,
-    target_entropy: chex.Array,
+    target_entropy: jax.Array,
 ) -> Tuple[
     Callable[[LearnerState], Tuple[LearnerState, Metrics]],
     Callable[[LearnerState], Tuple[LearnerState, Tuple[Metrics, Metrics]]],

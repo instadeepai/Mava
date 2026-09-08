@@ -14,7 +14,6 @@
 
 from typing import Callable, Dict, Sequence
 
-import chex
 import jax
 import numpy as np
 from flax import linen as nn
@@ -33,7 +32,7 @@ class MLPTorso(nn.Module):
         self.activation_fn = _parse_activation_fn(self.activation)
 
     @nn.compact
-    def __call__(self, observation: chex.Array) -> chex.Array:
+    def __call__(self, observation: jax.Array) -> jax.Array:
         """Forward pass."""
         x = observation
         for i, layer_size in enumerate(self.layer_sizes):
@@ -60,7 +59,7 @@ class CNNTorso(nn.Module):
         self.activation_fn = _parse_activation_fn(self.activation)
 
     @nn.compact
-    def __call__(self, observation: chex.Array) -> chex.Array:
+    def __call__(self, observation: jax.Array) -> jax.Array:
         """Forward pass."""
         x = observation
         for channel, kernel, stride in zip(
@@ -94,14 +93,14 @@ class SwiGLU(nn.Module):
             "W_output", nn.initializers.zeros, (self.hidden_dim, self.embed_dim)
         )
 
-    def __call__(self, x: chex.Array) -> chex.Array:
+    def __call__(self, x: jax.Array) -> jax.Array:
         gated_output = jax.nn.swish(x @ self.W_gate) * (x @ self.W_linear)
         return gated_output @ self.W_output
 
 
-def _parse_activation_fn(activation_fn_name: str) -> Callable[[chex.Array], chex.Array]:
+def _parse_activation_fn(activation_fn_name: str) -> Callable[[jax.Array], jax.Array]:
     """Get the activation function."""
-    activation_fns: Dict[str, Callable[[chex.Array], chex.Array]] = {
+    activation_fns: Dict[str, Callable[[jax.Array], jax.Array]] = {
         "relu": nn.relu,
         "tanh": nn.tanh,
     }

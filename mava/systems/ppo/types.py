@@ -14,6 +14,7 @@
 
 
 import chex
+import jax
 from flax.core.frozen_dict import FrozenDict
 from jumanji.types import TimeStep
 from optax._src.base import OptState
@@ -82,8 +83,8 @@ class PPOTransition(NamedTuple):
     done: Done
     action: Action
     value: Value
-    reward: chex.Array
-    log_prob: chex.Array
+    reward: jax.Array
+    log_prob: jax.Array
     obs: Observation
 
 
@@ -93,7 +94,7 @@ class RNNPPOTransition(NamedTuple):
     done: Done
     action: Action
     value: Value
-    reward: chex.Array
-    log_prob: chex.Array
-    obs: chex.Array
+    reward: jax.Array
+    log_prob: jax.Array
+    obs: jax.Array
     hstates: HiddenStates

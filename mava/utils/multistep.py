@@ -14,7 +14,6 @@
 
 from typing import Tuple, Union
 
-import chex
 import jax
 import jax.numpy as jnp
 
@@ -23,12 +22,12 @@ from mava.systems.ppo.types import PPOTransition, RNNPPOTransition
 
 def calculate_gae(
     traj_batch: Union[PPOTransition, RNNPPOTransition],
-    final_val: chex.Array,
-    final_done: chex.Array,
+    final_val: jax.Array,
+    final_done: jax.Array,
     gamma: float,
     gae_lambda: float,
     unroll: int = 16,
-) -> Tuple[chex.Array, chex.Array]:
+) -> Tuple[jax.Array, jax.Array]:
     """Computes truncated generalized advantage estimates.
 
     The advantages are computed in a backwards fashion according to the equation:
@@ -49,8 +48,8 @@ def calculate_gae(
     """
 
     def _get_advantages(
-        carry: Tuple[chex.Array, chex.Array, chex.Array], transition: RNNPPOTransition
-    ) -> Tuple[Tuple[chex.Array, chex.Array, chex.Array], chex.Array]:
+        carry: Tuple[jax.Array, jax.Array, jax.Array], transition: RNNPPOTransition
+    ) -> Tuple[Tuple[jax.Array, jax.Array, jax.Array], jax.Array]:
         gae, next_value, next_done = carry
         done, value, reward = transition.done, transition.value, transition.reward
 

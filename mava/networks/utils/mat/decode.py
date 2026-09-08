@@ -32,12 +32,12 @@ from mava.networks.distributions import IdentityTransformation, TanhTransformedD
 
 def discrete_parallel_act(
     decoder: nn.Module,
-    obs_rep: chex.Array,  # (B, N, E)
-    action: chex.Array,  # (B, N)
+    obs_rep: jax.Array,  # (B, N, E)
+    action: jax.Array,  # (B, N)
     action_dim: int,  # (, )
-    legal_actions: chex.Array,  # (B, N, A)
+    legal_actions: jax.Array,  # (B, N, A)
     key: chex.PRNGKey,
-) -> Tuple[chex.Array, chex.Array]:
+) -> Tuple[jax.Array, jax.Array]:
     B, N, _ = obs_rep.shape
     one_hot_action = jax.nn.one_hot(action, action_dim)  # (B, A)
     shifted_action = jnp.zeros((B, N, action_dim + 1))  # (B, N, A +1)
@@ -60,12 +60,12 @@ def discrete_parallel_act(
 
 def continuous_parallel_act(
     decoder: nn.Module,
-    obs_rep: chex.Array,  # (B, N, E)
-    action: chex.Array,  # (B, N, A)
+    obs_rep: jax.Array,  # (B, N, E)
+    action: jax.Array,  # (B, N, A)
     action_dim: int,  # (, )
-    legal_actions: chex.Array,  # (B, N, A)
+    legal_actions: jax.Array,  # (B, N, A)
     key: chex.PRNGKey,
-) -> Tuple[chex.Array, chex.Array]:
+) -> Tuple[jax.Array, jax.Array]:
     # We don't need legal_actions for continuous actions but keep it to keep the APIs consistent.
     del legal_actions
     B, N, _ = obs_rep.shape
@@ -89,11 +89,11 @@ def continuous_parallel_act(
 
 def discrete_autoregressive_act(
     decoder: nn.Module,
-    obs_rep: chex.Array,  # (B, N, E)
+    obs_rep: jax.Array,  # (B, N, E)
     action_dim: int,  # (, )
-    legal_actions: chex.Array,  # (B, N, A)
+    legal_actions: jax.Array,  # (B, N, A)
     key: chex.PRNGKey,
-) -> Tuple[chex.Array, chex.Array]:
+) -> Tuple[jax.Array, jax.Array]:
     B, N, _ = obs_rep.shape
     shifted_action = jnp.zeros((B, N, action_dim + 1))
     shifted_action = shifted_action.at[:, 0, 0].set(1)
@@ -126,11 +126,11 @@ def discrete_autoregressive_act(
 
 def continuous_autoregressive_act(
     decoder: nn.Module,
-    obs_rep: chex.Array,  # (B, N, E)
+    obs_rep: jax.Array,  # (B, N, E)
     action_dim: int,  # (, )
-    legal_actions: Union[chex.Array, None],
+    legal_actions: Union[jax.Array, None],
     key: chex.PRNGKey,
-) -> Tuple[chex.Array, chex.Array]:
+) -> Tuple[jax.Array, jax.Array]:
     # We don't need legal_actions for continuous actions but keep it to keep the APIs consistent.
     del legal_actions
     B, N, _ = obs_rep.shape

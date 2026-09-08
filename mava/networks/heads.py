@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-import chex
 import jax
 import jax.numpy as jnp
 import tensorflow_probability.substrates.jax.distributions as tfd
@@ -31,8 +30,8 @@ class DiscreteActionHead(nn.Module):
     @nn.compact
     def __call__(
         self,
-        obs_embedding: chex.Array,
-        action_mask: chex.Array,
+        obs_embedding: jax.Array,
+        action_mask: jax.Array,
     ) -> tfd.TransformedDistribution:
         """Action selection for distrete action space environments.
 
@@ -82,7 +81,7 @@ class ContinuousActionHead(nn.Module):
             self.log_std = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01))
 
     @nn.compact
-    def __call__(self, obs_embedding: chex.Array, action_mask: chex.Array) -> tfd.Independent:
+    def __call__(self, obs_embedding: jax.Array, action_mask: jax.Array) -> tfd.Independent:
         """Action selection for continuous action space environments.
 
         Args:

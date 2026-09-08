@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import chex
+import jax
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.linen.initializers import orthogonal
@@ -39,7 +39,7 @@ class SelfAttention(nn.Module):
         self.mask = jnp.tril(jnp.ones((self.n_agent + 1, self.n_agent + 1)))
         self.mask = self.mask[jnp.newaxis, jnp.newaxis]
 
-    def __call__(self, key: chex.Array, value: chex.Array, query: chex.Array) -> chex.Array:
+    def __call__(self, key: jax.Array, value: jax.Array, query: jax.Array) -> jax.Array:
         # Shape names:
         # B: batch size
         # S: sequence length
