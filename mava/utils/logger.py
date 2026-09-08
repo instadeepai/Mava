@@ -30,13 +30,18 @@ from etils.epath import Path
 from jax import tree
 from jax.typing import ArrayLike
 from marl_eval.json_tools import JsonLogger as MarlEvalJsonLogger
+from matplotlib.animation import Animation, PillowWriter
 from neptune.utils import stringify_unsupported
 from omegaconf import DictConfig, OmegaConf
 from pandas.io.json._normalize import _simple_json_normalize as flatten_dict
+from PIL import Image
 from rich.pretty import pprint
-from tensorboard_logger import configure, log_value
+from tensorboardX import SummaryWriter
+from tensorboardX.proto.summary_pb2 import Summary
 
 from mava.types import Metrics
+
+_EVAL_VIDEO_KEY = "__eval_video__"
 
 
 class LogEvent(Enum):
@@ -132,6 +137,10 @@ class MavaLogger:
             event (LogEvent): the event that the metrics are associated with.
 
         """
+        video = metrics.pop(_EVAL_VIDEO_KEY, None)
+        if video is not None:
+            self.logger.log_video(video, t_eval, event)
+
         # Apply custom metrics calculation
         metrics = self.custom_metrics_fn(metrics)
 
@@ -186,6 +195,10 @@ class BaseLogger(abc.ABC):
         """Stop the logger."""
         return None
 
+    def log_video(self, video: Animation, eval_step: int, event: LogEvent) -> None:
+        """Log an evaluation video if supported by the logger."""
+        return None
+
 
 class MultiLogger(BaseLogger):
     def __init__(self, loggers: List[BaseLogger]) -> None:
@@ -207,6 +220,10 @@ class MultiLogger(BaseLogger):
     def stop(self) -> None:
         for logger in self.loggers:
             logger.stop()
+
+    def log_video(self, video: Animation, eval_step: int, event: LogEvent) -> None:
+        for logger in self.loggers:
+            logger.log_video(video, eval_step, event)
 
 
 class NeptuneLogger(BaseLogger):
@@ -287,7 +304,13 @@ class NeptuneLogger(BaseLogger):
 
 
 class TensorboardLogger(BaseLogger):
-    def __init__(self, base_exp_path: PathLike, unique_token: str, system_name: str) -> None:
+    def __init__(
+        self,
+        base_exp_path: PathLike,
+        unique_token: str,
+        system_name: str,
+        record_video: bool = True,
+    ) -> None:
         """
         Initialize TensorBoard logger for visualization.
 
@@ -299,14 +322,41 @@ class TensorboardLogger(BaseLogger):
         tb_exp_path = get_logger_path(system_name, "tensorboard")
         tb_logs_path = os.path.join(base_exp_path, Path(tb_exp_path, unique_token))
 
-        configure(tb_logs_path)
-        self.log = log_value
+        self.logger = SummaryWriter(tb_logs_path)
+        self.log_dir = tb_logs_path
+        self.record_video = record_video
 
     def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
         t = step if event != LogEvent.EVAL else eval_step
-        self.log(f"{event.value}/{key}", value, t)
+        self.logger.add_scalar(f"{event.value}/{key}", value, t)
 
     def log_config(self, config: Dict) -> None: ...
+
+    def log_video(self, video: Animation, eval_step: int, event: LogEvent) -> None:
+        video_path = os.path.join(self.log_dir, f"{event.value}_{eval_step}.gif")
+        video.save(video_path, writer=PillowWriter(fps=4))
+
+        with Image.open(video_path) as image:
+            width, height = image.size
+        with open(video_path, "rb") as video_file:
+            encoded_video = video_file.read()
+
+        summary = Summary(
+            value=[
+                Summary.Value(
+                    tag=f"{event.value}/video",
+                    image=Summary.Image(
+                        encoded_image_string=encoded_video,
+                        height=height,
+                        width=width,
+                    ),
+                )
+            ]
+        )
+        self.logger.file_writer.add_summary(summary, eval_step)
+
+    def stop(self) -> None:
+        self.logger.close()
 
 
 class JsonLogger(BaseLogger):

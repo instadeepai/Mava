@@ -63,7 +63,7 @@ dependencies = [
   "scipy==1.12.0",
   "setuptools",
   "smaclite @ git+https://github.com/uoe-agents/smaclite.git",
-  "tensorboard_logger",
+  "tensorboardX",
   "tensorflow_probability",
   "type_enforced", # needed because gigastep is missing this dependency
 ]
