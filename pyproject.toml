@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=62.6"]
+requires = ["setuptools>=83.0.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -58,7 +58,7 @@ dependencies = [
   "numpy==1.26.4",
   "omegaconf",
   "optax",
-  "protobuf~=3.20",
+  "protobuf~=5.29",
   "rware",
   "scipy==1.12.0",
   "setuptools",
