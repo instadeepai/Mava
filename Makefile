@@ -15,7 +15,7 @@ build:
 	DOCKER_BUILDKIT=1 docker build --build-arg USE_CUDA=$(USE_CUDA) --tag $(IMAGE) .
 
 run:
-	$(DOCKER_RUN) python $(example)
+	$(DOCKER_RUN) uv run $(example)
 
 bash:
 	$(DOCKER_RUN) bash
