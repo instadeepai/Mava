@@ -9,20 +9,36 @@ loggers:
   console:
     _target_: mava.utils.logger.ConsoleLogger
     enabled: True
-  neptune:
-    _target_: mava.utils.logger.NeptuneLogger
+  mlflow:
+    _target_: mava.utils.logger.MLflowLogger
+    enabled: True
+
+    # If specified will resume the run with this run ID.
+    # This is useful for resuming runs and logging from multiple processes.
+    # NOTE: it will overwrite the run unless you set the timestep correctly.
+    run_id: ~
+    experiment_name: DAIR-Research/mava
+    tags:
+      purpose: delete
+    detailed_logging: False  # having mean/std/min/max can clutter mlflow so we make it optional
+    # Whether JSON file data should be uploaded to MLflow for downstream
+    # aggregation and plotting of data from multiple experiments. Note that when uploading JSON files,
+    # `json.path` must be unset to ensure that uploaded json files don't continue getting larger
+    # over time. Setting both will raise an error.
+    upload_json_data: False
+  wandb:
+    _target_: mava.utils.logger.WandBLogger
     enabled: False
 
     # If specified will resume the run with this run ID.
     # This is useful for resuming runs and logging from multiple processes.
     # NOTE: it will overwrite the run unless you set the timestep correctly.
     run_id: ~
-    project: Instadeep/mava-benchmark
-    tag: [delete]
-    group_tag: [delete]
-    detailed_logging: False  # having mean/std/min/max can clutter neptune so we make it optional
-    architecture_name: ${arch.architecture_name}  # this is required because async logging causes deadlocks in sebulba
-    # Whether JSON file data should be uploaded to Neptune for downstream
+    project: mava-benchmark
+    entity: ~
+    tags: [delete]
+    detailed_logging: False  # having mean/std/min/max can clutter wandb so we make it optional
+    # Whether JSON file data should be uploaded to WandB for downstream
     # aggregation and plotting of data from multiple experiments. Note that when uploading JSON files,
     # `json.path` must be unset to ensure that uploaded json files don't continue getting larger
     # over time. Setting both will raise an error.

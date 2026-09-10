@@ -23,14 +23,14 @@ from typing import Callable, ClassVar, Dict, List, Union
 
 import hydra
 import jax
-import neptune
+import mlflow
 import numpy as np
+import wandb
 from colorama import Fore, Style
 from etils.epath import Path
 from jax import tree
 from jax.typing import ArrayLike
 from marl_eval.json_tools import JsonLogger as MarlEvalJsonLogger
-from neptune.utils import stringify_unsupported
 from omegaconf import DictConfig, OmegaConf
 from pandas.io.json._normalize import _simple_json_normalize as flatten_dict
 from rich.pretty import pprint
@@ -209,49 +209,47 @@ class MultiLogger(BaseLogger):
             logger.stop()
 
 
-class NeptuneLogger(BaseLogger):
+class MLflowLogger(BaseLogger):
     def __init__(
         self,
         base_exp_path: PathLike,
         unique_token: str,
         system_name: str,
-        project: str,
-        tag: list[str],
-        group_tag: list[str],
+        experiment_name: str,
+        tags: dict[str, str],
         detailed_logging: bool,
-        architecture_name: str,
         upload_json_data: bool,
         run_id: str | None = None,
     ) -> None:
         """
-        Initialize neptune.ai logger for experiment tracking.
+        Initialize MLflow logger for experiment tracking.
 
         Args:
             base_exp_path: Base path where all logs are stored.
             unique_token: Unique identifier string for this run.
             system_name: Name of the system/algorithm being logged.
-            project: neptune.ai project name.
-            tag: List of tags for the neptune.ai experiment.
-            group_tag: List of group tags - useful for keeping track of a group of experiments.
+            experiment_name: MLflow experiment name.
+            tag: Dictionary of tags for the MLflow run.
             detailed_logging: Whether to log detailed metrics (incl. std/min/max).
-            architecture_name: Name of the architecture [anakin | sebulba].
-            upload_json_data: Whether to upload JSON data to neptune.ai.
+            upload_json_data: Whether to upload JSON data to MLflow.
             run_id: ID of the run you wish to resume - None if you don't want to resume the run.
                 Note this will overwrite the run if you restart the step from 0.
         """
-        # async logging leads to deadlocks in sebulba
-        mode = "async" if architecture_name == "anakin" else "sync"
+        tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
+        if not tracking_uri:
+            raise ValueError("MLFLOW_TRACKING_URI environment variable is required")
+        mlflow.set_tracking_uri(tracking_uri)
+        mlflow.set_experiment(experiment_name)
 
         if run_id is not None:
-            self.logger = neptune.init_run(with_id=run_id, project=project, mode=mode)
+            self.logger = mlflow.start_run(run_id=run_id)
         else:
-            self.logger = neptune.init_run(project=project, tags=list(tag), mode=mode)
-            self.logger["sys/group_tags"].add(list(group_tag))
+            self.logger = mlflow.start_run(tags=tags)
 
         self.detailed_logging = detailed_logging
         self.upload_json_data = upload_json_data
 
-        # Store json path for uploading json data to Neptune.
+        # Store json path for uploading json data to MLflow.
         json_exp_path = get_logger_path(system_name, "json")
         self.json_file_path = Path(base_exp_path, json_exp_path, unique_token, "metrics.json")
         self.unique_token = unique_token
@@ -265,15 +263,28 @@ class NeptuneLogger(BaseLogger):
             return
 
         value = value.item() if isinstance(value, (jax.Array, np.ndarray)) else value
-        self.logger[f"{event.value}/{key}"].log(value, step=step)
+        mlflow.log_metric(f"{event.value}/{key}", value, step=step)
+
+    def log_dict(self, data: Metrics, step: int, eval_step: int, event: LogEvent) -> None:
+        flat = flatten_dict(data, sep="/")
+        batch: dict[str, float] = {}
+        for key, value in flat.items():
+            is_main_metric = "/" not in key or key.endswith("/mean")
+            if not self.detailed_logging and not is_main_metric:
+                continue
+            value = value.item() if isinstance(value, (jax.Array, np.ndarray)) else value
+            batch[f"{event.value}/{key}"] = value
+        if batch:
+            mlflow.log_metrics(batch, step=step)
 
     def log_config(self, config: Dict) -> None:
-        self.logger["config"] = stringify_unsupported(config)
+        flat = flatten_dict(config, sep="/")
+        mlflow.log_params({k: str(v) for k, v in flat.items()})
 
     def stop(self) -> None:
         if self.upload_json_data:
             self._zip_and_upload_json()
-        self.logger.stop()
+        mlflow.end_run()
 
     def _zip_and_upload_json(self) -> None:
         # Create the zip file path by replacing '.json' with '.zip'
@@ -283,7 +294,89 @@ class NeptuneLogger(BaseLogger):
         with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
             zipf.write(self.json_file_path, arcname=self.json_file_path.name)
 
-        self.logger[f"metrics/metrics_{self.unique_token}"].upload(zip_file_path)
+        mlflow.log_artifact(zip_file_path, artifact_path=f"metrics/metrics_{self.unique_token}")
+
+
+class WandBLogger(BaseLogger):
+    def __init__(
+        self,
+        base_exp_path: PathLike,
+        unique_token: str,
+        system_name: str,
+        project: str,
+        tags: list[str],
+        detailed_logging: bool,
+        upload_json_data: bool,
+        run_id: str | None = None,
+        entity: str | None = None,
+    ) -> None:
+        """
+        Initialize WandB logger for experiment tracking.
+
+        Args:
+            base_exp_path: Base path where all logs are stored.
+            unique_token: Unique identifier string for this run.
+            system_name: Name of the system/algorithm being logged.
+            project: WandB project name.
+            tags: List of tags for the WandB run.
+            detailed_logging: Whether to log detailed metrics (incl. std/min/max).
+            upload_json_data: Whether to upload JSON data to WandB.
+            run_id: ID of the run you wish to resume - None if you don't want to resume the run.
+                Note this will overwrite the run unless you set the timestep correctly.
+            entity: WandB entity (user or team). None uses the default from the env.
+        """
+        if run_id is not None:
+            self.logger = wandb.init(
+                project=project, entity=entity, id=run_id, resume="allow"
+            )
+        else:
+            self.logger = wandb.init(project=project, entity=entity, tags=list(tags))
+
+        self.detailed_logging = detailed_logging
+        self.upload_json_data = upload_json_data
+
+        # Store json path for uploading json data to WandB.
+        json_exp_path = get_logger_path(system_name, "json")
+        self.json_file_path = Path(base_exp_path, json_exp_path, unique_token, "metrics.json")
+        self.unique_token = unique_token
+
+    def log_stat(self, key: str, value: float, step: int, eval_step: int, event: LogEvent) -> None:
+        is_main_metric = "/" not in key or key.endswith("/mean")
+        if not self.detailed_logging and not is_main_metric:
+            return
+
+        value = value.item() if isinstance(value, (jax.Array, np.ndarray)) else value
+        wandb.log({f"{event.value}/{key}": value}, step=step)
+
+    def log_dict(self, data: Metrics, step: int, eval_step: int, event: LogEvent) -> None:
+        flat = flatten_dict(data, sep="/")
+        batch: dict[str, float] = {}
+        for key, value in flat.items():
+            is_main_metric = "/" not in key or key.endswith("/mean")
+            if not self.detailed_logging and not is_main_metric:
+                continue
+            value = value.item() if isinstance(value, (jax.Array, np.ndarray)) else value
+            batch[f"{event.value}/{key}"] = value
+        if batch:
+            wandb.log(batch, step=step)
+
+    def log_config(self, config: Dict) -> None:
+        wandb.config.update(config)
+
+    def stop(self) -> None:
+        if self.upload_json_data:
+            self._zip_and_upload_json()
+        wandb.finish()
+
+    def _zip_and_upload_json(self) -> None:
+        # Create the zip file path by replacing '.json' with '.zip'
+        zip_file_path = self.json_file_path.with_suffix(".zip").as_posix()
+
+        # Create a zip file containing the specified JSON file
+        with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(self.json_file_path, arcname=self.json_file_path.name)
+
+        wandb.save(zip_file_path, policy="now")
 
 
 class TensorboardLogger(BaseLogger):
@@ -437,19 +530,17 @@ def _make_multi_logger(cfg: DictConfig) -> MultiLogger:
     """Instantiate only enabled loggers and remove the 'enabled' flag."""
     unique_token = datetime.now().strftime("%Y%m%d%H%M%S")
 
-    if (
-        cfg.logger.loggers.neptune.enabled
-        and cfg.logger.loggers.json.enabled
-        and cfg.logger.loggers.neptune.upload_json_data
-        and cfg.logger.loggers.json.path
-    ):
-        raise ValueError(
-            "Cannot upload json data to Neptune when `json_path` is set in the base logger config. "
-            "This is because each subsequent run will create a larger json file which will use "
-            "unnecessary storage. Either set `upload_json_data: false` if you don't want to "
-            "upload your json data but store a large file locally or set `json_path: ~` in "
-            "the base logger config."
-        )
+    if cfg.logger.loggers.json.enabled and cfg.logger.loggers.json.path:
+        for name in ("mlflow", "wandb"):
+            remote_cfg = cfg.logger.loggers[name]
+            if remote_cfg.enabled and remote_cfg.upload_json_data:
+                raise ValueError(
+                    f"Cannot upload json data to {name} when `json.path` is set in the base "
+                    "logger config. This is because each subsequent run will create a larger "
+                    "json file which will use unnecessary storage. Either set "
+                    "`upload_json_data: false` if you don't want to upload your json data but "
+                    "store a large file locally or set `json.path: ~` in the base logger config."
+                )
     loggers: List[BaseLogger] = []
     for _logger_config in cfg.logger.loggers.values():
         logger_config = dict(_logger_config)  # Create a copy to avoid modifying the original
