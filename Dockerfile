@@ -17,7 +17,7 @@ RUN uv pip install -e .
 
 ARG USE_CUDA=false
 RUN if [ "$USE_CUDA" = true ] ; \
-    then uv pip install jax[cuda12]==0.4.30 ; \
+    then uv pip install jax[cuda12]==0.5.3 ; \
     fi
 
 EXPOSE 6006
