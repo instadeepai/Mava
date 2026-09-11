@@ -120,6 +120,7 @@ These are the environments which Mava supports _out of the box_, to add a new en
 | Multi-Agent Brax                          | Continuous          | ✅   |       | [Link](https://arxiv.org/abs/2003.06709)  |    [Link](https://github.com/FLAIROx/JaxMARL/tree/main/jaxmarl/environments/mabrax)    |             |
 | Matrax                          | Discrete            | ✅   |       | [Link](https://www.cs.toronto.edu/~cebly/Papers/_download_/multirl.pdf)  |    [Link](https://github.com/instadeepai/matrax)    |             |
 | Multi Particle Environments            | Discrete/Continuous | ✅   |       | [Link](https://arxiv.org/abs/1706.02275)  |    [Link](https://github.com/FLAIROx/JaxMARL/tree/main/jaxmarl/environments/mpe)    |            |
+| Gigastep                               | Discrete/Continuous | ✅   |       | [Link](https://openreview.net/pdf?id=UgPAaEugH3)  |    [Link](https://github.com/mlech26l/gigastep)    |            |
 
 ## Performance and Speed 🚀
 
