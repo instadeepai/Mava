@@ -106,25 +106,25 @@ def merge_space(
 
 
 def is_homogenous(env: MultiAgentEnv) -> bool:
-    """Check that all agents in an environment have the same observation and action spaces.
+    """Check that all agents in an environment have the same observation and action spaces."""
 
-    Note: currently this is done by checking the shape of the observation and action spaces
-    as gymnax/jaxmarl environments do not have a custom __eq__ for their specs.
-    """
+    def same_space(first: jaxmarl_spaces.Space, other: jaxmarl_spaces.Space) -> bool:
+        if first.shape != other.shape or first.dtype != other.dtype:
+            return False
+        if _is_discrete(first) and _is_discrete(other):
+            return bool(first.n == other.n)
+        if _is_box(first) and _is_box(other):
+            return bool(jnp.all(first.low == other.low) & jnp.all(first.high == other.high))
+        return False
+
     agents = list(env.observation_spaces.keys())
-
-    main_agent_obs_shape = env.observation_space(agents[0]).shape
-    main_agent_act_shape = env.action_space(agents[0]).shape
-    # Cannot easily check low, high and n are the same, without being very messy.
-    # Unfortunately gymnax/jaxmarl doesn't have a custom __eq__ for their specs.
-    same_obs_shape = all(
-        env.observation_space(agent).shape == main_agent_obs_shape for agent in agents[1:]
+    observation_space = env.observation_space(agents[0])
+    action_space = env.action_space(agents[0])
+    return all(
+        same_space(observation_space, env.observation_space(agent))
+        and same_space(action_space, env.action_space(agent))
+        for agent in agents[1:]
     )
-    same_act_shape = all(
-        env.action_space(agent).shape == main_agent_act_shape for agent in agents[1:]
-    )
-
-    return same_obs_shape and same_act_shape
 
 
 def jaxmarl_space_to_jumanji_spec(space: jaxmarl_spaces.Space) -> specs.Spec:
